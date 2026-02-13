@@ -63,3 +63,19 @@ export async function changePassword(req: Request, res: Response) {
     });
   }
 }
+export async function getAllUsers(req: Request, res: Response) {
+  try {
+    const users = await userService.getAllUsers();
+
+    return res.status(200).json({
+      status: 'success',
+      results: users.length,
+      data: users,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message,
+    });
+  }
+}

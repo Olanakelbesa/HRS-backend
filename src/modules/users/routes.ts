@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as userController from './controller';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -71,6 +71,26 @@ router.patch('/profile', userController.updateProfile);
  *         description: Unauthorized
  */
 router.patch('/change-password', userController.changePassword);
+/**
+ * @swagger
+ * /api/v1/users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of users
+ *       403:
+ *         description: Forbidden
+ */
+router.get(
+  '/',
+  requireAuth,
+  restrictTo('ADMIN'),
+  userController.getAllUsers
+);
 
 
 export default router;

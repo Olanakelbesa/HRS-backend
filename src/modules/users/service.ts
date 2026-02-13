@@ -51,3 +51,21 @@ export async function changePassword(
 
   return { message: 'Password updated successfully' };
 }
+
+export async function getAllUsers() {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return users;
+}
