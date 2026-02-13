@@ -87,3 +87,21 @@ export async function updateUserRole(
 
   return user;
 }
+export async function updateUserStatus(
+  userId: string,
+  isActive: boolean
+) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+    },
+  });
+
+  return user;
+}

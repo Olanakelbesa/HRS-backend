@@ -30,3 +30,14 @@ export const updateUserRoleSchema = z.object({
 
 export type UpdateUserRoleInput =
   z.infer<typeof updateUserRoleSchema>;
+export const updateUserStatusSchema = z.object({
+  params: z.object({
+    id: z.string().cuid(),
+  }),
+  body: z.object({
+    isActive: z.boolean(),
+  }),
+});
+
+export type UpdateUserStatusInput =
+  z.infer<typeof updateUserStatusSchema>;

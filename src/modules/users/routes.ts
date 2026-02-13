@@ -126,5 +126,38 @@ router.patch(
   restrictTo('ADMIN'),
   userController.updateUserRole
 );
+/**
+ * @swagger
+ * /api/v1/users/{id}/status:
+ *   patch:
+ *     summary: Activate or deactivate user (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isActive:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: User status updated
+ */
+router.patch(
+  '/:id/status',
+  requireAuth,
+  restrictTo('ADMIN'),
+  userController.updateUserStatus
+);
 
 export default router;
