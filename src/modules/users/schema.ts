@@ -8,3 +8,13 @@ export const updateProfileSchema = z.object({
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>['body'];
+
+export const changePasswordSchema = z.object({
+  body: z.object({
+    currentPassword: z.string().min(6),
+    newPassword: z.string().min(6),
+  }),
+});
+
+export type ChangePasswordInput =
+  z.infer<typeof changePasswordSchema>['body'];

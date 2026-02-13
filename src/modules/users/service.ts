@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 import type { UpdateProfileInput } from './schema';
+import bcrypt from 'bcryptjs';
 
 export async function getProfile(userId: string) {
   const user = await prisma.user.findUnique({
@@ -18,4 +19,35 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
     select: { id: true, email: true, name: true, createdAt: true },
   });
   return user;
+}
+
+export async function changePassword(
+  userId: string,
+  data: { currentPassword: string; newPassword: string }
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const isMatch = await bcrypt.compare(
+    data.currentPassword,
+    user.password
+  );
+
+  if (!isMatch) {
+    throw new Error('Current password is incorrect');
+  }
+
+  const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword },
+  });
+
+  return { message: 'Password updated successfully' };
 }

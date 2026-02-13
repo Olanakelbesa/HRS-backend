@@ -40,5 +40,37 @@ router.use(requireAuth);
  */
 router.get('/profile', userController.getProfile);
 router.patch('/profile', userController.updateProfile);
+/**
+ * @swagger
+ * /api/v1/users/change-password:
+ *   patch:
+ *     summary: Change current user password
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.patch('/change-password', userController.changePassword);
+
 
 export default router;
