@@ -18,3 +18,15 @@ export const changePasswordSchema = z.object({
 
 export type ChangePasswordInput =
   z.infer<typeof changePasswordSchema>['body'];
+
+export const updateUserRoleSchema = z.object({
+  params: z.object({
+    id: z.string().cuid(),
+  }),
+  body: z.object({
+    role: z.enum(['RENTER', 'OWNER', 'ADMIN']),
+  }),
+});
+
+export type UpdateUserRoleInput =
+  z.infer<typeof updateUserRoleSchema>;

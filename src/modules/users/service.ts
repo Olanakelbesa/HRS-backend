@@ -69,3 +69,21 @@ export async function getAllUsers() {
 
   return users;
 }
+export async function updateUserRole(
+  userId: string,
+  role: 'RENTER' | 'OWNER' | 'ADMIN'
+) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { role },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+    },
+  });
+
+  return user;
+}

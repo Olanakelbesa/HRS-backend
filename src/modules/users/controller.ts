@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { updateProfileSchema } from './schema';
+import { updateProfileSchema, updateUserRoleSchema } from './schema';
 import * as userService from './service';
 import { changePasswordSchema } from './schema';
 
@@ -71,6 +71,37 @@ export async function getAllUsers(req: Request, res: Response) {
       status: 'success',
       results: users.length,
       data: users,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message,
+    });
+  }
+}
+export async function updateUserRole(req: Request, res: Response) {
+  const parsed = updateUserRoleSchema.safeParse({
+    params: req.params,
+    body: req.body,
+  });
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Validation failed',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  try {
+    const { id } = parsed.data.params;
+    const { role } = parsed.data.body;
+
+    const user = await userService.updateUserRole(id, role);
+
+    return res.status(200).json({
+      status: 'success',
+      data: user,
     });
   } catch (error: any) {
     return res.status(500).json({

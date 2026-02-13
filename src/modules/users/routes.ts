@@ -92,5 +92,39 @@ router.get(
   userController.getAllUsers
 );
 
+/**
+ * @swagger
+ * /api/v1/users/{id}/role:
+ *   patch:
+ *     summary: Update user role (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [RENTER, OWNER, ADMIN]
+ *     responses:
+ *       200:
+ *         description: Role updated
+ */
+router.patch(
+  '/:id/role',
+  requireAuth,
+  restrictTo('ADMIN'),
+  userController.updateUserRole
+);
 
 export default router;
