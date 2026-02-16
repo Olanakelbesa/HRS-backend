@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import type { Prisma } from '@prisma/client';
 import { Response } from 'express';
 import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
@@ -77,18 +78,20 @@ export async function register(input: RegisterInput) {
     data: {
       email: input.email,
       password: hashedPassword,
-      name: input.name ?? null,
+      first_name: input.first_name ?? null,
+      last_name: input.last_name ?? null,
       phone: input.phone ?? null,
-      role: role,
-    },
+      role,
+    } as Prisma.UserCreateInput,
     select: {
       id: true,
       email: true,
-      name: true,
+      first_name: true,
+      last_name: true,
       role: true,
       createdAt: true,
       emailVerified: true,
-    },
+    } as Prisma.UserSelect,
   });
 
   const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);

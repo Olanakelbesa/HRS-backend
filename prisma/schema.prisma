@@ -18,6 +18,8 @@ datasource db {
 model User {
   id            String  @id @default(cuid())
   name          String?
+  first_name    String?
+  last_name     String?
   email         String? @unique
   password      String? // Add this for credentials login
   emailVerified Boolean @default(false) // Changed from DateTime? to Boolean based on snippet, check logic

@@ -17,6 +17,10 @@ router.use(requireAuth);
  *     responses:
  *       200:
  *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserEnvelope'
  *       401:
  *         description: Unauthorized
  *   patch:
@@ -28,13 +32,14 @@ router.use(requireAuth);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
+ *             $ref: '#/components/schemas/UserUpdateInput'
  *     responses:
  *       200:
  *         description: Updated profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserEnvelope'
  *       401:
  *         description: Unauthorized
  */

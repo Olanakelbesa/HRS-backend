@@ -1,6 +1,7 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import { env } from './env';
 import path from 'path';
+import { generateOpenApiSchemas } from '../lib/prismaToOpenApi';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -29,4 +30,21 @@ const options: swaggerJsdoc.Options = {
   apis: [path.join(process.cwd(), 'src/modules/**/*.ts')],
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+const baseSpec = swaggerJsdoc(options) as {
+  components?: { schemas?: Record<string, unknown>; securitySchemes?: Record<string, unknown> };
+  [key: string]: unknown;
+};
+
+// All schemas from Prisma schema only (no hardcoded request/response shapes)
+const dynamicSchemas = generateOpenApiSchemas({
+  excludeModels: new Set(['Account', 'Session', 'VerificationToken', 'RefreshToken']),
+  includeAuthSchemas: true,
+});
+
+if (!baseSpec.components) baseSpec.components = {};
+baseSpec.components.schemas = {
+  ...(baseSpec.components.schemas ?? {}),
+  ...dynamicSchemas,
+};
+
+export const swaggerSpec = baseSpec;

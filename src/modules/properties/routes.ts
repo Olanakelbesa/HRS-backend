@@ -21,6 +21,10 @@ const router = Router();
  *     responses:
  *       200:
  *         description: List of properties
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiDataEnvelope'
  */
 router.get('/', propertyController.list);
 
@@ -51,6 +55,10 @@ router.get('/health', (_, res) => res.json({ status: 'ok', module: 'properties' 
  *     responses:
  *       200:
  *         description: Property details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiDataEnvelope'
  *       404:
  *         description: Not found
  */
