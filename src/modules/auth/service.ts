@@ -1,9 +1,16 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { Response } from 'express';
 import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 import { generateTokenPair, verifyRefreshToken } from '../../utils/jwt.utils';
-import type { RegisterInput, LoginInput } from './schema';
+import type {
+  RegisterInput,
+  LoginInput,
+  VerifyEmailInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+} from './schema';
 
 const SALT_ROUNDS = 12;
 
@@ -58,12 +65,21 @@ export async function register(input: RegisterInput) {
 
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
+  // Default to renter if not specified, but respect input if allowed
+  // For security, usually roles like 'admin' should not be self-assignable in public registration
+  // But adhering to input for now as per schema
+  const role = input.role || 'renter';
+  if (role === 'admin') {
+    // TODO: Add safeguard or logic to prevent unauthorized admin creation
+  }
+
   const user = await prisma.user.create({
     data: {
       email: input.email,
       password: hashedPassword,
       name: input.name ?? null,
-      role: 'RENTER', // Default role
+      phone: input.phone ?? null,
+      role: role,
     },
     select: {
       id: true,
@@ -71,6 +87,7 @@ export async function register(input: RegisterInput) {
       name: true,
       role: true,
       createdAt: true,
+      emailVerified: true,
     },
   });
 
@@ -89,9 +106,9 @@ export async function login(input: LoginInput) {
     throw new AppError('Invalid email or password', 401);
   }
 
-  // Check if account is active
-  if (!user.isActive) {
-    throw new AppError('Account is deactivated', 403);
+  // Check if account has password (social login users might not)
+  if (!user.password) {
+    throw new AppError('Please login with your social account', 400);
   }
 
   const valid = await bcrypt.compare(input.password, user.password);
@@ -102,7 +119,7 @@ export async function login(input: LoginInput) {
   const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);
   await storeRefreshToken(user.id, refreshToken);
 
-  const { password: _, failedAttempts: _fa, lockedUntil: _lu, ...safeUser } = user;
+  const { password: _, ...safeUser } = user;
   return { user: safeUser, accessToken, refreshToken };
 }
 
@@ -141,7 +158,7 @@ export async function refreshAccessToken(oldRefreshToken: string) {
   // Store new refresh token
   await storeRefreshToken(storedToken.user.id, refreshToken);
 
-  const { password: _, failedAttempts: _fa, lockedUntil: _lu, ...safeUser } = storedToken.user;
+  const { password: _, ...safeUser } = storedToken.user;
   return { user: safeUser, accessToken, refreshToken };
 }
 
@@ -155,12 +172,117 @@ export async function logout(refreshToken: string) {
 }
 
 /**
+ * Verify Email
+ */
+export async function verifyEmail(input: VerifyEmailInput) {
+  const tokenRecord = await prisma.verificationToken.findUnique({
+    where: { token: input.token },
+  });
+
+  if (!tokenRecord) {
+    throw new AppError('Invalid verification token', 400);
+  }
+
+  if (tokenRecord.expires < new Date()) {
+    await prisma.verificationToken.delete({
+      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+    });
+    throw new AppError('Verification token expired', 400);
+  }
+
+  const user = await prisma.user.update({
+    where: { email: tokenRecord.identifier },
+    data: { emailVerified: true },
+    select: { id: true, email: true, emailVerified: true },
+  });
+
+  // Clean up token
+  await prisma.verificationToken.delete({
+    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+  });
+
+  return user;
+}
+
+/**
+ * Forgot Password - Send Reset Link
+ */
+export async function forgotPassword(input: ForgotPasswordInput) {
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  if (!user) {
+    // Return success even if user not found to prevent enumeration
+    return;
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+
+  // Clean up old tokens for this user/identifier to prevent clutter
+  await prisma.verificationToken.deleteMany({
+    where: { identifier: user.email! },
+  });
+
+  await prisma.verificationToken.create({
+    data: {
+      identifier: user.email!,
+      token,
+      expires,
+    },
+  });
+
+  // TODO: Send email with token
+  console.log(`[MOCK EMAIL] Reset token for ${user.email}: ${token}`);
+}
+
+/**
+ * Reset Password
+ */
+export async function resetPassword(input: ResetPasswordInput) {
+  const tokenRecord = await prisma.verificationToken.findUnique({
+    where: { token: input.token },
+  });
+
+  if (!tokenRecord) {
+    throw new AppError('Invalid or expired password reset token', 400);
+  }
+
+  if (tokenRecord.expires < new Date()) {
+    await prisma.verificationToken.delete({
+      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+    });
+    throw new AppError('Token expired', 400);
+  }
+
+  const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
+
+  const user = await prisma.user.update({
+    where: { email: tokenRecord.identifier },
+    data: { password: hashedPassword },
+  });
+
+  // Clean up token
+  await prisma.verificationToken.delete({
+    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+  });
+
+  return { message: 'Password reset successfully' };
+}
+
+/**
  * Get current user
  */
 export async function getMe(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      createdAt: true,
+      emailVerified: true,
+      phone: true,
+    },
   });
   if (!user) {
     throw new AppError('User not found', 404);

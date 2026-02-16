@@ -9,9 +9,7 @@ import { errorHandler } from './middlewares/error.middleware';
 import { rateLimiter } from './middlewares/rateLimiter';
 
 // Routes
-import authRoutes from './modules/auth/routes';
-import userRoutes from './modules/users/routes';
-import propertyRoutes from './modules/properties/routes';
+import apiRoutes from './routes';
 
 const app = express();
 
@@ -46,9 +44,7 @@ app.get('/swagger.json', (req, res) => {
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API Routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/properties', propertyRoutes);
+app.use('/api/v1', apiRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

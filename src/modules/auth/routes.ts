@@ -21,6 +21,8 @@ const router = Router();
  *               email: { type: string, format: email }
  *               password: { type: string, minLength: 8 }
  *               name: { type: string }
+ *               phone: { type: string }
+ *               role: { type: string, enum: [renter, owner, admin] }
  *     responses:
  *       201: { description: User created }
  *       400: { description: Validation failed }
@@ -77,6 +79,70 @@ router.post('/logout', authController.logout);
 
 /**
  * @swagger
+ * /api/v1/auth/verify-email:
+ *   post:
+ *     summary: Verify email using token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       200: { description: Email verified successfully }
+ *       400: { description: Invalid or expired token }
+ */
+router.post('/verify-email', authController.verifyEmail);
+
+/**
+ * @swagger
+ * /api/v1/auth/forgot-password:
+ *   post:
+ *     summary: Request password reset link
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200: { description: Email sent if account exists }
+ *       400: { description: Validation failed }
+ */
+router.post('/forgot-password', authController.forgotPassword);
+
+/**
+ * @swagger
+ * /api/v1/auth/reset-password:
+ *   post:
+ *     summary: Reset password using token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, password]
+ *             properties:
+ *               token: { type: string }
+ *               password: { type: string, minLength: 8 }
+ *     responses:
+ *       200: { description: Password reset successfully }
+ *       400: { description: Invalid or expired token }
+ */
+router.post('/reset-password', authController.resetPassword);
+
+/**
+ * @swagger
  * /api/v1/auth/me:
  *   get:
  *     summary: Get current user (requires JWT)
@@ -95,6 +161,8 @@ router.get('/me', requireAuth, authController.getMe);
  *   get:
  *     summary: Auth module health check
  *     tags: [Auth]
+ *     responses:
+ *       200: { description: Auth module is healthy }
  */
 router.get('/health', (_, res) => res.json({ status: 'ok', module: 'auth' }));
 

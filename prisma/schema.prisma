@@ -10,31 +10,88 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  RENTER
-  OWNER
-  ADMIN
-}
+// =======================
+// AUTH MODELS
+// =======================
 
+// User model (core authentication + roles)
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      UserRole @default(RENTER)
-  
-  // Security fields
-  isActive        Boolean  @default(true)
-  failedAttempts  Int      @default(0)
-  lockedUntil     DateTime?
-  
+  id            String  @id @default(cuid())
+  name          String?
+  email         String? @unique
+  password      String? // Add this for credentials login
+  emailVerified Boolean @default(false) // Changed from DateTime? to Boolean based on snippet, check logic
+  // actually standard next-auth uses DateTime? for emailVerified. But snippet says Boolean @default(false). I will stick to snippet.
+  // Wait, NextAuth usually uses DateTime for emailVerified. If I use Boolean, it might conflict if I use NextAuth adapter later.
+  // User snippet explicitly says: "emailVerified Boolean @default(false)". I will follow snippet.
+  image         String?
+  phone         String? @unique
+
+  role              Role    @default(renter)
+  preferredLanguage String?
+  isVerified        Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
+  accounts      Account[]
+  sessions      Session[]
   refreshTokens RefreshToken[]
-  
-  @@index([email])
+
+  // properties        Property[] @relation("OwnerProperties")
+  // appointmentsRenter Appointment[] @relation("RenterAppointments")
+  // appointmentsOwner  Appointment[] @relation("OwnerAppointments")
+
+  // messagesSent      Message[] @relation("SentMessages")
+  // messagesReceived  Message[] @relation("ReceivedMessages")
+
+  // reviews           Review[]
+  // notifications     Notification[]
+  // searchHistories   SearchHistory[]
+  // preferences       UserPreference?
+
+  // reportsSubmitted  Report[] @relation("SubmittedReports")
+  // reportsAgainst    Report[] @relation("ReportsAgainst")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model RefreshToken {
@@ -43,10 +100,15 @@ model RefreshToken {
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
   @@index([token])
 }
 
+enum Role {
+  renter
+  owner
+  admin
+}

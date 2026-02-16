@@ -1,5 +1,11 @@
 import { Request, Response } from 'express';
-import { registerSchema, loginSchema } from './schema';
+import {
+  registerSchema,
+  loginSchema,
+  verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from './schema';
 import * as authService from './service';
 
 export async function register(req: Request, res: Response) {
@@ -100,5 +106,59 @@ export async function getMe(req: Request, res: Response) {
   return res.status(200).json({
     status: 'success',
     data: { user },
+  });
+}
+
+export async function verifyEmail(req: Request, res: Response) {
+  const parsed = verifyEmailSchema.safeParse({ body: req.body });
+  if (!parsed.success) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Validation failed',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  await authService.verifyEmail(parsed.data.body);
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Email verified successfully',
+  });
+}
+
+export async function forgotPassword(req: Request, res: Response) {
+  const parsed = forgotPasswordSchema.safeParse({ body: req.body });
+  if (!parsed.success) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Validation failed',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  await authService.forgotPassword(parsed.data.body);
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'If an account exists, a password reset email has been sent.',
+  });
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  const parsed = resetPasswordSchema.safeParse({ body: req.body });
+  if (!parsed.success) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Validation failed',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  await authService.resetPassword(parsed.data.body);
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Password has been reset successfully.',
   });
 }
