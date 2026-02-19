@@ -3,17 +3,71 @@ import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { Response } from 'express';
 import prisma from '../../config/database';
+import { env } from '../../config/env';
 import { AppError } from '../../core/AppError';
+import { sendEmail } from '../../emails/emailService';
 import { generateTokenPair, verifyRefreshToken } from '../../utils/jwt.utils';
 import type {
   RegisterInput,
   LoginInput,
   VerifyEmailInput,
+  ResendVerificationCodeInput,
   ForgotPasswordInput,
   ResetPasswordInput,
 } from './schema';
 
 const SALT_ROUNDS = 12;
+const EMAIL_VERIFICATION_EXPIRY_HOURS = 1;
+
+function generateSixDigitCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function createEmailVerificationToken(email: string): Promise<string> {
+  let token = generateSixDigitCode();
+  let attempts = 0;
+
+  while (attempts < 5) {
+    const existing = await prisma.verificationToken.findUnique({ where: { token } });
+    if (!existing) break;
+    token = generateSixDigitCode();
+    attempts += 1;
+  }
+
+  if (attempts >= 5) {
+    throw new AppError('Could not generate verification code. Please try again.', 500);
+  }
+
+  const expires = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
+
+  await prisma.verificationToken.deleteMany({ where: { identifier: email } });
+
+  await prisma.verificationToken.create({
+    data: {
+      identifier: email,
+      token,
+      expires,
+    },
+  });
+
+  return token;
+}
+
+async function sendVerificationEmail(email: string, firstName?: string | null): Promise<void> {
+  const verificationCode = await createEmailVerificationToken(email);
+
+  await sendEmail(
+    'verifyEmail',
+    email,
+    {
+      firstName: firstName ?? 'there',
+      verificationCode,
+      expiryHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
+      supportEmail: env.GOOGLE_EMAIL_USER ?? 'support@house-rental.com',
+    },
+    'Verify your email address'
+  );
+}
 
 /**
  * Set HTTP-Only cookie with refresh token
@@ -64,6 +118,14 @@ export async function register(input: RegisterInput) {
     throw new AppError('Email already registered', 409);
   }
 
+  const normalizedPhone = input.phone?.trim() || null;
+  if (normalizedPhone) {
+    const existingPhone = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    if (existingPhone) {
+      throw new AppError('Phone number already registered', 409);
+    }
+  }
+
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
   // Default to renter if not specified, but respect input if allowed
@@ -74,28 +136,55 @@ export async function register(input: RegisterInput) {
     // TODO: Add safeguard or logic to prevent unauthorized admin creation
   }
 
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      password: hashedPassword,
-      first_name: input.first_name ?? null,
-      last_name: input.last_name ?? null,
-      phone: input.phone ?? null,
-      role,
-    } as Prisma.UserCreateInput,
-    select: {
-      id: true,
-      email: true,
-      first_name: true,
-      last_name: true,
-      role: true,
-      createdAt: true,
-      emailVerified: true,
-    } as Prisma.UserSelect,
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        email: input.email,
+        password: hashedPassword,
+        first_name: input.first_name ?? null,
+        last_name: input.last_name ?? null,
+        phone: normalizedPhone,
+        role,
+      } as Prisma.UserCreateInput,
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+        createdAt: true,
+        emailVerified: true,
+      } as Prisma.UserSelect,
+    });
+  } catch (error) {
+    const prismaError = error as { code?: string; meta?: { target?: string[] | string } };
+    if (prismaError.code === 'P2002') {
+      const target = prismaError.meta?.target;
+      const fields = Array.isArray(target) ? target : target ? [target] : [];
+      if (fields.includes('email')) {
+        throw new AppError('Email already registered', 409);
+      }
+      if (fields.includes('phone')) {
+        throw new AppError('Phone number already registered', 409);
+      }
+      throw new AppError('Duplicate value violates unique constraint', 409);
+    }
+    throw error;
+  }
 
   const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);
   await storeRefreshToken(user.id, refreshToken);
+
+  if (user.email) {
+    try {
+      await sendVerificationEmail(user.email, user.first_name);
+    } catch (error) {
+      console.warn(
+        `Email verification could not be sent to ${user.email}: ${(error as Error).message}`
+      );
+    }
+  }
 
   return { user, accessToken, refreshToken };
 }
@@ -117,6 +206,10 @@ export async function login(input: LoginInput) {
   const valid = await bcrypt.compare(input.password, user.password);
   if (!valid) {
     throw new AppError('Invalid email or password', 401);
+  }
+
+  if (!user.emailVerified) {
+    throw new AppError('Please verify your email before logging in', 403);
   }
 
   const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);
@@ -208,6 +301,22 @@ export async function verifyEmail(input: VerifyEmailInput) {
 }
 
 /**
+ * Resend email verification code
+ */
+export async function resendVerificationCode(input: ResendVerificationCodeInput) {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+    select: { email: true, first_name: true, emailVerified: true },
+  });
+
+  if (!user || user.emailVerified || !user.email) {
+    return;
+  }
+
+  await sendVerificationEmail(user.email, user.first_name);
+}
+
+/**
  * Forgot Password - Send Reset Link
  */
 export async function forgotPassword(input: ForgotPasswordInput) {
@@ -280,7 +389,8 @@ export async function getMe(userId: string) {
     select: {
       id: true,
       email: true,
-      name: true,
+      first_name: true,
+      last_name: true,
       role: true,
       createdAt: true,
       emailVerified: true,

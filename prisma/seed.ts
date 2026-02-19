@@ -16,7 +16,7 @@ async function main() {
       data: {
         email: adminEmail,
         password: hashed,
-        name: 'Admin',
+        first_name: 'Admin',
       },
     });
     console.log('Admin user created:', adminEmail);

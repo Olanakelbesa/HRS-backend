@@ -3,6 +3,7 @@ import {
   registerSchema,
   loginSchema,
   verifyEmailSchema,
+  resendVerificationCodeSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
 } from './schema';
@@ -124,6 +125,24 @@ export async function verifyEmail(req: Request, res: Response) {
   return res.status(200).json({
     status: 'success',
     message: 'Email verified successfully',
+  });
+}
+
+export async function resendVerificationCode(req: Request, res: Response) {
+  const parsed = resendVerificationCodeSchema.safeParse({ body: req.body });
+  if (!parsed.success) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Validation failed',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  await authService.resendVerificationCode(parsed.data.body);
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'If an account exists and is not verified, a new verification code has been sent.',
   });
 }
 

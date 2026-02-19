@@ -106,6 +106,32 @@ router.post('/verify-email', authController.verifyEmail);
 
 /**
  * @swagger
+ * /api/v1/auth/resend-code:
+ *   post:
+ *     summary: Resend 6-digit email verification code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Generic success response (anti-enumeration)
+ *       400:
+ *         description: Validation failed
+ */
+router.post('/resend-code', authController.resendVerificationCode);
+
+/**
+ * @swagger
  * /api/v1/auth/forgot-password:
  *   post:
  *     summary: Request password reset link
