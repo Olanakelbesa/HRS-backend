@@ -7,17 +7,52 @@ const router = Router();
  * @swagger
  * /api/v1/properties:
  *   get:
- *     summary: List properties
+ *     summary: Advanced property search
  *     tags: [Properties]
  *     parameters:
  *       - name: page
  *         in: query
  *         schema:
  *           type: integer
+
  *       - name: limit
  *         in: query
  *         schema:
  *           type: integer
+
+ *       - name: search
+ *         in: query
+ *         description: Search by title or address
+ *         schema:
+ *           type: string
+
+ *       - name: minPrice
+ *         in: query
+ *         schema:
+ *           type: number
+
+ *       - name: maxPrice
+ *         in: query
+ *         schema:
+ *           type: number
+
+ *       - name: lat
+ *         in: query
+ *         description: Latitude for map search
+ *         schema:
+ *           type: number
+
+ *       - name: lng
+ *         in: query
+ *         description: Longitude for map search
+ *         schema:
+ *           type: number
+
+ *       - name: radius
+ *         in: query
+ *         description: Radius in KM
+ *         schema:
+ *           type: number
  *     responses:
  *       200:
  *         description: List of properties

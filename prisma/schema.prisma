@@ -33,10 +33,10 @@ model User {
   
   // Relations
   refreshTokens RefreshToken[]
+  properties Property[]
   
   @@index([email])
 }
-
 model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
@@ -50,3 +50,20 @@ model RefreshToken {
   @@index([token])
 }
 
+model Property {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  address       String
+  pricePerNight Float
+  latitude      Float?
+  longitude     Float?
+  ownerId       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([pricePerNight])
+  @@index([latitude, longitude])
+}
