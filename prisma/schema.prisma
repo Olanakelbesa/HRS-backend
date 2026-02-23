@@ -16,24 +16,40 @@ enum UserRole {
   ADMIN
 }
 
+enum PropertyStatus {
+  AVAILABLE
+  PENDING
+  RENTED
+  UNAVAILABLE
+}
+
+enum PropertyType {
+  VILLA
+  APARTMENT
+  CONDO
+  STUDIO
+  HOUSE
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      UserRole @default(RENTER)
-  
+  id         String     @id @default(cuid())
+  email      String     @unique
+  password   String
+  name       String?
+  role       UserRole   @default(RENTER)
+  properties Property[]
+
   // Security fields
-  isActive        Boolean  @default(true)
-  failedAttempts  Int      @default(0)
-  lockedUntil     DateTime?
-  
+  isActive       Boolean   @default(true)
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
   refreshTokens RefreshToken[]
-  
+
   @@index([email])
 }
 
@@ -43,10 +59,50 @@ model RefreshToken {
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
   @@index([token])
 }
 
+model Property {
+  id String @id @default(cuid())
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  type   PropertyType
+  status PropertyStatus @default(AVAILABLE)
+
+  title       Json
+  description Json
+  location    String
+  address     String?
+
+  price     Float
+  bedrooms  Int?
+  bathrooms Int?
+  area      Float?
+
+  amenities      Json
+  furnishingType String?
+
+  images String[] @default([])
+  videos String[] @default([])
+
+  rentTerms Json?
+
+  viewsCount Int @default(0)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([price])
+  @@index([status])
+  @@index([type])
+}
