@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
+import { createAuditLog, createNotification } from '../notifications/service';
 import type {
   CreateConversationInput,
   CreateMessageInput,
@@ -211,6 +212,24 @@ export async function sendMessage(
     }),
   ]);
 
+  const recipientId =
+    conversation.renterId === senderId ? conversation.ownerId : conversation.renterId;
+  await createNotification({
+    userId: recipientId,
+    type: 'MESSAGE_NEW',
+    title: 'New message',
+    body: input.content.slice(0, 120),
+    payload: { conversationId, messageId: message.id },
+  });
+
+  await createAuditLog({
+    actorId: senderId,
+    eventType: 'MESSAGE_SENT',
+    entityType: 'Message',
+    entityId: message.id,
+    metadata: { conversationId, type: 'TEXT' },
+  });
+
   return { message, conversation };
 }
 
@@ -237,6 +256,14 @@ export async function updateMessageStatus(
     where: { id: messageId },
     data: { status: input.status },
     select: messageSelect,
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'MESSAGE_STATUS_UPDATED',
+    entityType: 'Message',
+    entityId: updated.id,
+    metadata: { status: input.status, conversationId: updated.conversationId },
   });
 
   return { message: updated, conversation: message.conversation };
@@ -284,6 +311,33 @@ export async function sendAttachment(
     }),
   ]);
 
+  const recipientId =
+    conversation.renterId === senderId ? conversation.ownerId : conversation.renterId;
+  await createNotification({
+    userId: recipientId,
+    type: 'MESSAGE_NEW',
+    title: 'New attachment',
+    body: file.originalname,
+    payload: {
+      conversationId,
+      messageId: message.id,
+      attachmentType: messageType,
+    },
+  });
+
+  await createAuditLog({
+    actorId: senderId,
+    eventType: 'MESSAGE_ATTACHMENT_SENT',
+    entityType: 'Message',
+    entityId: message.id,
+    metadata: {
+      conversationId,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      messageType,
+    },
+  });
+
   return { message, conversation };
 }
 
@@ -320,6 +374,14 @@ export async function addReaction(messageId: string, userId: string, input: Mess
     select: messageSelect,
   });
 
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'MESSAGE_REACTION_ADDED',
+    entityType: 'Message',
+    entityId: messageId,
+    metadata: { emoji: input.emoji },
+  });
+
   return updatedMessage;
 }
 
@@ -350,6 +412,14 @@ export async function removeReaction(
   const updatedMessage = await prisma.message.findUnique({
     where: { id: messageId },
     select: messageSelect,
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'MESSAGE_REACTION_REMOVED',
+    entityType: 'Message',
+    entityId: messageId,
+    metadata: { emoji: input.emoji },
   });
 
   return updatedMessage;
@@ -384,6 +454,14 @@ export async function deleteMessage(messageId: string, userId: string) {
       data: { updatedAt: new Date() },
     }),
   ]);
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'MESSAGE_DELETED',
+    entityType: 'Message',
+    entityId: messageId,
+    metadata: { conversationId: message.conversationId },
+  });
 
   return {
     messageId,

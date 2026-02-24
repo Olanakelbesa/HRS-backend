@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 import { logger } from '../../core/logger';
 import { sendEmail } from '../../emails/emailService';
+import { createAuditLog, createNotification } from '../notifications/service';
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
@@ -138,6 +139,33 @@ export async function bookAppointment(
 
   await notifyOwnerOfNewBooking(appointment.id);
 
+  await createNotification({
+    userId: appointment.ownerId,
+    type: 'APPOINTMENT_BOOKED',
+    title: 'New booking request',
+    body: `A renter requested a visit for ${appointment.property.title}`,
+    payload: {
+      appointmentId: appointment.id,
+      propertyId: appointment.propertyId,
+      startsAt: appointment.startsAt.toISOString(),
+      endsAt: appointment.endsAt.toISOString(),
+    },
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'APPOINTMENT_BOOKED',
+    entityType: 'Appointment',
+    entityId: appointment.id,
+    metadata: {
+      propertyId: appointment.propertyId,
+      ownerId: appointment.ownerId,
+      renterId: appointment.renterId,
+      startsAt: appointment.startsAt.toISOString(),
+      endsAt: appointment.endsAt.toISOString(),
+    },
+  });
+
   return appointment;
 }
 
@@ -219,6 +247,26 @@ export async function updateAppointmentStatus(
     select: appointmentSelect,
   });
 
+  await createNotification({
+    userId: updated.renterId,
+    type: 'APPOINTMENT_UPDATED',
+    title: 'Appointment updated',
+    body: `Your appointment status is now ${updated.status}`,
+    payload: {
+      appointmentId: updated.id,
+      status: updated.status,
+      propertyId: updated.propertyId,
+    },
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'APPOINTMENT_STATUS_UPDATED',
+    entityType: 'Appointment',
+    entityId: updated.id,
+    metadata: { previousStatus: appointment.status, status: updated.status },
+  });
+
   return updated;
 }
 
@@ -242,6 +290,28 @@ export async function deleteAppointment(userId: string, userRole: string, appoin
   }
 
   await prisma.appointment.delete({ where: { id: appointmentId } });
+
+  const notificationRecipientId =
+    appointment.renterId === userId ? appointment.ownerId : appointment.renterId;
+
+  await createNotification({
+    userId: notificationRecipientId,
+    type: 'APPOINTMENT_UPDATED',
+    title: 'Appointment deleted',
+    body: 'An appointment was deleted by one of the participants',
+    payload: { appointmentId },
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'APPOINTMENT_DELETED',
+    entityType: 'Appointment',
+    entityId: appointmentId,
+    metadata: {
+      renterId: appointment.renterId,
+      ownerId: appointment.ownerId,
+    },
+  });
 
   return { id: appointmentId };
 }

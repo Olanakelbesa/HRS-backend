@@ -55,6 +55,8 @@ model User {
   ownerConversations  Conversation[] @relation("OwnerConversations")
   renterAppointments  Appointment[]  @relation("RenterAppointments")
   ownerAppointments   Appointment[]  @relation("OwnerAppointments")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
 
   // reviews           Review[]
   // notifications     Notification[]
@@ -264,4 +266,42 @@ enum MessageStatus {
   SENT
   DELIVERED
   READ
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  eventType  String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([eventType])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  MESSAGE_NEW
+  APPOINTMENT_BOOKED
+  APPOINTMENT_UPDATED
 }
