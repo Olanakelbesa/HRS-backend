@@ -3,6 +3,7 @@ import authRoutes from './modules/auth/routes';
 import userRoutes from './modules/users/routes';
 import propertyRoutes from './modules/properties/routes';
 import messagingRoutes from './modules/messaging/routes';
+import appointmentRoutes from './modules/appointments/routes';
 
 const router = Router();
 
@@ -17,5 +18,8 @@ router.use('/properties', propertyRoutes);
 
 // Messaging Routes
 router.use('/messaging', messagingRoutes);
+
+// Appointment Routes
+router.use('/appointments', appointmentRoutes);
 
 export default router;

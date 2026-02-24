@@ -39,11 +39,11 @@ model User {
   accounts      Account[]
   sessions      Session[]
   refreshTokens RefreshToken[]
- 
+
   // Messaging relations
-  messagesSent Message[] @relation("UserMessages")
+  messagesSent     Message[]         @relation("UserMessages")
   messageReactions MessageReaction[]
-  properties   Property[] @relation("OwnerProperties")
+  properties       Property[]        @relation("OwnerProperties")
 
   // properties        Property[] @relation("OwnerProperties")
   // appointmentsRenter Appointment[] @relation("RenterAppointments")
@@ -53,7 +53,8 @@ model User {
 
   renterConversations Conversation[] @relation("RenterConversations")
   ownerConversations  Conversation[] @relation("OwnerConversations")
-
+  renterAppointments  Appointment[]  @relation("RenterAppointments")
+  ownerAppointments   Appointment[]  @relation("OwnerAppointments")
 
   // reviews           Review[]
   // notifications     Notification[]
@@ -122,27 +123,26 @@ enum Role {
   admin
 }
 
-
 // =======================
 // MESSAGING MODELS
 // =======================
 
 model Conversation {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  propertyId  String?
-  property    Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
 
-  renterId    String
-  renter      User     @relation("RenterConversations", fields: [renterId], references: [id])
+  renterId String
+  renter   User   @relation("RenterConversations", fields: [renterId], references: [id])
 
-  ownerId     String
-  owner       User     @relation("OwnerConversations", fields: [ownerId], references: [id])
+  ownerId String
+  owner   User   @relation("OwnerConversations", fields: [ownerId], references: [id])
 
-  messages    Message[]
+  messages Message[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([renterId])
   @@index([ownerId])
@@ -163,32 +163,62 @@ model Property {
   updatedAt     DateTime @updatedAt
 
   conversations Conversation[]
+  appointments  Appointment[]
 
   @@index([ownerId])
 }
 
+model Appointment {
+  id         String            @id @default(cuid())
+  propertyId String
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renterId   String
+  renter     User              @relation("RenterAppointments", fields: [renterId], references: [id], onDelete: Cascade)
+  ownerId    String
+  owner      User              @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
+  startsAt   DateTime
+  endsAt     DateTime
+  status     AppointmentStatus @default(PENDING)
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([startsAt])
+  @@index([status])
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  CANCELLED
+}
+
 model Message {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  replyToId       String?
-  replyTo         Message? @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies         Message[] @relation("MessageReplies")
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
 
   senderId String
-  sender   User @relation("UserMessages", fields: [senderId], references: [id])
+  sender   User   @relation("UserMessages", fields: [senderId], references: [id])
 
-  type            MessageType @default(TEXT)
-  content         String
-  status          MessageStatus @default(SENT)
+  type    MessageType   @default(TEXT)
+  content String
+  status  MessageStatus @default(SENT)
 
-  attachments     MessageAttachment[]
-  reactions       MessageReaction[]
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([conversationId])
   @@index([senderId])
@@ -196,30 +226,30 @@ model Message {
 }
 
 model MessageAttachment {
-  id          String   @id @default(cuid())
-  messageId   String
-  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  url         String
-  fileName    String
-  mimeType    String
-  fileSize    Int
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url       String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
 
   @@index([messageId])
 }
 
 model MessageReaction {
-  id          String   @id @default(cuid())
-  messageId   String
-  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emoji       String
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
 
+  @@unique([messageId, userId, emoji])
   @@index([messageId])
   @@index([userId])
-  @@unique([messageId, userId, emoji])
 }
 
 enum MessageType {
