@@ -142,7 +142,7 @@ export async function resendVerificationCode(req: Request, res: Response) {
 
   return res.status(200).json({
     status: 'success',
-    message: 'If an account exists and is not verified, a new verification code has been sent.',
+    message: 'A new verification code has been sent.',
   });
 }
 
@@ -160,7 +160,7 @@ export async function forgotPassword(req: Request, res: Response) {
 
   return res.status(200).json({
     status: 'success',
-    message: 'If an account exists, a password reset email has been sent.',
+    message: 'A password reset email has been sent.',
   });
 }
 

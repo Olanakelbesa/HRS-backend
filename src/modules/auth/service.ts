@@ -18,6 +18,7 @@ import type {
 
 const SALT_ROUNDS = 12;
 const EMAIL_VERIFICATION_EXPIRY_HOURS = 1;
+const PASSWORD_RESET_EXPIRY_HOURS = 1;
 
 function generateSixDigitCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -321,29 +322,39 @@ export async function resendVerificationCode(input: ResendVerificationCodeInput)
  */
 export async function forgotPassword(input: ForgotPasswordInput) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
-  if (!user) {
-    // Return success even if user not found to prevent enumeration
-    return;
+  if (!user || !user.email) {
+    throw new AppError('Email not found', 404);
   }
 
   const token = crypto.randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+  const expires = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000);
 
   // Clean up old tokens for this user/identifier to prevent clutter
   await prisma.verificationToken.deleteMany({
-    where: { identifier: user.email! },
+    where: { identifier: user.email },
   });
 
   await prisma.verificationToken.create({
     data: {
-      identifier: user.email!,
+      identifier: user.email,
       token,
       expires,
     },
   });
 
-  // TODO: Send email with token
-  console.log(`[MOCK EMAIL] Reset token for ${user.email}: ${token}`);
+  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+
+  await sendEmail(
+    'resetPassword',
+    user.email,
+    {
+      firstName: user.first_name ?? 'there',
+      resetUrl,
+      expiryHours: PASSWORD_RESET_EXPIRY_HOURS,
+      supportEmail: env.GOOGLE_EMAIL_USER ?? 'support@house-rental.com',
+    },
+    'Reset your password'
+  );
 }
 
 /**
