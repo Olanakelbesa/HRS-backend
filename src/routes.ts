@@ -2,6 +2,9 @@ import { Router } from 'express';
 import authRoutes from './modules/auth/routes';
 import userRoutes from './modules/users/routes';
 import propertyRoutes from './modules/properties/routes';
+import messagingRoutes from './modules/messaging/routes';
+import appointmentRoutes from './modules/appointments/routes';
+import notificationRoutes from './modules/notifications/routes';
 
 const router = Router();
 
@@ -13,5 +16,14 @@ router.use('/users', userRoutes);
 
 // Property Routes
 router.use('/properties', propertyRoutes);
+
+// Messaging Routes
+router.use('/messaging', messagingRoutes);
+
+// Appointment Routes
+router.use('/appointments', appointmentRoutes);
+
+// Notification Routes
+router.use('/notifications', notificationRoutes);
 
 export default router;

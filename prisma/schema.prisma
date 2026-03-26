@@ -40,12 +40,23 @@ model User {
   sessions      Session[]
   refreshTokens RefreshToken[]
 
+  // Messaging relations
+  messagesSent     Message[]         @relation("UserMessages")
+  messageReactions MessageReaction[]
+  properties       Property[]        @relation("OwnerProperties")
+
   // properties        Property[] @relation("OwnerProperties")
   // appointmentsRenter Appointment[] @relation("RenterAppointments")
   // appointmentsOwner  Appointment[] @relation("OwnerAppointments")
 
-  // messagesSent      Message[] @relation("SentMessages")
-  // messagesReceived  Message[] @relation("ReceivedMessages")
+  // inside User model
+
+  renterConversations Conversation[] @relation("RenterConversations")
+  ownerConversations  Conversation[] @relation("OwnerConversations")
+  renterAppointments  Appointment[]  @relation("RenterAppointments")
+  ownerAppointments   Appointment[]  @relation("OwnerAppointments")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
 
   // reviews           Review[]
   // notifications     Notification[]
@@ -112,4 +123,185 @@ enum Role {
   renter
   owner
   admin
+}
+
+// =======================
+// MESSAGING MODELS
+// =======================
+
+model Conversation {
+  id String @id @default(cuid())
+
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  renterId String
+  renter   User   @relation("RenterConversations", fields: [renterId], references: [id])
+
+  ownerId String
+  owner   User   @relation("OwnerConversations", fields: [ownerId], references: [id])
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([propertyId])
+}
+
+model Property {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  address       String
+  pricePerNight Float
+  latitude      Float?
+  longitude     Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  conversations Conversation[]
+  appointments  Appointment[]
+
+  @@index([ownerId])
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  propertyId String
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renterId   String
+  renter     User              @relation("RenterAppointments", fields: [renterId], references: [id], onDelete: Cascade)
+  ownerId    String
+  owner      User              @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
+  startsAt   DateTime
+  endsAt     DateTime
+  status     AppointmentStatus @default(PENDING)
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([startsAt])
+  @@index([status])
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  CANCELLED
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  senderId String
+  sender   User   @relation("UserMessages", fields: [senderId], references: [id])
+
+  type    MessageType   @default(TEXT)
+  content String
+  status  MessageStatus @default(SENT)
+
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([replyToId])
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url       String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  eventType  String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([eventType])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  MESSAGE_NEW
+  APPOINTMENT_BOOKED
+  APPOINTMENT_UPDATED
 }
