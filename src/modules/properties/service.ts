@@ -1,82 +1,183 @@
-import prisma from '../../config/database';
-import { Prisma } from '@prisma/client';
-import { AppError } from '../../core/AppError';
+import prisma from "../../config/database";
+import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from "./schema";
+import { PropertyStatus } from "@prisma/client";
+export const propertyService = {
 
-interface ListOptions {
-  page: number;
-  limit: number;
-  minPrice?: number;
-  maxPrice?: number;
-  search?: string;
-  lat?: number;
-  lng?: number;
-  radius?: number;
-}
-
-export async function listProperties(opts: ListOptions) {
-  const { page, limit, minPrice, maxPrice, search, lat, lng, radius } = opts;
-
-  const where: Prisma.PropertyWhereInput = {};
-
-  // Price filter
-  if (minPrice || maxPrice) {
-    where.pricePerNight = {};
-    if (minPrice) where.pricePerNight.gte = minPrice;
-    if (maxPrice) where.pricePerNight.lte = maxPrice;
-  }
-
-  // Text search
-  if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { address: { contains: search, mode: 'insensitive' } },
-    ];
-  }
-
-  // Map filter
-  if (lat && lng && radius) {
-    const latRange = radius / 111;
-    const lngRange = radius / (111 * Math.cos((lat * Math.PI) / 180));
-
-    where.latitude = {
-      gte: lat - latRange,
-      lte: lat + latRange,
-    };
-
-    where.longitude = {
-      gte: lng - lngRange,
-      lte: lng + lngRange,
-    };
-  }
-
-  const [list, total] = await Promise.all([
-    prisma.property.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: {
-        createdAt: 'desc',
+  async createProperty(ownerId: string, data: CreatePropertyInput) {
+    return await prisma.property.create({
+      data: {
+        owner: {
+        connect: { id: ownerId },
       },
-    }),
-    prisma.property.count({ where }),
-  ]);
+ // 🔥 Use foreign key directly (simpler & safer)
 
-  return {
-    list,
-    total,
-    page,
-    limit,
-  };
-}
+        type: data.type,
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        address: data.address ?? null,
+        price: data.price,
+        bedrooms: data.bedrooms ?? null,
+        bathrooms: data.bathrooms ?? null,
+        area: data.area ?? null,
+        amenities: data.amenities ?? {},
+        furnishingType: data.furnishingType ?? null,
+        images: data.images,
+        videos: data.videos ?? [],
+        rentTerms: data.rentTerms ?? null,
+      },
+    });
+  },
 
-export async function getPropertyById(id: string) {
-  const property = await prisma.property.findUnique({
-    where: { id },
-  });
+  async getProperties(query: GetPropertiesQueryInput) {
+    const {
+      page,
+      limit,
+      status,
+      type,
+      minPrice,
+      maxPrice,
+      bedrooms,
+      bathrooms,
+      sortBy,
+      order,
+    } = query;
 
-  if (!property) {
-    throw new AppError('Property not found', 404);
-  }
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      isDeleted: false,
+    };
+
+    if (status) where.status = status;
+    if (type) where.type = type;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {};
+      if (minPrice !== undefined) where.price.gte = minPrice;
+      if (maxPrice !== undefined) where.price.lte = maxPrice;
+    }
+
+    if (bedrooms !== undefined) where.bedrooms = bedrooms;
+    if (bathrooms !== undefined) where.bathrooms = bathrooms;
+
+    const [properties, total] = await Promise.all([
+      prisma.property.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          [sortBy]: order,
+        },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              
+            },
+          },
+        },
+      }),
+      prisma.property.count({ where }),
+    ]);
+
+    return {
+      properties,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  async getPropertyById(propertyId: string) {
+    return await prisma.property.findFirst({
+      where: {
+        id: propertyId,
+        isDeleted: false,
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            
+          },
+        },
+      },
+    });
+  },
+
+  async updateProperty(
+    ownerId: string,
+    propertyId: string,
+    data: UpdatePropertyInput
+  ) {
+    const existing = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+    });
+
+    if (!existing) return null;
+    if (existing.ownerId !== ownerId) return "UNAUTHORIZED";
+
+    return await prisma.property.update({
+      where: { id: propertyId },
+      data,
+    });
+  },
+
+  async softDeleteProperty(ownerId: string, propertyId: string) {
+    const existing = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+    });
+
+    if (!existing) return null;
+    if (existing.ownerId !== ownerId) return "UNAUTHORIZED";
+
+    return await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
+    });
+  },
+
+  async getMyProperties(ownerId: string) {
+    return await prisma.property.findMany({
+      where: {
+        ownerId,
+        isDeleted: false,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  },
+
+  async updatePropertyStatus(
+    ownerId: string,
+    propertyId: string,
+    status: PropertyStatus
+  ) {
+    const existing = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+    });
+
+    if (!existing) return null;
+    if (existing.ownerId !== ownerId) return "UNAUTHORIZED";
+
+    return await prisma.property.update({
+      where: { id: propertyId },
+      data: { status },
+    });
+  },
+};
 
   return property;
 }

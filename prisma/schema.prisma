@@ -35,6 +35,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+
   // Relations
   accounts      Account[]
   sessions      Session[]
@@ -320,4 +321,44 @@ model Property {
 
   @@index([pricePerNight])
   @@index([latitude, longitude])
+}
+model Property {
+  id String @id @default(cuid())
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  type   PropertyType
+  status PropertyStatus @default(AVAILABLE)
+
+  title       Json
+  description Json
+  location    String
+  address     String?
+
+  price     Float
+  bedrooms  Int?
+  bathrooms Int?
+  area      Float?
+
+  amenities      Json
+  furnishingType String?
+
+  images String[] @default([])
+  videos String[] @default([])
+
+  rentTerms Json?
+
+  viewsCount Int @default(0)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([price])
+  @@index([status])
+  @@index([type])
 }
