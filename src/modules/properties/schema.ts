@@ -12,12 +12,20 @@ export const createPropertySchema = z.object({
 });
 
 export const updatePropertySchema = createPropertySchema.partial();
+
 export const queryPropertiesSchema = z.object({
   query: z.object({
     page: z.coerce.number().min(1).optional().default(1),
     limit: z.coerce.number().min(1).max(100).optional().default(20),
+
     minPrice: z.coerce.number().optional(),
     maxPrice: z.coerce.number().optional(),
+
+    search: z.string().optional(),
+
+    lat: z.coerce.number().optional(),
+    lng: z.coerce.number().optional(),
+    radius: z.coerce.number().optional(), // km
   }),
 });
 
