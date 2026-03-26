@@ -152,22 +152,63 @@ model Conversation {
 }
 
 model Property {
-  id            String   @id @default(cuid())
-  ownerId       String
-  owner         User     @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?
-  address       String
-  pricePerNight Float
-  latitude      Float?
-  longitude     Float?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id String @id @default(cuid())
+
+  ownerId String
+  owner   User   @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  type   PropertyType
+  status PropertyStatus @default(AVAILABLE)
+
+  title       Json
+  description Json
+  location    String
+  address     String?
+
+  price     Float
+  bedrooms  Int?
+  bathrooms Int?
+  area      Float?
+
+  amenities      Json
+  furnishingType String?
+
+  images String[] @default([])
+  videos String[] @default([])
+
+  rentTerms Json?
+
+  viewsCount Int @default(0)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   conversations Conversation[]
   appointments  Appointment[]
 
   @@index([ownerId])
+  @@index([price])
+  @@index([status])
+  @@index([type])
+  @@index([isDeleted])
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  PENDING
+  RENTED
+  UNAVAILABLE
+}
+
+enum PropertyType {
+  VILLA
+  APARTMENT
+  CONDO
+  STUDIO
+  HOUSE
 }
 
 model Appointment {
@@ -304,61 +345,4 @@ enum NotificationType {
   MESSAGE_NEW
   APPOINTMENT_BOOKED
   APPOINTMENT_UPDATED
-}
-model Property {
-  id            String   @id @default(cuid())
-  title         String
-  description   String?
-  address       String
-  pricePerNight Float
-  latitude      Float?
-  longitude     Float?
-  ownerId       String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@index([pricePerNight])
-  @@index([latitude, longitude])
-}
-model Property {
-  id String @id @default(cuid())
-
-  ownerId String
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  type   PropertyType
-  status PropertyStatus @default(AVAILABLE)
-
-  title       Json
-  description Json
-  location    String
-  address     String?
-
-  price     Float
-  bedrooms  Int?
-  bathrooms Int?
-  area      Float?
-
-  amenities      Json
-  furnishingType String?
-
-  images String[] @default([])
-  videos String[] @default([])
-
-  rentTerms Json?
-
-  viewsCount Int @default(0)
-
-  isDeleted Boolean   @default(false)
-  deletedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([ownerId])
-  @@index([price])
-  @@index([status])
-  @@index([type])
 }

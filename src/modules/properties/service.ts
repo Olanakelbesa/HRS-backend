@@ -1,15 +1,14 @@
-import prisma from "../../config/database";
-import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from "./schema";
-import { PropertyStatus } from "@prisma/client";
+import prisma from '../../config/database';
+import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from './schema';
+import { PropertyStatus } from '@prisma/client';
 export const propertyService = {
-
   async createProperty(ownerId: string, data: CreatePropertyInput) {
     return await prisma.property.create({
       data: {
         owner: {
-        connect: { id: ownerId },
-      },
- // 🔥 Use foreign key directly (simpler & safer)
+          connect: { id: ownerId },
+        },
+        // 🔥 Use foreign key directly (simpler & safer)
 
         type: data.type,
         title: data.title,
@@ -30,18 +29,8 @@ export const propertyService = {
   },
 
   async getProperties(query: GetPropertiesQueryInput) {
-    const {
-      page,
-      limit,
-      status,
-      type,
-      minPrice,
-      maxPrice,
-      bedrooms,
-      bathrooms,
-      sortBy,
-      order,
-    } = query;
+    const { page, limit, status, type, minPrice, maxPrice, bedrooms, bathrooms, sortBy, order } =
+      query;
 
     const skip = (page - 1) * limit;
 
@@ -73,9 +62,9 @@ export const propertyService = {
           owner: {
             select: {
               id: true,
-              name: true,
+              first_name: true,
+              last_name: true,
               email: true,
-              
             },
           },
         },
@@ -104,26 +93,22 @@ export const propertyService = {
         owner: {
           select: {
             id: true,
-            name: true,
+            first_name: true,
+            last_name: true,
             email: true,
-            
           },
         },
       },
     });
   },
 
-  async updateProperty(
-    ownerId: string,
-    propertyId: string,
-    data: UpdatePropertyInput
-  ) {
+  async updateProperty(ownerId: string, propertyId: string, data: UpdatePropertyInput) {
     const existing = await prisma.property.findFirst({
       where: { id: propertyId, isDeleted: false },
     });
 
     if (!existing) return null;
-    if (existing.ownerId !== ownerId) return "UNAUTHORIZED";
+    if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
 
     return await prisma.property.update({
       where: { id: propertyId },
@@ -137,7 +122,7 @@ export const propertyService = {
     });
 
     if (!existing) return null;
-    if (existing.ownerId !== ownerId) return "UNAUTHORIZED";
+    if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
 
     return await prisma.property.update({
       where: { id: propertyId },
@@ -155,22 +140,18 @@ export const propertyService = {
         isDeleted: false,
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc',
       },
     });
   },
 
-  async updatePropertyStatus(
-    ownerId: string,
-    propertyId: string,
-    status: PropertyStatus
-  ) {
+  async updatePropertyStatus(ownerId: string, propertyId: string, status: PropertyStatus) {
     const existing = await prisma.property.findFirst({
       where: { id: propertyId, isDeleted: false },
     });
 
     if (!existing) return null;
-    if (existing.ownerId !== ownerId) return "UNAUTHORIZED";
+    if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
 
     return await prisma.property.update({
       where: { id: propertyId },
@@ -178,6 +159,3 @@ export const propertyService = {
     });
   },
 };
-
-  return property;
-}

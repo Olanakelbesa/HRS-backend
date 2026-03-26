@@ -33,10 +33,11 @@ export async function changePassword(
     throw new Error('User not found');
   }
 
-  const isMatch = await bcrypt.compare(
-    data.currentPassword,
-    user.password
-  );
+  if (!user.password) {
+    throw new Error('Password is not set for this account');
+  }
+
+  const isMatch = await bcrypt.compare(data.currentPassword, user.password);
 
   if (!isMatch) {
     throw new Error('Current password is incorrect');
@@ -57,9 +58,10 @@ export async function getAllUsers() {
     select: {
       id: true,
       email: true,
-      name: true,
+      first_name: true,
+      last_name: true,
       role: true,
-      isActive: true,
+      isVerified: true,
       createdAt: true,
     },
     orderBy: {
@@ -69,37 +71,33 @@ export async function getAllUsers() {
 
   return users;
 }
-export async function updateUserRole(
-  userId: string,
-  role: 'RENTER' | 'OWNER' | 'ADMIN'
-) {
+export async function updateUserRole(userId: string, role: 'renter' | 'owner' | 'admin') {
   const user = await prisma.user.update({
     where: { id: userId },
     data: { role },
     select: {
       id: true,
       email: true,
-      name: true,
+      first_name: true,
+      last_name: true,
       role: true,
-      isActive: true,
+      isVerified: true,
     },
   });
 
   return user;
 }
-export async function updateUserStatus(
-  userId: string,
-  isActive: boolean
-) {
+export async function updateUserStatus(userId: string, isActive: boolean) {
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { isActive },
+    data: { isVerified: isActive },
     select: {
       id: true,
       email: true,
-      name: true,
+      first_name: true,
+      last_name: true,
       role: true,
-      isActive: true,
+      isVerified: true,
     },
   });
 

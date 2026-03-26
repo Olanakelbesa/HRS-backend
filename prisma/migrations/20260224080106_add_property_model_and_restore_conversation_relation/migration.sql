@@ -14,22 +14,6 @@ CREATE TABLE "Conversation" (
 );
 
 -- CreateTable
-CREATE TABLE "Property" (
-    "id" TEXT NOT NULL,
-    "ownerId" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
-    "address" TEXT NOT NULL,
-    "pricePerNight" DOUBLE PRECISION NOT NULL,
-    "latitude" DOUBLE PRECISION,
-    "longitude" DOUBLE PRECISION,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Property_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "Message" (
     "id" TEXT NOT NULL,
     "conversationId" TEXT NOT NULL,
@@ -52,9 +36,6 @@ CREATE INDEX "Conversation_ownerId_idx" ON "Conversation"("ownerId");
 CREATE INDEX "Conversation_propertyId_idx" ON "Conversation"("propertyId");
 
 -- CreateIndex
-CREATE INDEX "Property_ownerId_idx" ON "Property"("ownerId");
-
--- CreateIndex
 CREATE INDEX "Message_conversationId_idx" ON "Message"("conversationId");
 
 -- CreateIndex
@@ -68,9 +49,6 @@ ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_renterId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Property" ADD CONSTRAINT "Property_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;

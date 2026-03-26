@@ -16,20 +16,18 @@ export const changePasswordSchema = z.object({
   }),
 });
 
-export type ChangePasswordInput =
-  z.infer<typeof changePasswordSchema>['body'];
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>['body'];
 
 export const updateUserRoleSchema = z.object({
   params: z.object({
     id: z.string().cuid(),
   }),
   body: z.object({
-    role: z.enum(['RENTER', 'OWNER', 'ADMIN']),
+    role: z.enum(['renter', 'owner', 'admin']),
   }),
 });
 
-export type UpdateUserRoleInput =
-  z.infer<typeof updateUserRoleSchema>;
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 export const updateUserStatusSchema = z.object({
   params: z.object({
     id: z.string().cuid(),
@@ -39,5 +37,4 @@ export const updateUserStatusSchema = z.object({
   }),
 });
 
-export type UpdateUserStatusInput =
-  z.infer<typeof updateUserStatusSchema>;
+export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
