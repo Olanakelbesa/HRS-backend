@@ -14,8 +14,8 @@
 
     <main class="hero">
         <div class="hero-content">
-            <div class="badge fade-in">
-                <span class="ping"></span> System Online
+            <div class="badge badge--checking fade-in" id="system-status-badge" aria-live="polite">
+                <span class="ping"></span> Checking System Status...
             </div>
             <h1 class="fade-in">Smart House <br><span class="gradient-text">Rental API</span></h1>
             <p class="subtitle fade-in">A robust, production-grade Express.js API designed for high-concurrency property management.</p>
@@ -72,3 +72,36 @@
     <footer>
         &copy; 2026 SmartHouseRental Platform. Engineered for performance.
     </footer>
+
+    <script>
+        (function () {
+            const badge = document.getElementById('system-status-badge');
+            if (!badge) return;
+
+            const setBadge = (state, label) => {
+                badge.classList.remove('badge--online', 'badge--offline', 'badge--checking');
+                badge.classList.add(`badge--${state}`);
+                badge.innerHTML = `<span class="ping"></span> ${label}`;
+            };
+
+            const checkHealth = async () => {
+                setBadge('checking', 'Checking System Status...');
+
+                try {
+                    const response = await fetch('/health', { cache: 'no-store' });
+                    if (!response.ok) {
+                        throw new Error(`Health check failed with status ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const isHealthy = data && data.status === 'ok';
+                    setBadge(isHealthy ? 'online' : 'offline', isHealthy ? 'System Online' : 'System Degraded');
+                } catch (_) {
+                    setBadge('offline', 'System Offline');
+                }
+            };
+
+            checkHealth();
+            setInterval(checkHealth, 10000);
+        })();
+    </script>

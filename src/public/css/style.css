@@ -76,11 +76,39 @@ body::selection {
     font-size: 0.75rem; font-weight: 700; margin-bottom: 24px;
 }
 
+.badge--online {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--accent-primary);
+}
+
+.badge--checking {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.28);
+    color: #f59e0b;
+}
+
+.badge--offline {
+    background: rgba(244, 63, 94, 0.12);
+    border-color: rgba(244, 63, 94, 0.28);
+    color: #f43f5e;
+}
+
 .ping { width: 8px; height: 8px; background: var(--accent-primary); border-radius: 50%; position: relative; }
 .ping::after {
     content: ''; position: absolute; width: 100%; height: 100%;
     background: var(--accent-primary); border-radius: 50%;
     animation: ping-anim 1.5s infinite;
+}
+
+.badge--checking .ping,
+.badge--checking .ping::after {
+    background: #f59e0b;
+}
+
+.badge--offline .ping,
+.badge--offline .ping::after {
+    background: #f43f5e;
 }
 
 @keyframes ping-anim { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }

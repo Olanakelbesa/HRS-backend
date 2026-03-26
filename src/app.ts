@@ -70,6 +70,15 @@ app.get('/', (req, res) => {
   res.render('landing', { title: 'Home' });
 });
 
+// Global health route for uptime checks and landing page status badge
+app.get('/health', (_, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // API Routes
 app.use('/api/v1', apiRoutes);
 
