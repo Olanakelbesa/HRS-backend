@@ -1,0 +1,107 @@
+    <div class="glow-top"></div>
+    <div class="glow-bottom"></div>
+
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <div class="logo-box"><i class="fas fa-home" style=" font-size: 14px;"></i></div>
+            SmartHouse<span style="color: var(--zinc-500); font-weight: 300;">Rental</span>
+        </a>
+        <div class="nav-links">
+            <a href="/api-docs" class="nav-link"><i class="fas fa-book-open"></i> Docs</a>
+            <a href="https://github.com/SmartHouseRental/backend" class="nav-link" target="_blank"><i class="fab fa-github"></i> Github</a>
+        </div>
+    </nav>
+
+    <main class="hero">
+        <div class="hero-content">
+            <div class="badge badge--checking fade-in" id="system-status-badge" aria-live="polite">
+                <span class="ping"></span> Checking System Status...
+            </div>
+            <h1 class="fade-in">Smart House <br><span class="gradient-text">Rental API</span></h1>
+            <p class="subtitle fade-in">A robust, production-grade Express.js API designed for high-concurrency property management.</p>
+            <div class="cta-group fade-in">
+                <a href="/api-docs" class="btn btn-primary"><i class="fas fa-bolt"></i> Get Started</a>
+            </div>
+        </div>
+
+        <div class="hero-visual fade-in">
+            <div class="code-container">
+                <div class="code-header">
+                    <div class="dots">
+                        <span class="dot-1"></span><span class="dot-2"></span><span class="dot-3"></span>
+                    </div>
+                    <div class="method-badge">GET /v1/properties</div>
+                </div>
+                <div class="code-body">
+                    <span style="color: #71717a">{</span><br>
+                    &nbsp;&nbsp;<span class="key">"status"</span>: <span class="string">"success"</span>,<br>
+                    &nbsp;&nbsp;<span class="key">"data"</span>: {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"properties"</span>: [<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="key">"id"</span>: <span class="string">"p_1"</span>, <span class="key">"price"</span>: <span class="number">1200</span> }<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;]<br>
+                    &nbsp;&nbsp;}<br>
+                    <span style="color: #71717a">}</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <section class="features">
+        <div class="feature-card fade-in">
+            <div class="icon-wrapper" style="color: #fb923c;"><i class="fas fa-shield-alt"></i></div>
+            <h3>Secure Auth</h3>
+            <p>Enterprise-ready JWT rotation and role-based access management.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="icon-wrapper" style="color: var(--accent-primary);"><i class="fas fa-bolt"></i></div>
+            <h3>Real-time</h3>
+            <p>Bi-directional Socket.io communication for instant availability updates.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="icon-wrapper" style="color: var(--accent-secondary);"><i class="fas fa-database"></i></div>
+            <h3>Type Safety</h3>
+            <p>Strict schema validation using Prisma ORM and TypeScript models.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="icon-wrapper" style="color: #f43f5e;"><i class="fas fa-brain"></i></div>
+            <h3>AI Insights</h3>
+            <p>Built-in sentiment analysis for property descriptions and reviews.</p>
+        </div>
+    </section>
+
+    <footer>
+        &copy; 2026 SmartHouseRental Platform. Engineered for performance.
+    </footer>
+
+    <script>
+        (function () {
+            const badge = document.getElementById('system-status-badge');
+            if (!badge) return;
+
+            const setBadge = (state, label) => {
+                badge.classList.remove('badge--online', 'badge--offline', 'badge--checking');
+                badge.classList.add(`badge--${state}`);
+                badge.innerHTML = `<span class="ping"></span> ${label}`;
+            };
+
+            const checkHealth = async () => {
+                setBadge('checking', 'Checking System Status...');
+
+                try {
+                    const response = await fetch('/health', { cache: 'no-store' });
+                    if (!response.ok) {
+                        throw new Error(`Health check failed with status ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const isHealthy = data && data.status === 'ok';
+                    setBadge(isHealthy ? 'online' : 'offline', isHealthy ? 'System Online' : 'System Degraded');
+                } catch (_) {
+                    setBadge('offline', 'System Offline');
+                }
+            };
+
+            checkHealth();
+            setInterval(checkHealth, 10000);
+        })();
+    </script>
