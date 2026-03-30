@@ -1,5 +1,16 @@
 # backend
+
 Backend application for the Smart House Rental Platform built with Node and Express.
+
+## Build behavior
+
+The build process compiles TypeScript and copies runtime assets into `dist`, including:
+
+- `src/views` -> `dist/views`
+- `src/public` -> `dist/public`
+- `src/emails` -> `dist/emails`
+
+This prevents template-missing errors in production deployments.
 
 ## Run with Docker
 
