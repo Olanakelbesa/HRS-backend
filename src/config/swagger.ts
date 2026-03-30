@@ -13,9 +13,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: `http://localhost:${env.PORT}`,
-        description: 'Development server',
-      },
+        url: env.APP_BASE_URL || 'http://localhost:5000'
+      }
     ],
     components: {
       securitySchemes: {

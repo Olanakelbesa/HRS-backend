@@ -5,6 +5,7 @@ dotenv.config();
 
 const envSchema = z.object({
   PORT: z.string().default('5000'),
+  APP_BASE_URL: z.string().url().default('http://localhost:5000'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
