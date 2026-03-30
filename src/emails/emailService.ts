@@ -5,19 +5,28 @@ import dns from 'dns';
 import handlebars from 'handlebars';
 import { env } from '../config/env';
 
-function createTransport(host?: string) {
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // No-op for older runtimes that don't support this API.
+}
+
+function createTransport(host: string, port: number, secure: boolean) {
   return nodemailer.createTransport({
-    host: host ?? 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    host,
+    port,
+    secure,
     auth: {
       user: env.GOOGLE_EMAIL_USER,
       pass: env.GOOGLE_EMAIL_PASS,
     },
     tls: {
       // Keep certificate validation tied to Gmail hostname if we connect by IPv4 literal.
-      servername: 'smtp.gmail.com',
+      servername: env.SMTP_HOST,
     },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
 }
 
@@ -42,24 +51,53 @@ export const sendEmail = async (
   const html = compiledTemplate(variables);
 
   const message = {
-    from: `"House Rental" <${env.GOOGLE_EMAIL_USER}>`,
+    from: env.EMAIL_FROM || `"House Rental" <${env.GOOGLE_EMAIL_USER}>`,
     to,
     subject: subject || 'Notification from House Rental',
     html,
   };
 
-  const primaryTransport = createTransport();
+  const attemptConfigs: Array<{ host: string; port: number; secure: boolean; label: string }> = [
+    {
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
+      label: 'primary smtp config',
+    },
+    {
+      host: env.SMTP_HOST,
+      port: env.SMTP_FALLBACK_PORT,
+      secure: env.SMTP_FALLBACK_PORT === 465,
+      label: 'fallback smtp port',
+    },
+  ];
 
+  // Add IPv4 fallback for hosts where IPv6 route to SMTP is unavailable.
   try {
-    await primaryTransport.sendMail(message);
-  } catch (error) {
-    if (!isIpv6NetworkUnreachable(error)) {
-      throw error;
-    }
-
-    // Some hosting networks cannot reach Gmail over IPv6.
-    const [ipv4Host] = await dns.promises.resolve4('smtp.gmail.com');
-    const fallbackTransport = createTransport(ipv4Host);
-    await fallbackTransport.sendMail(message);
+    const [ipv4Host] = await dns.promises.resolve4(env.SMTP_HOST);
+    attemptConfigs.push({
+      host: ipv4Host,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
+      label: 'ipv4 resolved smtp host',
+    });
+  } catch {
+    // DNS IPv4 resolution failed; rely on hostname attempts.
   }
+
+  let lastError: unknown;
+  for (const attempt of attemptConfigs) {
+    try {
+      const transport = createTransport(attempt.host, attempt.port, attempt.secure);
+      await transport.sendMail(message);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isIpv6NetworkUnreachable(error)) {
+        console.warn(`Email send failed using ${attempt.label}: ${(error as Error).message}`);
+      }
+    }
+  }
+
+  throw lastError;
 };
