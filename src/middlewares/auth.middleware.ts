@@ -44,7 +44,10 @@ export function restrictTo(...allowedRoles: string[]) {
       });
     }
 
-    if (!allowedRoles.includes(userRole)) {
+    const normalizedUserRole = String(userRole).trim().toLowerCase();
+    const normalizedAllowedRoles = allowedRoles.map((role) => role.trim().toLowerCase());
+
+    if (!normalizedAllowedRoles.includes(normalizedUserRole)) {
       return res.status(403).json({
         status: 'error',
         message: 'You do not have permission to perform this action',
