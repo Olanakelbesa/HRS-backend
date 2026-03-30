@@ -9,17 +9,15 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
-  SMTP_HOST: z.string().default('smtp.gmail.com'),
-  SMTP_PORT: z.coerce.number().int().positive().default(465),
-  SMTP_SECURE: z
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z
     .string()
-    .optional()
-    .transform((value) => {
-      if (!value) return undefined;
-      return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
-    }),
-  SMTP_FALLBACK_PORT: z.coerce.number().int().positive().default(587),
-  EMAIL_FROM: z.string().optional(),
+    .regex(
+      /^(?:[^<>]+\s<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/,
+      'EMAIL_FROM must be in the format email@example.com or Name <email@example.com>'
+    )
+    .default('House Rental <onboarding@resend.dev>'),
+  SUPPORT_EMAIL: z.string().email().optional(),
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
@@ -54,5 +52,4 @@ function deriveBaseUrl(appBaseUrl: string | undefined, nodeEnv: string, port: st
 export const env = {
   ...rawEnv,
   APP_BASE_URL: deriveBaseUrl(rawEnv.APP_BASE_URL, rawEnv.NODE_ENV, rawEnv.PORT),
-  SMTP_SECURE: rawEnv.SMTP_SECURE ?? rawEnv.SMTP_PORT === 465,
 };

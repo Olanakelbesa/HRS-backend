@@ -64,7 +64,7 @@ async function sendVerificationEmail(email: string, firstName?: string | null): 
       firstName: firstName ?? 'there',
       verificationCode,
       expiryHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
-      supportEmail: env.GOOGLE_EMAIL_USER ?? 'support@house-rental.com',
+      supportEmail: env.SUPPORT_EMAIL ?? env.EMAIL_FROM,
     },
     'Verify your email address'
   );
@@ -351,7 +351,7 @@ export async function forgotPassword(input: ForgotPasswordInput) {
       firstName: user.first_name ?? 'there',
       resetUrl,
       expiryHours: PASSWORD_RESET_EXPIRY_HOURS,
-      supportEmail: env.GOOGLE_EMAIL_USER ?? 'support@house-rental.com',
+      supportEmail: env.SUPPORT_EMAIL ?? env.EMAIL_FROM,
     },
     'Reset your password'
   );

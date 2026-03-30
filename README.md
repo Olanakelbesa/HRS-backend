@@ -12,6 +12,18 @@ The build process compiles TypeScript and copies runtime assets into `dist`, inc
 
 This prevents template-missing errors in production deployments.
 
+## Email provider (Resend)
+
+The backend uses Resend API for transactional emails in all environments.
+
+Set these environment variables:
+
+- `RESEND_API_KEY`: API key from Resend dashboard
+- `EMAIL_FROM`: sender address (must be a verified sender/domain in Resend for production)
+- `SUPPORT_EMAIL` (optional): support contact displayed in email templates
+
+For quick testing, `onboarding@resend.dev` can be used as sender with Resend test mode.
+
 ## Run with Docker
 
 1. Copy env file:
