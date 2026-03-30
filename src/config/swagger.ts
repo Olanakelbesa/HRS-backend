@@ -13,8 +13,9 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: env.APP_BASE_URL || 'http://localhost:5000'
-      }
+        url: env.APP_BASE_URL,
+        description: env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
+      },
     ],
     components: {
       securitySchemes: {
