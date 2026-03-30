@@ -27,7 +27,11 @@ const options: swaggerJsdoc.Options = {
       },
     },
   },
-  apis: [path.join(process.cwd(), 'src/modules/**/*.ts')],
+  // Support both local TS execution and Docker production JS output.
+  apis: [
+    path.join(process.cwd(), 'src/modules/**/*.ts'),
+    path.join(process.cwd(), 'dist/modules/**/*.js'),
+  ],
 };
 
 const baseSpec = swaggerJsdoc(options) as {

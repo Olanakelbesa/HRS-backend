@@ -49,9 +49,10 @@ body::selection {
 .logo { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 1.1rem; text-decoration: none; color: inherit; letter-spacing: 0; }
 .logo-box {
     width: 32px; height: 32px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    background:  #f4f4f5;
+    color: #000;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 4px 12px #1e1e1e;
 }
 
 .nav-links { display: flex; gap: 24px; }
