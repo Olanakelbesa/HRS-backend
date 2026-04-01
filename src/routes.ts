@@ -5,6 +5,7 @@ import propertyRoutes from './modules/properties/routes';
 import messagingRoutes from './modules/messaging/routes';
 import appointmentRoutes from './modules/appointments/routes';
 import notificationRoutes from './modules/notifications/routes';
+import adminRoutes from './modules/admin/routes';
 
 const router = Router();
 
@@ -25,5 +26,8 @@ router.use('/appointments', appointmentRoutes);
 
 // Notification Routes
 router.use('/notifications', notificationRoutes);
+
+// Admin Routes
+router.use('/admin', adminRoutes);
 
 export default router;
