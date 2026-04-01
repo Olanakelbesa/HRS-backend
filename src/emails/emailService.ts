@@ -1,16 +1,10 @@
-import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
 import handlebars from 'handlebars';
+import { Resend } from 'resend';
 import { env } from '../config/env';
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: env.GOOGLE_EMAIL_USER,
-    pass: env.GOOGLE_EMAIL_PASS,
-  },
-});
+const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 export const sendEmail = async (
   templateName: string,
@@ -18,8 +12,8 @@ export const sendEmail = async (
   variables: Record<string, unknown>,
   subject?: string
 ) => {
-  if (!env.GOOGLE_EMAIL_USER || !env.GOOGLE_EMAIL_PASS) {
-    throw new Error('Email credentials are missing. Set GOOGLE_EMAIL_USER and GOOGLE_EMAIL_PASS.');
+  if (!resend) {
+    throw new Error('Email provider is not configured. Set RESEND_API_KEY.');
   }
 
   const templatePath = path.join(__dirname, 'templates', `${templateName}.hbs`);
@@ -27,10 +21,15 @@ export const sendEmail = async (
   const compiledTemplate = handlebars.compile(source);
   const html = compiledTemplate(variables);
 
-  await transporter.sendMail({
-    from: `"House Rental" <${env.GOOGLE_EMAIL_USER}>`,
+  const message = {
+    from: env.EMAIL_FROM,
     to,
     subject: subject || 'Notification from House Rental',
     html,
-  });
+  };
+
+  const { error } = await resend.emails.send(message);
+  if (error) {
+    throw new Error(`Resend failed to send email: ${error.message}`);
+  }
 };

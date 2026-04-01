@@ -13,8 +13,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: `http://localhost:${env.PORT}`,
-        description: 'Development server',
+        url: env.APP_BASE_URL,
+        description: env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
       },
     ],
     components: {

@@ -7,7 +7,13 @@ export function validate(schema: ZodSchema, source: 'body' | 'query' | 'params' 
     const result = schema.safeParse(data);
 
     if (result.success) {
-      (req as any)[source] = result.data;
+      if (source === 'query') {
+        Object.assign(req.query as Record<string, unknown>, result.data);
+      } else if (source === 'params') {
+        Object.assign(req.params as Record<string, unknown>, result.data);
+      } else {
+        (req as any)[source] = result.data;
+      }
       return next();
     }
 
