@@ -29,8 +29,18 @@ export const propertyService = {
   },
 
   async getProperties(query: GetPropertiesQueryInput) {
-    const { page, limit, status, type, minPrice, maxPrice, bedrooms, bathrooms, sortBy, order } =
-      query;
+    const {
+      page = 1,
+      limit = 12,
+      status,
+      type,
+      minPrice,
+      maxPrice,
+      bedrooms,
+      bathrooms,
+      sortBy = 'createdAt',
+      order = 'desc',
+    } = query ?? {};
 
     const skip = (page - 1) * limit;
 
@@ -55,9 +65,7 @@ export const propertyService = {
         where,
         skip,
         take: limit,
-        orderBy: {
-          [sortBy]: order,
-        },
+        orderBy: { [sortBy]: order },
         include: {
           owner: {
             select: {
