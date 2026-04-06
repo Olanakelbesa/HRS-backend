@@ -29,18 +29,29 @@ export const propertyService = {
   },
 
   async getProperties(query: GetPropertiesQueryInput) {
-    const {
-      page = 1,
-      limit = 12,
-      status,
-      type,
-      minPrice,
-      maxPrice,
-      bedrooms,
-      bathrooms,
-      sortBy = 'createdAt',
-      order = 'desc',
-    } = query ?? {};
+    const raw = (query ?? {}) as Record<string, unknown>;
+    const toNumber = (value: unknown): number | undefined => {
+      if (value === undefined || value === null || value === '') return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
+
+    const page = Math.max(1, Math.trunc(toNumber(raw.page) ?? 1));
+    const limit = Math.min(50, Math.max(1, Math.trunc(toNumber(raw.limit) ?? 12)));
+
+    const status = typeof raw.status === 'string' ? raw.status : undefined;
+    const type = typeof raw.type === 'string' ? raw.type : undefined;
+
+    const minPrice = toNumber(raw.minPrice);
+    const maxPrice = toNumber(raw.maxPrice);
+    const bedrooms = toNumber(raw.bedrooms);
+    const bathrooms = toNumber(raw.bathrooms);
+
+    const allowedSortBy = new Set(['createdAt', 'price', 'viewsCount']);
+    const sortBy =
+      typeof raw.sortBy === 'string' && allowedSortBy.has(raw.sortBy) ? raw.sortBy : 'createdAt';
+
+    const order = raw.order === 'asc' || raw.order === 'desc' ? raw.order : 'desc';
 
     const skip = (page - 1) * limit;
 
