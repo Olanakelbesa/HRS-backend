@@ -1,36 +1,76 @@
 -- CreateEnum
-CREATE TYPE "UserStatus" AS ENUM ('active', 'suspended', 'banned');
+DO $$ BEGIN
+    CREATE TYPE "UserStatus" AS ENUM ('active', 'suspended', 'banned');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "VerificationState" AS ENUM ('verified', 'pending_otp', 'pending_documents', 'rejected');
+DO $$ BEGIN
+    CREATE TYPE "VerificationState" AS ENUM ('verified', 'pending_otp', 'pending_documents', 'rejected');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "AgreementStatus" AS ENUM ('active', 'pending_renter', 'pending_owner', 'draft', 'terminated', 'expired');
+DO $$ BEGIN
+    CREATE TYPE "AgreementStatus" AS ENUM ('active', 'pending_renter', 'pending_owner', 'draft', 'terminated', 'expired');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('confirmed', 'proof_uploaded', 'pending');
+DO $$ BEGIN
+    CREATE TYPE "PaymentStatus" AS ENUM ('confirmed', 'proof_uploaded', 'pending');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ReportTargetType" AS ENUM ('property', 'user', 'agreement', 'other');
+DO $$ BEGIN
+    CREATE TYPE "ReportTargetType" AS ENUM ('property', 'user', 'agreement', 'other');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ReportStatus" AS ENUM ('open', 'in_review', 'resolved', 'dismissed');
+DO $$ BEGIN
+    CREATE TYPE "ReportStatus" AS ENUM ('open', 'in_review', 'resolved', 'dismissed');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "VerificationDocumentType" AS ENUM ('national_id', 'passport', 'ownership_deed');
+DO $$ BEGIN
+    CREATE TYPE "VerificationDocumentType" AS ENUM ('national_id', 'passport', 'ownership_deed');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "VerificationStatus" AS ENUM ('pending', 'approved', 'rejected');
+DO $$ BEGIN
+    CREATE TYPE "VerificationStatus" AS ENUM ('pending', 'approved', 'rejected');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ReviewTargetType" AS ENUM ('property', 'owner');
+DO $$ BEGIN
+    CREATE TYPE "ReviewTargetType" AS ENUM ('property', 'owner');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ReviewStatus" AS ENUM ('published', 'flagged', 'removed');
+DO $$ BEGIN
+    CREATE TYPE "ReviewStatus" AS ENUM ('published', 'flagged', 'removed');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AlterTable
-ALTER TABLE "User" ADD COLUMN     "status" "UserStatus" NOT NULL DEFAULT 'active',
-ADD COLUMN     "verificationState" "VerificationState" NOT NULL DEFAULT 'pending_otp';
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "status" "UserStatus" NOT NULL DEFAULT 'active',
+ADD COLUMN IF NOT EXISTS "verificationState" "VerificationState" NOT NULL DEFAULT 'pending_otp';
 
 -- CreateTable
 CREATE TABLE "Agreement" (
