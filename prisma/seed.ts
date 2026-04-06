@@ -26,6 +26,10 @@ const prisma = new PrismaClient();
 
 const DEFAULT_PASSWORD = 'Password123!';
 
+function textPair(en: string, am: string) {
+  return { en, am };
+}
+
 function daysFromNow(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -278,11 +282,11 @@ async function main() {
   const prop1 = await prisma.property.create({
     data: {
       ownerId: owner1.id,
-      title: { en: 'Horizon Peak Villa', am: 'ሆራይዘን ፒክ ቪላ' },
-      description: {
-        en: 'A beautiful villa overlooking the city with modern amenities.',
-        am: 'ዘመናዊ አገልግሎቶች ያሉት ከተማን የሚመለከት ቪላ።',
-      },
+      title: textPair('Horizon Peak Villa', 'ሆራይዘን ፒክ ቪላ'),
+      description: textPair(
+        'A beautiful villa overlooking the city with modern amenities.',
+        'ዘመናዊ አገልግሎቶች ያሉት ከተማን የሚመለከት ቪላ።'
+      ),
       location: 'POINT(38.7636 8.9806)',
       address: 'Bole, Addis Ababa',
       type: PropertyType.VILLA,
@@ -305,11 +309,11 @@ async function main() {
   const prop2 = await prisma.property.create({
     data: {
       ownerId: owner2.id,
-      title: { en: 'Urban Loft 42', am: 'ከተማ ሎፍት 42' },
-      description: {
-        en: 'Modern loft in the heart of Addis with walkable services.',
-        am: 'በአዲስ አበባ መሀል የሚገኝ ዘመናዊ ሎፍት።',
-      },
+      title: textPair('Urban Loft 42', 'ከተማ ሎፍት 42'),
+      description: textPair(
+        'Modern loft in the heart of Addis with walkable services.',
+        'በአዲስ አበባ መሀል የሚገኝ ዘመናዊ ሎፍት።'
+      ),
       location: 'POINT(38.7612 9.0167)',
       address: 'Kazanchis, Addis Ababa',
       type: PropertyType.APARTMENT,
@@ -327,11 +331,11 @@ async function main() {
   const prop3 = await prisma.property.create({
     data: {
       ownerId: owner3.id,
-      title: { en: 'Suspicious Listing', am: 'አስጠራጣሪ ማስታወቂያ' },
-      description: {
-        en: 'Cheap house listing with inconsistent details.',
-        am: 'ዝርዝሮቹ የማይጣጣሙ ዝቅተኛ ዋጋ ቤት ማስታወቂያ።',
-      },
+      title: textPair('Suspicious Listing', 'አስጠራጣሪ ማስታወቂያ'),
+      description: textPair(
+        'Cheap house listing with inconsistent details.',
+        'ዝርዝሮቹ የማይጣጣሙ ዝቅተኛ ዋጋ ቤት ማስታወቂያ።'
+      ),
       location: 'POINT(38.8470 9.0100)',
       address: 'Megenagna, Addis Ababa',
       type: PropertyType.HOUSE,
@@ -348,11 +352,11 @@ async function main() {
   const prop4 = await prisma.property.create({
     data: {
       ownerId: owner1.id,
-      title: { en: 'Cottage by the Lake', am: 'የሐይቅ ዳር ኮተጅ' },
-      description: {
-        en: 'Perfect family home close to the lake and parks.',
-        am: 'ከሐይቅና ፓርኮች አቅራቢያ የሚገኝ ለቤተሰብ ተስማሚ ቤት።',
-      },
+      title: textPair('Cottage by the Lake', 'የሐይቅ ዳር ኮተጅ'),
+      description: textPair(
+        'Perfect family home close to the lake and parks.',
+        'ከሐይቅና ፓርኮች አቅራቢያ የሚገኝ ለቤተሰብ ተስማሚ ቤት።'
+      ),
       location: 'POINT(38.4795 7.0570)',
       address: 'Hawassa',
       type: PropertyType.HOUSE,
@@ -369,11 +373,11 @@ async function main() {
   const prop5 = await prisma.property.create({
     data: {
       ownerId: owner4.id,
-      title: { en: 'Sunset Studio', am: 'ሰንሴት ስቱዲዮ' },
-      description: {
-        en: 'Affordable studio for single professionals.',
-        am: 'ለነጠላ ሰራተኞች ተመጣጣኝ ዋጋ ያለው ስቱዲዮ።',
-      },
+      title: textPair('Sunset Studio', 'ሰንሴት ስቱዲዮ'),
+      description: textPair(
+        'Affordable studio for single professionals.',
+        'ለነጠላ ሰራተኞች ተመጣጣኝ ዋጋ ያለው ስቱዲዮ።'
+      ),
       location: 'POINT(38.7485 9.0302)',
       address: 'CMC, Addis Ababa',
       type: PropertyType.STUDIO,
