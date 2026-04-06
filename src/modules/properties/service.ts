@@ -1,6 +1,37 @@
 import prisma from '../../config/database';
 import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from './schema';
 import { PropertyStatus } from '@prisma/client';
+
+const SUPPORTED_LANGUAGES = new Set(['en', 'am']);
+
+function toRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const entries = Object.entries(value as Record<string, unknown>).filter(
+    ([, v]) => typeof v === 'string'
+  ) as Array<[string, string]>;
+  return Object.fromEntries(entries);
+}
+
+function localizeText(value: unknown, language: string): string {
+  const map = toRecord(value);
+  if (map[language]) return map[language];
+  if (map.en) return map.en;
+  const first = Object.values(map)[0];
+  return typeof first === 'string' ? first : '';
+}
+
+function localizeProperty<T extends { title: unknown; description: unknown }>(
+  property: T,
+  language: string
+) {
+  return {
+    ...property,
+    titleText: localizeText(property.title, language),
+    descriptionText: localizeText(property.description, language),
+    language,
+  };
+}
+
 export const propertyService = {
   async createProperty(ownerId: string, data: CreatePropertyInput) {
     return await prisma.property.create({
@@ -28,19 +59,30 @@ export const propertyService = {
     });
   },
 
-  async getProperties(query: GetPropertiesQueryInput) {
-    const {
-      page = 1,
-      limit = 12,
-      status,
-      type,
-      minPrice,
-      maxPrice,
-      bedrooms,
-      bathrooms,
-      sortBy = 'createdAt',
-      order = 'desc',
-    } = query ?? {};
+  async getProperties(query: GetPropertiesQueryInput, language = 'en') {
+    const raw = (query ?? {}) as Record<string, unknown>;
+    const toNumber = (value: unknown): number | undefined => {
+      if (value === undefined || value === null || value === '') return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
+
+    const page = Math.max(1, Math.trunc(toNumber(raw.page) ?? 1));
+    const limit = Math.min(50, Math.max(1, Math.trunc(toNumber(raw.limit) ?? 12)));
+
+    const status = typeof raw.status === 'string' ? raw.status : undefined;
+    const type = typeof raw.type === 'string' ? raw.type : undefined;
+
+    const minPrice = toNumber(raw.minPrice);
+    const maxPrice = toNumber(raw.maxPrice);
+    const bedrooms = toNumber(raw.bedrooms);
+    const bathrooms = toNumber(raw.bathrooms);
+
+    const allowedSortBy = new Set(['createdAt', 'price', 'viewsCount']);
+    const sortBy =
+      typeof raw.sortBy === 'string' && allowedSortBy.has(raw.sortBy) ? raw.sortBy : 'createdAt';
+
+    const order = raw.order === 'asc' || raw.order === 'desc' ? raw.order : 'desc';
 
     const skip = (page - 1) * limit;
 
@@ -59,6 +101,8 @@ export const propertyService = {
 
     if (bedrooms !== undefined) where.bedrooms = bedrooms;
     if (bathrooms !== undefined) where.bathrooms = bathrooms;
+
+    const normalizedLanguage = SUPPORTED_LANGUAGES.has(language) ? language : 'en';
 
     const [properties, total] = await Promise.all([
       prisma.property.findMany({
@@ -81,7 +125,7 @@ export const propertyService = {
     ]);
 
     return {
-      properties,
+      properties: properties.map((property) => localizeProperty(property, normalizedLanguage)),
       meta: {
         total,
         page,
@@ -91,8 +135,9 @@ export const propertyService = {
     };
   },
 
-  async getPropertyById(propertyId: string) {
-    return await prisma.property.findFirst({
+  async getPropertyById(propertyId: string, language = 'en') {
+    const normalizedLanguage = SUPPORTED_LANGUAGES.has(language) ? language : 'en';
+    const property = await prisma.property.findFirst({
       where: {
         id: propertyId,
         isDeleted: false,
@@ -108,6 +153,9 @@ export const propertyService = {
         },
       },
     });
+
+    if (!property) return null;
+    return localizeProperty(property, normalizedLanguage);
   },
 
   async updateProperty(ownerId: string, propertyId: string, data: UpdatePropertyInput) {
@@ -142,7 +190,7 @@ export const propertyService = {
   },
 
   async getMyProperties(ownerId: string) {
-    return await prisma.property.findMany({
+    const properties = await prisma.property.findMany({
       where: {
         ownerId,
         isDeleted: false,
@@ -151,6 +199,7 @@ export const propertyService = {
         createdAt: 'desc',
       },
     });
+    return properties.map((property) => localizeProperty(property, 'en'));
   },
 
   async updatePropertyStatus(ownerId: string, propertyId: string, status: PropertyStatus) {
@@ -164,6 +213,95 @@ export const propertyService = {
     return await prisma.property.update({
       where: { id: propertyId },
       data: { status },
+    });
+  },
+
+  async upsertPropertyTranslation(
+    ownerId: string,
+    propertyId: string,
+    language: 'en' | 'am',
+    title: string,
+    description: string
+  ) {
+    const existing = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+      select: { ownerId: true, title: true, description: true },
+    });
+
+    if (!existing) return null;
+    if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
+
+    const titleMap = toRecord(existing.title);
+    const descriptionMap = toRecord(existing.description);
+
+    titleMap[language] = title;
+    descriptionMap[language] = description;
+
+    return await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        title: titleMap,
+        description: descriptionMap,
+      },
+    });
+  },
+
+  async updatePropertyTranslation(
+    ownerId: string,
+    propertyId: string,
+    language: 'en' | 'am',
+    title: string,
+    description: string
+  ) {
+    const existing = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+      select: { ownerId: true, title: true, description: true },
+    });
+
+    if (!existing) return null;
+    if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
+
+    const titleMap = toRecord(existing.title);
+    const descriptionMap = toRecord(existing.description);
+    if (!titleMap[language] || !descriptionMap[language]) return 'NOT_FOUND';
+
+    titleMap[language] = title;
+    descriptionMap[language] = description;
+
+    return await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        title: titleMap,
+        description: descriptionMap,
+      },
+    });
+  },
+
+  async deletePropertyTranslation(ownerId: string, propertyId: string, language: 'en' | 'am') {
+    if (language === 'en') return 'CANNOT_DELETE_ENGLISH';
+
+    const existing = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+      select: { ownerId: true, title: true, description: true },
+    });
+
+    if (!existing) return null;
+    if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
+
+    const titleMap = toRecord(existing.title);
+    const descriptionMap = toRecord(existing.description);
+
+    if (!titleMap[language] && !descriptionMap[language]) return 'NOT_FOUND';
+
+    delete titleMap[language];
+    delete descriptionMap[language];
+
+    return await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        title: titleMap,
+        description: descriptionMap,
+      },
     });
   },
 };

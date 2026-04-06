@@ -6,6 +6,7 @@ import { z } from 'zod';
 export const PropertyTypeEnum = z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE']);
 
 export const PropertyStatusEnum = z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE']);
+export const SupportedLanguageEnum = z.enum(['en', 'am']);
 
 export const SortByEnum = z.enum(['createdAt', 'price', 'viewsCount']);
 export const OrderEnum = z.enum(['asc', 'desc']);
@@ -88,6 +89,7 @@ export const updatePropertyStatusSchema = z.object({
 export const getPropertiesSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(12),
+  lang: SupportedLanguageEnum.optional(),
   status: PropertyStatusEnum.optional(),
   type: PropertyTypeEnum.optional(),
   minPrice: z.coerce.number().min(0).optional(),
@@ -116,6 +118,27 @@ export const deletePropertySchema = z.object({
   }),
 });
 
+export const addPropertyTranslationSchema = z.object({
+  language: SupportedLanguageEnum,
+  title: z.string().min(1),
+  description: z.string().min(1),
+});
+
+export const updatePropertyTranslationSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+});
+
+export const deletePropertyTranslationSchema = z.object({
+  propertyId: z.string().min(1, 'propertyId is required'),
+  lang: SupportedLanguageEnum,
+});
+
+export const translationParamsSchema = z.object({
+  propertyId: z.string().min(1, 'propertyId is required'),
+  lang: SupportedLanguageEnum,
+});
+
 /**
  * Types inferred from schemas
  */
@@ -124,3 +147,6 @@ export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>['body'];
 export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>['body'];
 export type GetPropertiesQueryInput = z.infer<typeof getPropertiesSchema>;
 export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>['params'];
+export type SupportedLanguage = z.infer<typeof SupportedLanguageEnum>;
+export type AddPropertyTranslationInput = z.infer<typeof addPropertyTranslationSchema>;
+export type UpdatePropertyTranslationInput = z.infer<typeof updatePropertyTranslationSchema>;

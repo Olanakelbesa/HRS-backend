@@ -16,6 +16,15 @@ import { deletePropertyController } from './controller';
 import { getMyPropertiesController } from './controller';
 import { updatePropertyStatusSchema } from './schema';
 import { updatePropertyStatusController } from './controller';
+import { addPropertyTranslationSchema } from './schema';
+import { updatePropertyTranslationSchema } from './schema';
+import { deletePropertyTranslationSchema } from './schema';
+import { translationParamsSchema } from './schema';
+import {
+  addPropertyTranslationController,
+  updatePropertyTranslationController,
+  deletePropertyTranslationController,
+} from './controller';
 /**
  * @openapi
  * tags:
@@ -298,6 +307,28 @@ router.patch(
   requireAuth,
   validate(updatePropertyStatusSchema, 'body'),
   updatePropertyStatusController
+);
+
+router.post(
+  '/:propertyId/translations',
+  requireAuth,
+  validate(addPropertyTranslationSchema, 'body'),
+  addPropertyTranslationController
+);
+
+router.put(
+  '/:propertyId/translations/:lang',
+  requireAuth,
+  validate(translationParamsSchema, 'params'),
+  validate(updatePropertyTranslationSchema, 'body'),
+  updatePropertyTranslationController
+);
+
+router.delete(
+  '/:propertyId/translations/:lang',
+  requireAuth,
+  validate(deletePropertyTranslationSchema, 'params'),
+  deletePropertyTranslationController
 );
 
 export default router;
