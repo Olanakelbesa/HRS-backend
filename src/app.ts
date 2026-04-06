@@ -63,7 +63,18 @@ app.use(rateLimiter);
 app.get('/swagger.json', (req, res) => {
   res.json(swaggerSpec);
 });
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    swaggerOptions: {
+      filter: true,
+      docExpansion: 'none',
+      defaultModelsExpandDepth: -1,
+    },
+  })
+);
 
 // Landing page route
 app.get('/', (req, res) => {
