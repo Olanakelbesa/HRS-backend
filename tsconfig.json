@@ -8,6 +8,7 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] },
     "typeRoots": ["./node_modules/@types", "./src/@types"]

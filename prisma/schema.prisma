@@ -59,7 +59,16 @@ model User {
   notifications       Notification[]
   auditLogs           AuditLog[]
 
-  // reviews           Review[]
+  status            UserStatus @default(active)
+  verificationState VerificationState @default(pending_otp)
+
+  renterAgreements  Agreement[] @relation("RenterAgreements")
+  ownerAgreements   Agreement[] @relation("OwnerAgreements")
+  reportsSubmitted  Report[] @relation("SubmittedReports")
+  verificationDocs  VerificationDocument[] @relation("VerificationDocuments")
+  reviewedDocs      VerificationDocument[] @relation("ReviewedDocuments")
+
+  reviews           Review[]
   // notifications     Notification[]
   // searchHistories   SearchHistory[]
   // preferences       UserPreference?
@@ -125,6 +134,19 @@ enum Role {
   admin
 }
 
+enum UserStatus {
+  active
+  suspended
+  banned
+}
+
+enum VerificationState {
+  verified
+  pending_otp
+  pending_documents
+  rejected
+}
+
 // =======================
 // MESSAGING MODELS
 // =======================
@@ -188,6 +210,7 @@ model Property {
 
   conversations Conversation[]
   appointments  Appointment[]
+  agreements    Agreement[]
 
   @@index([ownerId])
   @@index([price])
@@ -345,4 +368,129 @@ enum NotificationType {
   MESSAGE_NEW
   APPOINTMENT_BOOKED
   APPOINTMENT_UPDATED
+}
+
+// =======================
+// ADMIN & PLATFORM MODELS
+// =======================
+
+model Agreement {
+  id            String   @id @default(cuid())
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renterId      String
+  renter        User     @relation("RenterAgreements", fields: [renterId], references: [id])
+  ownerId       String
+  owner         User     @relation("OwnerAgreements", fields: [ownerId], references: [id])
+  monthlyRent   Float
+  currency      String   @default("ETB")
+  startDate     DateTime
+  endDate       DateTime
+  status        AgreementStatus @default(draft)
+  paymentStatus PaymentStatus @default(pending)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+}
+
+enum AgreementStatus {
+  active
+  pending_renter
+  pending_owner
+  draft
+  terminated
+  expired
+}
+
+enum PaymentStatus {
+  confirmed
+  proof_uploaded
+  pending
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reportedById   String
+  reportedBy     User     @relation("SubmittedReports", fields: [reportedById], references: [id])
+  targetId       String
+  targetType     ReportTargetType
+  category       String
+  description    String
+  status         ReportStatus @default(open)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([reportedById])
+  @@index([targetId])
+}
+
+enum ReportTargetType {
+  property
+  user
+  agreement
+  other
+}
+
+enum ReportStatus {
+  open
+  in_review
+  resolved
+  dismissed
+}
+
+model VerificationDocument {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation("VerificationDocuments", fields: [userId], references: [id])
+  documentType   VerificationDocumentType
+  documentUrl    String
+  status         VerificationStatus @default(pending)
+  submittedAt    DateTime @default(now())
+  reviewedAt     DateTime?
+  reviewedById   String?
+  reviewedBy     User?    @relation("ReviewedDocuments", fields: [reviewedById], references: [id])
+
+  @@index([userId])
+}
+
+enum VerificationDocumentType {
+  national_id
+  passport
+  ownership_deed
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+}
+
+model Review {
+  id          String       @id @default(cuid())
+  reviewerId  String
+  reviewer    User         @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  targetType  ReviewTargetType
+  targetId    String
+  rating      Int
+  comment     String
+  status      ReviewStatus @default(published)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([reviewerId])
+  @@index([targetId, targetType])
+}
+
+enum ReviewTargetType {
+  property
+  owner
+}
+
+enum ReviewStatus {
+  published
+  flagged
+  removed
 }

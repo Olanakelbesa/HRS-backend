@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const optionalNonEmptyString = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().min(1).optional()
+);
+
 export const createConversationSchema = z.object({
   ownerId: z.string().min(1),
   renterId: z.string().min(1),
@@ -8,12 +13,12 @@ export const createConversationSchema = z.object({
 
 export const createMessageSchema = z.object({
   content: z.string().min(1).max(2000),
-  replyToId: z.string().min(1).optional(),
+  replyToId: optionalNonEmptyString,
 });
 
 export const sendAttachmentSchema = z.object({
   caption: z.string().max(2000).optional(),
-  replyToId: z.string().min(1).optional(),
+  replyToId: optionalNonEmptyString,
 });
 
 export const listMessagesQuerySchema = z.object({
