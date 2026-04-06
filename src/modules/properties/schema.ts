@@ -1,25 +1,14 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * MUST match Prisma enums EXACTLY
  */
-export const PropertyTypeEnum = z.enum([
-  "VILLA",
-  "APARTMENT",
-  "CONDO",
-  "STUDIO",
-  "HOUSE",
-]);
+export const PropertyTypeEnum = z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE']);
 
-export const PropertyStatusEnum = z.enum([
-  "AVAILABLE",
-  "PENDING",
-  "RENTED",
-  "UNAVAILABLE",
-]);
+export const PropertyStatusEnum = z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE']);
 
-export const SortByEnum = z.enum(["createdAt", "price", "viewsCount"]);
-export const OrderEnum = z.enum(["asc", "desc"]);
+export const SortByEnum = z.enum(['createdAt', 'price', 'viewsCount']);
+export const OrderEnum = z.enum(['asc', 'desc']);
 
 export const MultiLangTextSchema = z.object({
   en: z.string().min(1),
@@ -53,13 +42,12 @@ export const createPropertySchema = z.object({
   }),
 });
 
-
 /**
  * Update Property Schema
  */
 export const updatePropertySchema = z.object({
   params: z.object({
-    propertyId: z.string().min(1, "propertyId is required"),
+    propertyId: z.string().min(1, 'propertyId is required'),
   }),
   body: z
     .object({
@@ -87,7 +75,7 @@ export const updatePropertySchema = z.object({
  */
 export const updatePropertyStatusSchema = z.object({
   params: z.object({
-    propertyId: z.string().min(1, "propertyId is required"),
+    propertyId: z.string().min(1, 'propertyId is required'),
   }),
   body: z.object({
     status: PropertyStatusEnum,
@@ -98,18 +86,16 @@ export const updatePropertyStatusSchema = z.object({
  * Get Properties Query Schema
  */
 export const getPropertiesSchema = z.object({
-  query: z.object({
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(50).default(12),
-    status: PropertyStatusEnum.optional(),
-    type: PropertyTypeEnum.optional(),
-    minPrice: z.coerce.number().min(0).optional(),
-    maxPrice: z.coerce.number().min(0).optional(),
-    bedrooms: z.coerce.number().int().min(0).optional(),
-    bathrooms: z.coerce.number().int().min(0).optional(),
-    sortBy: SortByEnum.default("createdAt"),
-    order: OrderEnum.default("desc"),
-  }),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  status: PropertyStatusEnum.optional(),
+  type: PropertyTypeEnum.optional(),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+  bedrooms: z.coerce.number().int().min(0).optional(),
+  bathrooms: z.coerce.number().int().min(0).optional(),
+  sortBy: SortByEnum.default('createdAt'),
+  order: OrderEnum.default('desc'),
 });
 
 /**
@@ -117,7 +103,7 @@ export const getPropertiesSchema = z.object({
  */
 export const getPropertyByIdSchema = z.object({
   params: z.object({
-    propertyId: z.string().min(1, "propertyId is required"),
+    propertyId: z.string().min(1, 'propertyId is required'),
   }),
 });
 
@@ -126,7 +112,7 @@ export const getPropertyByIdSchema = z.object({
  */
 export const deletePropertySchema = z.object({
   params: z.object({
-    propertyId: z.string().min(1, "propertyId is required"),
+    propertyId: z.string().min(1, 'propertyId is required'),
   }),
 });
 
@@ -136,5 +122,5 @@ export const deletePropertySchema = z.object({
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>['body'];
 export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>['body'];
 export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>['body'];
-export type GetPropertiesQueryInput = z.infer<typeof getPropertiesSchema>['query'];
+export type GetPropertiesQueryInput = z.infer<typeof getPropertiesSchema>;
 export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>['params'];
