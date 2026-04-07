@@ -38,6 +38,7 @@ model User {
   name       String?
   role       UserRole   @default(RENTER)
   properties Property[]
+  reviews Review[]
 
   // Security fields
   isActive       Boolean   @default(true)
@@ -79,6 +80,7 @@ model Property {
   description Json
   location    String
   address     String?
+  reviews Review[]
 
   price     Float
   bedrooms  Int?
@@ -105,4 +107,23 @@ model Property {
   @@index([price])
   @@index([status])
   @@index([type])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+
+  rating     Int      // 1–5
+  comment    String?
+
+  userId     String
+  propertyId String
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, propertyId]) 
+  @@index([userId])
 }

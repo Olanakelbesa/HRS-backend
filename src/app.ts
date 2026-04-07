@@ -12,6 +12,7 @@ import { rateLimiter } from './middlewares/rateLimiter';
 import authRoutes from './modules/auth/routes';
 import userRoutes from './modules/users/routes';
 import propertyRoutes from './modules/properties/routes';
+import reviewRoutes from './modules/review-rate/routes';
 
 const app = express();
 
@@ -49,6 +50,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/properties', propertyRoutes);
+app.use('/api/v1/review', reviewRoutes);
+
 
 // Global Error Handler
 app.use(errorHandler);
