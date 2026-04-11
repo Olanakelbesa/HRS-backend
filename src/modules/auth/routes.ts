@@ -15,7 +15,30 @@ const router = Router();
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UserCreateInput'
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *               first_name:
+ *                 type: string
+ *               last_name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *                 example: "+251911000000"
+ *               role:
+ *                 type: string
+ *                 enum: [owner, renter]
+ *                 default: renter
+ *                 example: owner
+ *                 description: Select account role during registration
  *     responses:
  *       201:
  *         description: User created
