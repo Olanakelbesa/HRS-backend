@@ -22,7 +22,12 @@ export const registerSchema = z.object({
       (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
       phoneSchema.optional()
     ),
-    role: z.enum(['renter', 'owner', 'admin']).optional(),
+    role: z
+      .preprocess(
+        (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
+        z.enum(['renter', 'owner'])
+      )
+      .optional(),
   }),
 });
 

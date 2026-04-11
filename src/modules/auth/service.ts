@@ -129,13 +129,8 @@ export async function register(input: RegisterInput) {
 
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-  // Default to renter if not specified, but respect input if allowed
-  // For security, usually roles like 'admin' should not be self-assignable in public registration
-  // But adhering to input for now as per schema
-  const role = input.role || 'renter';
-  if (role === 'admin') {
-    // TODO: Add safeguard or logic to prevent unauthorized admin creation
-  }
+  // Registration supports only renter/owner roles, with renter as default.
+  const role = input.role ?? 'renter';
 
   let user;
   try {
