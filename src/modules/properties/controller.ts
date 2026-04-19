@@ -1,11 +1,21 @@
 import { Request, Response } from 'express';
-import { propertyService } from "./service";
-import { CreatePropertyInput } from "./schema";
-import { GetPropertiesQueryInput } from "./schema";
-import { UpdatePropertyInput } from "./schema";
-import { UpdatePropertyStatusInput } from "./schema";
+import { propertyService } from './service';
+import { CreatePropertyInput } from './schema';
+import { GetPropertiesQueryInput } from './schema';
+import { UpdatePropertyInput } from './schema';
+import { UpdatePropertyStatusInput } from './schema';
+import { AddPropertyTranslationInput } from './schema';
+import { UpdatePropertyTranslationInput } from './schema';
 
+const resolveLanguage = (req: Request): 'en' | 'am' => {
+  const queryLang = typeof req.query.lang === 'string' ? req.query.lang.toLowerCase() : undefined;
+  if (queryLang === 'en' || queryLang === 'am') return queryLang;
 
+  const header = req.headers['accept-language'];
+  const raw = Array.isArray(header) ? header[0] : header;
+  const normalized = raw?.split(',')[0]?.split('-')[0]?.toLowerCase();
+  return normalized === 'am' ? 'am' : 'en';
+};
 
 // export async function list(req: Request, res: Response) {
 //   const page = Number(req.query.page) || 1;
@@ -18,9 +28,6 @@ import { UpdatePropertyStatusInput } from "./schema";
 //   const property = await propertyService.getPropertyById(String(req.params.id));
 //   return res.status(200).json({ status: 'success', data: { property } });
 // }
-
-
-
 
 /**
  * Create Property Controller
@@ -37,7 +44,7 @@ export const createPropertyController = async (req: Request, res: Response) => {
 
     if (!ownerId) {
       return res.status(401).json({
-        message: "Unauthorized. Please login.",
+        message: 'Unauthorized. Please login.',
       });
     }
 
@@ -46,19 +53,18 @@ export const createPropertyController = async (req: Request, res: Response) => {
     const property = await propertyService.createProperty(ownerId, body);
 
     return res.status(201).json({
-      message: "Property created successfully",
+      message: 'Property created successfully',
       data: property,
     });
   } catch (error: any) {
-    console.error("Create property error:", error);
+    console.error('Create property error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
       error: error.message,
     });
   }
 };
-
 
 /**
  * GET /api/properties
@@ -66,119 +72,100 @@ export const createPropertyController = async (req: Request, res: Response) => {
 export const getPropertiesController = async (req: Request, res: Response) => {
   try {
     const query = req.query as unknown as GetPropertiesQueryInput;
+    const language = resolveLanguage(req);
 
-    const result = await propertyService.getProperties(query);
+    const result = await propertyService.getProperties(query, language);
 
     return res.status(200).json({
-      message: "Properties fetched successfully",
+      message: 'Properties fetched successfully',
       data: result.properties,
       meta: result.meta,
     });
   } catch (error: any) {
-    console.error("Get properties error:", error);
+    console.error('Get properties error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
       error: error.message,
     });
   }
 };
 
-
-export const getPropertyByIdController = async (
-  req: Request,
-  res: Response
-) => {
+export const getPropertyByIdController = async (req: Request, res: Response) => {
   try {
     const propertyId = req.params.propertyId as string;
+    const language = resolveLanguage(req);
 
-
-    const property = await propertyService.getPropertyById(propertyId);
+    const property = await propertyService.getPropertyById(propertyId, language);
 
     if (!property) {
       return res.status(404).json({
-        message: "Property not found",
+        message: 'Property not found',
       });
     }
 
     return res.status(200).json({
-      message: "Property fetched successfully",
+      message: 'Property fetched successfully',
       data: property,
     });
   } catch (error: any) {
-    console.error("Get property by id error:", error);
+    console.error('Get property by id error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
       error: error.message,
     });
   }
-
-  
 };
 
-
-
-
-export const updatePropertyController = async (
-  req: Request,
-  res: Response
-) => {
+export const updatePropertyController = async (req: Request, res: Response) => {
   try {
     const ownerId = (req as any).user?.id;
 
     if (!ownerId) {
       return res.status(401).json({
-        message: "Unauthorized. Please login.",
+        message: 'Unauthorized. Please login.',
       });
     }
 
     const propertyId = req.params.propertyId as string;
     const body = req.body as UpdatePropertyInput;
 
-    const result = await propertyService.updateProperty(
-      ownerId,
-      propertyId,
-      body
-    );
+    const result = await propertyService.updateProperty(ownerId, propertyId, body);
 
     if (result === null) {
       return res.status(404).json({
-        message: "Property not found",
+        message: 'Property not found',
       });
     }
 
-    if (result === "UNAUTHORIZED") {
+    if (result === 'UNAUTHORIZED') {
       return res.status(401).json({
-        message: "Unauthorized. You are not the owner of this property.",
+        message: 'Unauthorized. You are not the owner of this property.',
       });
     }
 
     return res.status(200).json({
-      message: "Property updated successfully",
+      message: 'Property updated successfully',
       data: result,
     });
   } catch (error: any) {
-    console.error("Update property error:", error);
+    console.error('Update property error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
       error: error.message,
     });
   }
 };
 
-
-export const deletePropertyController = async (
-  req: Request,
-  res: Response
-) => {
+export const deletePropertyController = async (req: Request, res: Response) => {
   try {
     const ownerId = (req as any).user?.id;
 
     if (!ownerId) {
       return res.status(401).json({
-        message: "Unauthorized. Please login.",
+        message: 'Unauthorized. Please login.',
       });
     }
 
@@ -188,108 +175,222 @@ export const deletePropertyController = async (
 
     if (result === null) {
       return res.status(404).json({
-        message: "Property not found",
+        message: 'Property not found',
       });
     }
 
-    if (result === "UNAUTHORIZED") {
+    if (result === 'UNAUTHORIZED') {
       return res.status(401).json({
-        message: "Unauthorized. You are not the owner of this property.",
+        message: 'Unauthorized. You are not the owner of this property.',
       });
     }
 
     return res.status(200).json({
-      message: "Property soft deleted successfully",
+      message: 'Property soft deleted successfully',
       data: result,
     });
   } catch (error: any) {
-    console.error("Delete property error:", error);
+    console.error('Delete property error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
       error: error.message,
     });
   }
 };
 
-
-
-
-export const getMyPropertiesController = async (
-  req: Request,
-  res: Response
-) => {
+export const getMyPropertiesController = async (req: Request, res: Response) => {
   try {
     const ownerId = (req as any).user?.id;
 
     if (!ownerId) {
       return res.status(401).json({
-        message: "Unauthorized. Please login.",
+        message: 'Unauthorized. Please login.',
       });
     }
 
     const properties = await propertyService.getMyProperties(ownerId);
 
     return res.status(200).json({
-      message: "Owner properties fetched successfully",
+      message: 'Owner properties fetched successfully',
       data: properties,
     });
   } catch (error: any) {
-    console.error("Get my properties error:", error);
+    console.error('Get my properties error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
       error: error.message,
     });
   }
 };
 
-
-
-
-export const updatePropertyStatusController = async (
-  req: Request,
-  res: Response
-) => {
+export const updatePropertyStatusController = async (req: Request, res: Response) => {
   try {
     const ownerId = (req as any).user?.id;
 
     if (!ownerId) {
       return res.status(401).json({
-        message: "Unauthorized. Please login.",
+        message: 'Unauthorized. Please login.',
       });
     }
 
     const propertyId = req.params.propertyId as string;
     const { status } = req.body as UpdatePropertyStatusInput;
 
-    const result = await propertyService.updatePropertyStatus(
-      ownerId,
-      propertyId,
-      status
-    );
+    const result = await propertyService.updatePropertyStatus(ownerId, propertyId, status);
 
     if (result === null) {
       return res.status(404).json({
-        message: "Property not found",
+        message: 'Property not found',
       });
     }
 
-    if (result === "UNAUTHORIZED") {
+    if (result === 'UNAUTHORIZED') {
       return res.status(401).json({
-        message: "Unauthorized. You are not the owner of this property.",
+        message: 'Unauthorized. You are not the owner of this property.',
       });
     }
 
     return res.status(200).json({
-      message: "Property status updated successfully",
+      message: 'Property status updated successfully',
       data: result,
     });
   } catch (error: any) {
-    console.error("Update property status error:", error);
+    console.error('Update property status error:', error);
 
     return res.status(500).json({
-      message: "Internal server error",
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const addPropertyTranslationController = async (req: Request, res: Response) => {
+  try {
+    const ownerId = (req as any).user?.id;
+    if (!ownerId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const propertyId = req.params.propertyId as string;
+    const body = req.body as AddPropertyTranslationInput;
+
+    const result = await propertyService.upsertPropertyTranslation(
+      ownerId,
+      propertyId,
+      body.language,
+      body.title,
+      body.description
+    );
+
+    if (result === null) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    if (result === 'UNAUTHORIZED') {
+      return res.status(401).json({
+        message: 'Unauthorized. You are not the owner of this property.',
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Translation saved successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Add property translation error:', error);
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const updatePropertyTranslationController = async (req: Request, res: Response) => {
+  try {
+    const ownerId = (req as any).user?.id;
+    if (!ownerId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const propertyId = req.params.propertyId as string;
+    const language = req.params.lang as 'en' | 'am';
+    const body = req.body as UpdatePropertyTranslationInput;
+
+    const result = await propertyService.updatePropertyTranslation(
+      ownerId,
+      propertyId,
+      language,
+      body.title,
+      body.description
+    );
+
+    if (result === null) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    if (result === 'UNAUTHORIZED') {
+      return res.status(401).json({
+        message: 'Unauthorized. You are not the owner of this property.',
+      });
+    }
+    if (result === 'NOT_FOUND') {
+      return res.status(404).json({ message: 'Translation not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Translation updated successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Update property translation error:', error);
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const deletePropertyTranslationController = async (req: Request, res: Response) => {
+  try {
+    const ownerId = (req as any).user?.id;
+    if (!ownerId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const propertyId = req.params.propertyId as string;
+    const language = req.params.lang as 'en' | 'am';
+
+    const result = await propertyService.deletePropertyTranslation(ownerId, propertyId, language);
+
+    if (result === null) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    if (result === 'UNAUTHORIZED') {
+      return res.status(401).json({
+        message: 'Unauthorized. You are not the owner of this property.',
+      });
+    }
+    if (result === 'CANNOT_DELETE_ENGLISH') {
+      return res.status(400).json({ message: 'English translation cannot be deleted' });
+    }
+    if (result === 'NOT_FOUND') {
+      return res.status(404).json({ message: 'Translation not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Translation deleted successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('Delete property translation error:', error);
+    return res.status(500).json({
+      message: 'Internal server error',
       error: error.message,
     });
   }

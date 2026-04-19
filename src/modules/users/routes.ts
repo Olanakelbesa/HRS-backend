@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as userController from './controller';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -17,6 +17,10 @@ router.use(requireAuth);
  *     responses:
  *       200:
  *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserEnvelope'
  *       401:
  *         description: Unauthorized
  *   patch:
@@ -28,17 +32,137 @@ router.use(requireAuth);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
+ *             $ref: '#/components/schemas/UserUpdateInput'
  *     responses:
  *       200:
  *         description: Updated profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserEnvelope'
  *       401:
  *         description: Unauthorized
  */
 router.get('/profile', userController.getProfile);
 router.patch('/profile', userController.updateProfile);
+/**
+ * @swagger
+ * /api/v1/users/change-password:
+ *   patch:
+ *     summary: Change current user password
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.patch('/change-password', userController.changePassword);
+/**
+ * @swagger
+ * /api/v1/users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of users
+ *       403:
+ *         description: Forbidden
+ */
+router.get(
+  '/',
+  requireAuth,
+  restrictTo('ADMIN'),
+  userController.getAllUsers
+);
+
+/**
+ * @swagger
+ * /api/v1/users/{id}/role:
+ *   patch:
+ *     summary: Update user role (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [RENTER, OWNER, ADMIN]
+ *     responses:
+ *       200:
+ *         description: Role updated
+ */
+router.patch(
+  '/:id/role',
+  requireAuth,
+  restrictTo('ADMIN'),
+  userController.updateUserRole
+);
+/**
+ * @swagger
+ * /api/v1/users/{id}/status:
+ *   patch:
+ *     summary: Activate or deactivate user (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isActive:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: User status updated
+ */
+router.patch(
+  '/:id/status',
+  requireAuth,
+  restrictTo('ADMIN'),
+  userController.updateUserStatus
+);
 
 export default router;

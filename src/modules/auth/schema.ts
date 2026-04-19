@@ -7,11 +7,22 @@ const passwordSchema = z
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number');
 
+const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\+?[0-9]\d{7,14}$/, 'Phone number must be valid (8-15 digits, optional +)');
+
 export const registerSchema = z.object({
   body: z.object({
     email: z.string().email('Invalid email address'),
     password: passwordSchema,
-    name: z.string().min(1, 'Name is required').optional(),
+    first_name: z.string().min(1, 'First name is required').optional(),
+    last_name: z.string().min(1, 'Last name is required').optional(),
+    phone: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      phoneSchema.optional()
+    ),
+    role: z.enum(['renter', 'owner', 'admin']).optional(),
   }),
 });
 
@@ -22,5 +33,34 @@ export const loginSchema = z.object({
   }),
 });
 
+export const verifyEmailSchema = z.object({
+  body: z.object({
+    token: z.string().regex(/^\d{6}$/, 'Verification code must be exactly 6 digits'),
+  }),
+});
+
+export const resendVerificationCodeSchema = z.object({
+  body: z.object({
+    email: z.string().email('Invalid email address'),
+  }),
+});
+
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: z.string().email('Invalid email address'),
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    token: z.string().min(1, 'Reset token is required'),
+    password: passwordSchema,
+  }),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>['body'];
+export type ResendVerificationCodeInput = z.infer<typeof resendVerificationCodeSchema>['body'];
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>['body'];
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>['body'];

@@ -1,0 +1,109 @@
+name: Backend AI Review (Gemini + Telegram)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Get PR metadata
+      - name: Get PR Metadata
+        id: prinfo
+        run: |
+          echo "title=${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
+          echo "url=${{ github.event.pull_request.html_url }}" >> $GITHUB_OUTPUT
+          echo "author=${{ github.event.pull_request.user.login }}" >> $GITHUB_OUTPUT
+          echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+
+      # Step 3: Fetch PR diff
+      - name: Fetch PR Diff
+        run: |
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "${{ github.event.pull_request.diff_url }}" \
+          -o pr.diff
+          # Limit diff size for Gemini token safety (approx 15k chars)
+          head -c 15000 pr.diff > pr_limited.diff
+
+      # Step 4: Install jq
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # Step 5: Send Diff to Gemini
+      - name: Send Diff to Gemini
+        id: gemini
+        run: |
+          PROMPT="You are a senior backend architect reviewing a Node.js + Express + Prisma + TypeScript backend.
+          
+          Focus on:
+          - SECURITY: JWT misuse, Missing auth middleware, Prisma injection, validation, rate limiting, env exposure.
+          - PERFORMANCE: N+1 queries, blocking sync code, Redis misuse.
+          - ARCHITECTURE: Controller/service separation, AppError usage, logging, middleware order.
+          - CODE QUALITY: Type safety, Async/await mistakes, unhandled rejections.
+
+          Return your response in this structure:
+          CRITICAL ISSUES:
+          IMPROVEMENTS:
+          GOOD PRACTICES:
+          OVERALL RISK LEVEL: Low / Medium / High"
+
+          DIFF_CONTENT=$(cat pr_limited.diff)
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+            -d "$(jq -n \
+              --arg prompt "$PROMPT\n\nHere is the PR diff:\n$DIFF_CONTENT" \
+              '{contents:[{parts:[{text:$prompt}]}]}')")
+
+          echo "$RESPONSE" > response.json
+          
+          # Extract text using jq
+          COMMENT=$(jq -r '.candidates[0].content.parts[0].text' response.json)
+
+          # Use heredoc for multi-line output to GITHUB_OUTPUT
+          echo "comment<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # Step 6: Post comment on PR
+      - name: Post Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            🤖 **AI Backend Review**
+
+            ${{ steps.gemini.outputs.comment }}
+
+      # Step 7: Send Telegram Notification
+      - name: Send Notification to Telegram
+        run: |
+          # Truncate summary for Telegram message limits (4096 chars)
+          SUMMARY=$(echo "${{ steps.gemini.outputs.comment }}" | head -c 3500)
+
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d "$(jq -n \
+            --arg text "*New Backend PR Review*
+          **Title:** ${{ steps.prinfo.outputs.title }}
+          **Author:** ${{ steps.prinfo.outputs.author }}
+          **Branch:** ${{ steps.prinfo.outputs.branch }}
+
+          **Review Summary:**
+          $SUMMARY
+
+          🔗 [View PR](${{ steps.prinfo.outputs.url }})" \
+            --arg chat_id "${{ secrets.TELEGRAM_CHAT_ID }}" \
+            '{chat_id: $chat_id, text: $text, parse_mode: "Markdown"}')"

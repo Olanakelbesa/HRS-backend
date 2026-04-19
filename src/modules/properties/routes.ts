@@ -1,21 +1,30 @@
-import { Router } from "express";
+import { Router } from 'express';
 
 const router = Router();
-import { createPropertyController } from "./controller";
-import { createPropertySchema } from "./schema";
-import { validate } from "../../middlewares/validate";
-import { requireAuth } from "../../middlewares/auth.middleware";
-import { getPropertiesSchema } from "./schema";
-import { getPropertiesController } from "./controller";
-import { getPropertyByIdSchema } from "./schema";
-import { getPropertyByIdController } from "./controller";
-import { updatePropertySchema } from "./schema";
-import { updatePropertyController } from "./controller";
-import { deletePropertySchema } from "./schema";
-import { deletePropertyController } from "./controller";
-import { getMyPropertiesController } from "./controller";
-import { updatePropertyStatusSchema } from "./schema";
-import { updatePropertyStatusController } from "./controller";
+import { createPropertyController } from './controller';
+import { createPropertySchema } from './schema';
+import { validate } from '../../middlewares/validate';
+import { requireAuth } from '../../middlewares/auth.middleware';
+import { getPropertiesSchema } from './schema';
+import { getPropertiesController } from './controller';
+import { getPropertyByIdSchema } from './schema';
+import { getPropertyByIdController } from './controller';
+import { updatePropertySchema } from './schema';
+import { updatePropertyController } from './controller';
+import { deletePropertySchema } from './schema';
+import { deletePropertyController } from './controller';
+import { getMyPropertiesController } from './controller';
+import { updatePropertyStatusSchema } from './schema';
+import { updatePropertyStatusController } from './controller';
+import { addPropertyTranslationSchema } from './schema';
+import { updatePropertyTranslationSchema } from './schema';
+import { deletePropertyTranslationSchema } from './schema';
+import { translationParamsSchema } from './schema';
+import {
+  addPropertyTranslationController,
+  updatePropertyTranslationController,
+  deletePropertyTranslationController,
+} from './controller';
 /**
  * @openapi
  * tags:
@@ -86,7 +95,7 @@ import { updatePropertyStatusController } from "./controller";
  *       200:
  *         description: Properties fetched successfully
  */
-router.get("/", validate(getPropertiesSchema), getPropertiesController);
+router.get('/', validate(getPropertiesSchema, 'query'), getPropertiesController);
 
 /**
  * @openapi
@@ -107,13 +116,7 @@ router.get("/", validate(getPropertiesSchema), getPropertiesController);
  *       404:
  *         description: Property not found
  */
-router.get(
-  "/:propertyId",
-  validate(getPropertyByIdSchema),
-  getPropertyByIdController
-);
-
-
+router.get('/:propertyId', validate(getPropertyByIdSchema, 'params'), getPropertyByIdController);
 
 /**
  * @openapi
@@ -183,12 +186,7 @@ router.get(
  *       401:
  *         description: Unauthorized
  */
-router.post(
-  "/",
-  requireAuth,
-  validate(createPropertySchema),
-  createPropertyController
-);
+router.post('/', requireAuth, validate(createPropertySchema, 'body'), createPropertyController);
 
 /**
  * @openapi
@@ -219,9 +217,9 @@ router.post(
  *         description: Property not found
  */
 router.patch(
-  "/:propertyId",
+  '/:propertyId',
   requireAuth,
-  validate(updatePropertySchema),
+  validate(updatePropertySchema, 'body'),
   updatePropertyController
 );
 
@@ -248,12 +246,11 @@ router.patch(
  *         description: Property not found
  */
 router.delete(
-  "/:propertyId",
+  '/:propertyId',
   requireAuth,
-  validate(deletePropertySchema),
+  validate(deletePropertySchema, 'params'),
   deletePropertyController
 );
-
 
 /**
  * @openapi
@@ -269,7 +266,7 @@ router.delete(
  *       401:
  *         description: Unauthorized
  */
-router.get("/my", requireAuth, getMyPropertiesController);
+router.get('/my', requireAuth, getMyPropertiesController);
 
 /**
  * @openapi
@@ -306,10 +303,32 @@ router.get("/my", requireAuth, getMyPropertiesController);
  *         description: Property not found
  */
 router.patch(
-  "/:propertyId/status",
+  '/:propertyId/status',
   requireAuth,
-  validate(updatePropertyStatusSchema),
+  validate(updatePropertyStatusSchema, 'body'),
   updatePropertyStatusController
+);
+
+router.post(
+  '/:propertyId/translations',
+  requireAuth,
+  validate(addPropertyTranslationSchema, 'body'),
+  addPropertyTranslationController
+);
+
+router.put(
+  '/:propertyId/translations/:lang',
+  requireAuth,
+  validate(translationParamsSchema, 'params'),
+  validate(updatePropertyTranslationSchema, 'body'),
+  updatePropertyTranslationController
+);
+
+router.delete(
+  '/:propertyId/translations/:lang',
+  requireAuth,
+  validate(deletePropertyTranslationSchema, 'params'),
+  deletePropertyTranslationController
 );
 
 export default router;

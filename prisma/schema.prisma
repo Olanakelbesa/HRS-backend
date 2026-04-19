@@ -10,50 +10,111 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  RENTER
-  OWNER
-  ADMIN
-}
+// =======================
+// AUTH MODELS
+// =======================
 
-enum PropertyStatus {
-  AVAILABLE
-  PENDING
-  RENTED
-  UNAVAILABLE
-}
-
-enum PropertyType {
-  VILLA
-  APARTMENT
-  CONDO
-  STUDIO
-  HOUSE
-}
-
+// User model (core authentication + roles)
 model User {
-  id         String     @id @default(cuid())
-  email      String     @unique
-  password   String
-  name       String?
-  role       UserRole   @default(RENTER)
-  properties Property[]
-  reviews Review[]
+  id            String  @id @default(cuid())
+  first_name    String?
+  last_name     String?
+  email         String? @unique
+  password      String? // Add this for credentials login
+  emailVerified Boolean @default(false) // Changed from DateTime? to Boolean based on snippet, check logic
+  // actually standard next-auth uses DateTime? for emailVerified. But snippet says Boolean @default(false). I will stick to snippet.
+  // Wait, NextAuth usually uses DateTime for emailVerified. If I use Boolean, it might conflict if I use NextAuth adapter later.
+  // User snippet explicitly says: "emailVerified Boolean @default(false)". I will follow snippet.
+  image         String?
+  phone         String? @unique
 
-  // Security fields
-  isActive       Boolean   @default(true)
-  failedAttempts Int       @default(0)
-  lockedUntil    DateTime?
+  role              Role    @default(renter)
+  preferredLanguage String?
+  isVerified        Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  refreshTokens RefreshToken[]
 
-  @@index([email])
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+  
+  // Messaging relations
+  messagesSent     Message[]         @relation("UserMessages")
+  messageReactions MessageReaction[]
+  properties       Property[]        @relation("OwnerProperties")
+
+  // properties        Property[] @relation("OwnerProperties")
+  // appointmentsRenter Appointment[] @relation("RenterAppointments")
+  // appointmentsOwner  Appointment[] @relation("OwnerAppointments")
+
+  // inside User model
+
+  renterConversations Conversation[] @relation("RenterConversations")
+  ownerConversations  Conversation[] @relation("OwnerConversations")
+  renterAppointments  Appointment[]  @relation("RenterAppointments")
+  ownerAppointments   Appointment[]  @relation("OwnerAppointments")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+
+  status            UserStatus @default(active)
+  verificationState VerificationState @default(pending_otp)
+
+  renterAgreements  Agreement[] @relation("RenterAgreements")
+  ownerAgreements   Agreement[] @relation("OwnerAgreements")
+  reportsSubmitted  Report[] @relation("SubmittedReports")
+  verificationDocs  VerificationDocument[] @relation("VerificationDocuments")
+  reviewedDocs      VerificationDocument[] @relation("ReviewedDocuments")
+
+  reviews           Review[]
+  // notifications     Notification[]
+  // searchHistories   SearchHistory[]
+  // preferences       UserPreference?
+
+  // reportsSubmitted  Report[] @relation("SubmittedReports")
+  // reportsAgainst    Report[] @relation("ReportsAgainst")
 }
 
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
 model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
@@ -67,11 +128,56 @@ model RefreshToken {
   @@index([token])
 }
 
+enum Role {
+  renter
+  owner
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  banned
+}
+
+enum VerificationState {
+  verified
+  pending_otp
+  pending_documents
+  rejected
+}
+
+// =======================
+// MESSAGING MODELS
+// =======================
+
+model Conversation {
+  id String @id @default(cuid())
+
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  renterId String
+  renter   User   @relation("RenterConversations", fields: [renterId], references: [id])
+
+  ownerId String
+  owner   User   @relation("OwnerConversations", fields: [ownerId], references: [id])
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([propertyId])
+}
+
 model Property {
   id String @id @default(cuid())
 
   ownerId String
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   User   @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: Cascade)
 
   type   PropertyType
   status PropertyStatus @default(AVAILABLE)
@@ -103,27 +209,289 @@ model Property {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  conversations Conversation[]
+  appointments  Appointment[]
+  agreements    Agreement[]
+
   @@index([ownerId])
   @@index([price])
   @@index([status])
   @@index([type])
+  @@index([isDeleted])
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  PENDING
+  RENTED
+  UNAVAILABLE
+}
+
+enum PropertyType {
+  VILLA
+  APARTMENT
+  CONDO
+  STUDIO
+  HOUSE
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  propertyId String
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renterId   String
+  renter     User              @relation("RenterAppointments", fields: [renterId], references: [id], onDelete: Cascade)
+  ownerId    String
+  owner      User              @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
+  startsAt   DateTime
+  endsAt     DateTime
+  status     AppointmentStatus @default(PENDING)
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([startsAt])
+  @@index([status])
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  CANCELLED
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  senderId String
+  sender   User   @relation("UserMessages", fields: [senderId], references: [id])
+
+  type    MessageType   @default(TEXT)
+  content String
+  status  MessageStatus @default(SENT)
+
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([replyToId])
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url       String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  eventType  String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([eventType])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  MESSAGE_NEW
+  APPOINTMENT_BOOKED
+  APPOINTMENT_UPDATED
+}
+
+// =======================
+// ADMIN & PLATFORM MODELS
+// =======================
+
+model Agreement {
+  id            String   @id @default(cuid())
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renterId      String
+  renter        User     @relation("RenterAgreements", fields: [renterId], references: [id])
+  ownerId       String
+  owner         User     @relation("OwnerAgreements", fields: [ownerId], references: [id])
+  monthlyRent   Float
+  currency      String   @default("ETB")
+  startDate     DateTime
+  endDate       DateTime
+  status        AgreementStatus @default(draft)
+  paymentStatus PaymentStatus @default(pending)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+}
+
+enum AgreementStatus {
+  active
+  pending_renter
+  pending_owner
+  draft
+  terminated
+  expired
+}
+
+enum PaymentStatus {
+  confirmed
+  proof_uploaded
+  pending
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reportedById   String
+  reportedBy     User     @relation("SubmittedReports", fields: [reportedById], references: [id])
+  targetId       String
+  targetType     ReportTargetType
+  category       String
+  description    String
+  status         ReportStatus @default(open)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([reportedById])
+  @@index([targetId])
+}
+
+enum ReportTargetType {
+  property
+  user
+  agreement
+  other
+}
+
+enum ReportStatus {
+  open
+  in_review
+  resolved
+  dismissed
+}
+
+model VerificationDocument {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation("VerificationDocuments", fields: [userId], references: [id])
+  documentType   VerificationDocumentType
+  documentUrl    String
+  status         VerificationStatus @default(pending)
+  submittedAt    DateTime @default(now())
+  reviewedAt     DateTime?
+  reviewedById   String?
+  reviewedBy     User?    @relation("ReviewedDocuments", fields: [reviewedById], references: [id])
+
+  @@index([userId])
+}
+
+enum VerificationDocumentType {
+  national_id
+  passport
+  ownership_deed
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
 }
 
 model Review {
-  id         String   @id @default(cuid())
+  id          String       @id @default(cuid())
+  reviewerId  String
+  reviewer    User         @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  targetType  ReviewTargetType
+  targetId    String
+  rating      Int
+  comment     String
+  status      ReviewStatus @default(published)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  rating     Int      // 1–5
-  comment    String?
+  @@index([reviewerId])
+  @@index([targetId, targetType])
+}
 
-  userId     String
-  propertyId String
+enum ReviewTargetType {
+  property
+  owner
+}
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([userId, propertyId]) 
-  @@index([userId])
+enum ReviewStatus {
+  published
+  flagged
+  removed
 }

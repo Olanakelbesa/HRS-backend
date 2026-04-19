@@ -1,11 +1,74 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import type { Prisma } from '@prisma/client';
 import { Response } from 'express';
 import prisma from '../../config/database';
+import { env } from '../../config/env';
 import { AppError } from '../../core/AppError';
+import { sendEmail } from '../../emails/emailService';
 import { generateTokenPair, verifyRefreshToken } from '../../utils/jwt.utils';
-import type { RegisterInput, LoginInput } from './schema';
+import type {
+  RegisterInput,
+  LoginInput,
+  VerifyEmailInput,
+  ResendVerificationCodeInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+} from './schema';
 
 const SALT_ROUNDS = 12;
+const EMAIL_VERIFICATION_EXPIRY_HOURS = 1;
+const PASSWORD_RESET_EXPIRY_HOURS = 1;
+
+function generateSixDigitCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function createEmailVerificationToken(email: string): Promise<string> {
+  let token = generateSixDigitCode();
+  let attempts = 0;
+
+  while (attempts < 5) {
+    const existing = await prisma.verificationToken.findUnique({ where: { token } });
+    if (!existing) break;
+    token = generateSixDigitCode();
+    attempts += 1;
+  }
+
+  if (attempts >= 5) {
+    throw new AppError('Could not generate verification code. Please try again.', 500);
+  }
+
+  const expires = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
+
+  await prisma.verificationToken.deleteMany({ where: { identifier: email } });
+
+  await prisma.verificationToken.create({
+    data: {
+      identifier: email,
+      token,
+      expires,
+    },
+  });
+
+  return token;
+}
+
+async function sendVerificationEmail(email: string, firstName?: string | null): Promise<void> {
+  const verificationCode = await createEmailVerificationToken(email);
+
+  await sendEmail(
+    'verifyEmail',
+    email,
+    {
+      firstName: firstName ?? 'there',
+      verificationCode,
+      expiryHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
+      supportEmail: env.SUPPORT_EMAIL ?? env.EMAIL_FROM,
+    },
+    'Verify your email address'
+  );
+}
 
 /**
  * Set HTTP-Only cookie with refresh token
@@ -56,26 +119,73 @@ export async function register(input: RegisterInput) {
     throw new AppError('Email already registered', 409);
   }
 
+  const normalizedPhone = input.phone?.trim() || null;
+  if (normalizedPhone) {
+    const existingPhone = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    if (existingPhone) {
+      throw new AppError('Phone number already registered', 409);
+    }
+  }
+
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      password: hashedPassword,
-      name: input.name ?? null,
-      role: 'RENTER', // Default role
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      createdAt: true,
-    },
-  });
+  // Default to renter if not specified, but respect input if allowed
+  // For security, usually roles like 'admin' should not be self-assignable in public registration
+  // But adhering to input for now as per schema
+  const role = input.role || 'renter';
+  if (role === 'admin') {
+    // TODO: Add safeguard or logic to prevent unauthorized admin creation
+  }
+
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        email: input.email,
+        password: hashedPassword,
+        first_name: input.first_name ?? null,
+        last_name: input.last_name ?? null,
+        phone: normalizedPhone,
+        role,
+      } as Prisma.UserCreateInput,
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+        createdAt: true,
+        emailVerified: true,
+      } as Prisma.UserSelect,
+    });
+  } catch (error) {
+    const prismaError = error as { code?: string; meta?: { target?: string[] | string } };
+    if (prismaError.code === 'P2002') {
+      const target = prismaError.meta?.target;
+      const fields = Array.isArray(target) ? target : target ? [target] : [];
+      if (fields.includes('email')) {
+        throw new AppError('Email already registered', 409);
+      }
+      if (fields.includes('phone')) {
+        throw new AppError('Phone number already registered', 409);
+      }
+      throw new AppError('Duplicate value violates unique constraint', 409);
+    }
+    throw error;
+  }
 
   const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);
   await storeRefreshToken(user.id, refreshToken);
+
+  if (user.email) {
+    try {
+      await sendVerificationEmail(user.email, user.first_name);
+    } catch (error) {
+      console.warn(
+        `Email verification could not be sent to ${user.email}: ${(error as Error).message}`
+      );
+    }
+  }
 
   return { user, accessToken, refreshToken };
 }
@@ -89,9 +199,9 @@ export async function login(input: LoginInput) {
     throw new AppError('Invalid email or password', 401);
   }
 
-  // Check if account is active
-  if (!user.isActive) {
-    throw new AppError('Account is deactivated', 403);
+  // Check if account has password (social login users might not)
+  if (!user.password) {
+    throw new AppError('Please login with your social account', 400);
   }
 
   const valid = await bcrypt.compare(input.password, user.password);
@@ -99,10 +209,14 @@ export async function login(input: LoginInput) {
     throw new AppError('Invalid email or password', 401);
   }
 
+  if (!user.emailVerified) {
+    throw new AppError('Please verify your email before logging in', 403);
+  }
+
   const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);
   await storeRefreshToken(user.id, refreshToken);
 
-  const { password: _, failedAttempts: _fa, lockedUntil: _lu, ...safeUser } = user;
+  const { password: _, ...safeUser } = user;
   return { user: safeUser, accessToken, refreshToken };
 }
 
@@ -141,7 +255,7 @@ export async function refreshAccessToken(oldRefreshToken: string) {
   // Store new refresh token
   await storeRefreshToken(storedToken.user.id, refreshToken);
 
-  const { password: _, failedAttempts: _fa, lockedUntil: _lu, ...safeUser } = storedToken.user;
+  const { password: _, ...safeUser } = storedToken.user;
   return { user: safeUser, accessToken, refreshToken };
 }
 
@@ -155,12 +269,144 @@ export async function logout(refreshToken: string) {
 }
 
 /**
+ * Verify Email
+ */
+export async function verifyEmail(input: VerifyEmailInput) {
+  const tokenRecord = await prisma.verificationToken.findUnique({
+    where: { token: input.token },
+  });
+
+  if (!tokenRecord) {
+    throw new AppError('Invalid verification token', 400);
+  }
+
+  if (tokenRecord.expires < new Date()) {
+    await prisma.verificationToken.delete({
+      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+    });
+    throw new AppError('Verification token expired', 400);
+  }
+
+  const user = await prisma.user.update({
+    where: { email: tokenRecord.identifier },
+    data: { emailVerified: true },
+    select: { id: true, email: true, emailVerified: true },
+  });
+
+  // Clean up token
+  await prisma.verificationToken.delete({
+    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+  });
+
+  return user;
+}
+
+/**
+ * Resend email verification code
+ */
+export async function resendVerificationCode(input: ResendVerificationCodeInput) {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+    select: { email: true, first_name: true, emailVerified: true },
+  });
+
+  if (!user || user.emailVerified || !user.email) {
+    return;
+  }
+
+  await sendVerificationEmail(user.email, user.first_name);
+}
+
+/**
+ * Forgot Password - Send Reset Link
+ */
+export async function forgotPassword(input: ForgotPasswordInput) {
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  if (!user || !user.email) {
+    throw new AppError('Email not found', 404);
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000);
+
+  // Clean up old tokens for this user/identifier to prevent clutter
+  await prisma.verificationToken.deleteMany({
+    where: { identifier: user.email },
+  });
+
+  await prisma.verificationToken.create({
+    data: {
+      identifier: user.email,
+      token,
+      expires,
+    },
+  });
+
+  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+
+  await sendEmail(
+    'resetPassword',
+    user.email,
+    {
+      firstName: user.first_name ?? 'there',
+      resetUrl,
+      expiryHours: PASSWORD_RESET_EXPIRY_HOURS,
+      supportEmail: env.SUPPORT_EMAIL ?? env.EMAIL_FROM,
+    },
+    'Reset your password'
+  );
+}
+
+/**
+ * Reset Password
+ */
+export async function resetPassword(input: ResetPasswordInput) {
+  const tokenRecord = await prisma.verificationToken.findUnique({
+    where: { token: input.token },
+  });
+
+  if (!tokenRecord) {
+    throw new AppError('Invalid or expired password reset token', 400);
+  }
+
+  if (tokenRecord.expires < new Date()) {
+    await prisma.verificationToken.delete({
+      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+    });
+    throw new AppError('Token expired', 400);
+  }
+
+  const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
+
+  const user = await prisma.user.update({
+    where: { email: tokenRecord.identifier },
+    data: { password: hashedPassword },
+  });
+
+  // Clean up token
+  await prisma.verificationToken.delete({
+    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+  });
+
+  return { message: 'Password reset successfully' };
+}
+
+/**
  * Get current user
  */
 export async function getMe(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      role: true,
+      createdAt: true,
+      emailVerified: true,
+      phone: true,
+    },
   });
   if (!user) {
     throw new AppError('User not found', 404);

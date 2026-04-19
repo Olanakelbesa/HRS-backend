@@ -13,6 +13,6 @@ export const cloudinaryConfig = {
   // apiKey: process.env.CLOUDINARY_API_KEY,
   // apiSecret: process.env.CLOUDINARY_API_SECRET,
   get uploadPreset() {
-    return process.env.CLOUDINARY_UPLOAD_PRESET ?? 'house_rental';
+    return process.env.CLOUDINARY_URL ?? 'house_rental';
   },
 };
