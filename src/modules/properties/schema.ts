@@ -20,67 +20,55 @@ export const MultiLangTextSchema = z.object({
  * CREATE
  */
 export const createPropertySchema = z.object({
-  body: z.object({
-    type: PropertyTypeEnum,
-    title: MultiLangTextSchema,
-    description: MultiLangTextSchema,
-    location: z.string().min(1),
-    address: z.string().optional(),
+  type: PropertyTypeEnum,
+  title: MultiLangTextSchema,
+  description: MultiLangTextSchema,
+  location: z.string().min(1),
+  address: z.string().optional(),
 
-    price: z.number().positive(),
+  price: z.number().positive(),
 
-    bedrooms: z.number().int().min(0).optional(),
-    bathrooms: z.number().int().min(0).optional(),
-    area: z.number().positive().optional(),
+  bedrooms: z.number().int().min(0).optional(),
+  bathrooms: z.number().int().min(0).optional(),
+  area: z.number().positive().optional(),
 
-    amenities: z.any().optional(),
-    furnishingType: z.string().optional(),
+  amenities: z.any().optional(),
+  furnishingType: z.string().optional(),
 
-    images: z.array(z.string().url()).min(1),
-    videos: z.array(z.string().url()).optional(),
+  images: z.array(z.string().url()).min(1),
+  videos: z.array(z.string().url()).optional(),
 
-    rentTerms: z.any().optional(),
-  }),
+  rentTerms: z.any().optional(),
 });
 
 /**
  * Update Property Schema
  */
-export const updatePropertySchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
-  body: z
-    .object({
-      type: PropertyTypeEnum.optional(),
-      title: MultiLangTextSchema.optional(),
-      description: MultiLangTextSchema.optional(),
-      location: z.string().min(1).optional(),
-      address: z.string().optional(),
-      price: z.number().positive().optional(),
-      bedrooms: z.number().int().min(0).optional(),
-      bathrooms: z.number().int().min(0).optional(),
-      area: z.number().positive().optional(),
-      amenities: z.any().optional(),
-      furnishingType: z.string().optional(),
-      images: z.array(z.string().url()).optional(),
-      videos: z.array(z.string().url()).optional(),
-      rentTerms: z.any().optional(),
-      status: PropertyStatusEnum.optional(),
-    })
-    .strict(),
-});
+export const updatePropertySchema = z
+  .object({
+    type: PropertyTypeEnum.optional(),
+    title: MultiLangTextSchema.optional(),
+    description: MultiLangTextSchema.optional(),
+    location: z.string().min(1).optional(),
+    address: z.string().optional(),
+    price: z.number().positive().optional(),
+    bedrooms: z.number().int().min(0).optional(),
+    bathrooms: z.number().int().min(0).optional(),
+    area: z.number().positive().optional(),
+    amenities: z.any().optional(),
+    furnishingType: z.string().optional(),
+    images: z.array(z.string().url()).optional(),
+    videos: z.array(z.string().url()).optional(),
+    rentTerms: z.any().optional(),
+    status: PropertyStatusEnum.optional(),
+  })
+  .strict();
 
 /**
  * Update Property Status
  */
 export const updatePropertyStatusSchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
-  body: z.object({
-    status: PropertyStatusEnum,
-  }),
+  status: PropertyStatusEnum,
 });
 
 /**
@@ -104,18 +92,14 @@ export const getPropertiesSchema = z.object({
  * Get Property By Id Schema
  */
 export const getPropertyByIdSchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
+  propertyId: z.string().min(1, 'propertyId is required'),
 });
 
 /**
  * Delete Property Schema
  */
 export const deletePropertySchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
+  propertyId: z.string().min(1, 'propertyId is required'),
 });
 
 export const addPropertyTranslationSchema = z.object({
@@ -142,11 +126,11 @@ export const translationParamsSchema = z.object({
 /**
  * Types inferred from schemas
  */
-export type CreatePropertyInput = z.infer<typeof createPropertySchema>['body'];
-export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>['body'];
-export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>['body'];
+export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
+export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
+export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>;
 export type GetPropertiesQueryInput = z.infer<typeof getPropertiesSchema>;
-export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>['params'];
+export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>;
 export type SupportedLanguage = z.infer<typeof SupportedLanguageEnum>;
 export type AddPropertyTranslationInput = z.infer<typeof addPropertyTranslationSchema>;
 export type UpdatePropertyTranslationInput = z.infer<typeof updatePropertyTranslationSchema>;

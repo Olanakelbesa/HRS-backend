@@ -6,14 +6,14 @@ class ReviewService {
    * Enforces one review per user per property
    */
   async createReview(
-    userId: string,
+    reviewerId: string,
     propertyId: string,
     rating: number,
     comment?: string
   ) {
     const existing = await prisma.review.findUnique({
       where: {
-        userId_propertyId: { userId, propertyId },
+        reviewerId_propertyId: { reviewerId, propertyId },
       },
     });
 
@@ -23,13 +23,13 @@ class ReviewService {
 
     return prisma.review.create({
       data: {
+        reviewerId,
+        propertyId,
         rating,
-        comment,
-        user: { connect: { id: userId } },
-        property: { connect: { id: propertyId } },
+        comment: comment ?? "", // fix undefined issue
       },
       include: {
-        user: {
+        reviewer: {
           select: { id: true, email: true },
         },
       },
@@ -41,29 +41,29 @@ class ReviewService {
    */
   async updateReview(
     reviewId: string,
-    userId: string,
+    reviewerId: string,
     rating?: number,
     comment?: string
   ) {
     const result = await prisma.review.updateMany({
       where: {
         id: reviewId,
-        userId,
+        reviewerId,
       },
       data: {
-        rating,
-        comment,
+        ...(rating !== undefined && { rating }),
+        ...(comment !== undefined && { comment }),
       },
     });
 
     if (result.count === 0) {
-      throw new Error("Review not found or you are not allowed to update it");
+      throw new Error("Review not found or not authorized");
     }
 
     return prisma.review.findUnique({
       where: { id: reviewId },
       include: {
-        user: {
+        reviewer: {
           select: { id: true, email: true },
         },
       },
@@ -73,16 +73,16 @@ class ReviewService {
   /**
    * Delete a review (only owner can delete)
    */
-  async deleteReview(reviewId: string, userId: string) {
+  async deleteReview(reviewId: string, reviewerId: string) {
     const result = await prisma.review.deleteMany({
       where: {
         id: reviewId,
-        userId,
+        reviewerId,
       },
     });
 
     if (result.count === 0) {
-      throw new Error("Review not found or you are not allowed to delete it");
+      throw new Error("Review not found or not authorized");
     }
 
     return { message: "Review deleted successfully" };
@@ -95,7 +95,7 @@ class ReviewService {
     return prisma.review.findMany({
       where: { propertyId },
       include: {
-        user: {
+        reviewer: {
           select: { id: true, email: true },
         },
       },
@@ -106,9 +106,9 @@ class ReviewService {
   /**
    * Get reviews written by a user
    */
-  async getUserReviews(userId: string) {
+  async getUserReviews(reviewerId: string) {
     return prisma.review.findMany({
-      where: { userId },
+      where: { reviewerId },
       include: {
         property: {
           select: { id: true, title: true },

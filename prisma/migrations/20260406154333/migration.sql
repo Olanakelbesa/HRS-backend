@@ -120,6 +120,7 @@ CREATE TABLE "VerificationDocument" (
 );
 
 -- CreateTable
+DROP TABLE IF EXISTS "Review" CASCADE;
 CREATE TABLE "Review" (
     "id" TEXT NOT NULL,
     "reviewerId" TEXT NOT NULL,
