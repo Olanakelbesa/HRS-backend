@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { Response } from 'express';
 import prisma from '../../config/database';
@@ -25,6 +24,10 @@ function generateSixDigitCode(): string {
 }
 
 async function createEmailVerificationToken(email: string): Promise<string> {
+  return createSixDigitCodeToken(email, EMAIL_VERIFICATION_EXPIRY_HOURS);
+}
+
+async function createSixDigitCodeToken(email: string, expiryHours: number): Promise<string> {
   let token = generateSixDigitCode();
   let attempts = 0;
 
@@ -39,7 +42,7 @@ async function createEmailVerificationToken(email: string): Promise<string> {
     throw new AppError('Could not generate verification code. Please try again.', 500);
   }
 
-  const expires = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
+  const expires = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
 
   await prisma.verificationToken.deleteMany({ where: { identifier: email } });
 
@@ -268,7 +271,7 @@ export async function logout(refreshToken: string) {
  */
 export async function verifyEmail(input: VerifyEmailInput) {
   const tokenRecord = await prisma.verificationToken.findUnique({
-    where: { token: input.token },
+    where: { token: input.code },
   });
 
   if (!tokenRecord) {
@@ -277,7 +280,7 @@ export async function verifyEmail(input: VerifyEmailInput) {
 
   if (tokenRecord.expires < new Date()) {
     await prisma.verificationToken.delete({
-      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.code } },
     });
     throw new AppError('Verification token expired', 400);
   }
@@ -290,7 +293,7 @@ export async function verifyEmail(input: VerifyEmailInput) {
 
   // Clean up token
   await prisma.verificationToken.delete({
-    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.code } },
   });
 
   return user;
@@ -305,15 +308,19 @@ export async function resendVerificationCode(input: ResendVerificationCodeInput)
     select: { email: true, first_name: true, emailVerified: true },
   });
 
-  if (!user || user.emailVerified || !user.email) {
-    return;
+  if (!user || !user.email) {
+    throw new AppError('Email not found', 404);
+  }
+
+  if (user.emailVerified) {
+    throw new AppError('Email is already verified', 400);
   }
 
   await sendVerificationEmail(user.email, user.first_name);
 }
 
 /**
- * Forgot Password - Send Reset Link
+ * Forgot Password - Send Reset Code
  */
 export async function forgotPassword(input: ForgotPasswordInput) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
@@ -321,30 +328,14 @@ export async function forgotPassword(input: ForgotPasswordInput) {
     throw new AppError('Email not found', 404);
   }
 
-  const token = crypto.randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000);
-
-  // Clean up old tokens for this user/identifier to prevent clutter
-  await prisma.verificationToken.deleteMany({
-    where: { identifier: user.email },
-  });
-
-  await prisma.verificationToken.create({
-    data: {
-      identifier: user.email,
-      token,
-      expires,
-    },
-  });
-
-  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+  const resetCode = await createSixDigitCodeToken(user.email, PASSWORD_RESET_EXPIRY_HOURS);
 
   await sendEmail(
     'resetPassword',
     user.email,
     {
       firstName: user.first_name ?? 'there',
-      resetUrl,
+      resetCode,
       expiryHours: PASSWORD_RESET_EXPIRY_HOURS,
       supportEmail: env.SUPPORT_EMAIL ?? env.EMAIL_FROM,
     },
@@ -357,18 +348,18 @@ export async function forgotPassword(input: ForgotPasswordInput) {
  */
 export async function resetPassword(input: ResetPasswordInput) {
   const tokenRecord = await prisma.verificationToken.findUnique({
-    where: { token: input.token },
+    where: { token: input.code },
   });
 
   if (!tokenRecord) {
-    throw new AppError('Invalid or expired password reset token', 400);
+    throw new AppError('Invalid or expired password reset code', 400);
   }
 
   if (tokenRecord.expires < new Date()) {
     await prisma.verificationToken.delete({
-      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+      where: { identifier_token: { identifier: tokenRecord.identifier, token: input.code } },
     });
-    throw new AppError('Token expired', 400);
+    throw new AppError('Code expired', 400);
   }
 
   const hashedPassword = await bcrypt.hash(input.password, SALT_ROUNDS);
@@ -380,7 +371,7 @@ export async function resetPassword(input: ResetPasswordInput) {
 
   // Clean up token
   await prisma.verificationToken.delete({
-    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.token } },
+    where: { identifier_token: { identifier: tokenRecord.identifier, token: input.code } },
   });
 
   return { message: 'Password reset successfully' };

@@ -40,13 +40,18 @@ export const loginSchema = z.object({
 
 export const verifyEmailSchema = z.object({
   body: z.object({
-    token: z.string().regex(/^\d{6}$/, 'Verification code must be exactly 6 digits'),
+    code: z.string().regex(/^\d{6}$/, 'Verification code must be exactly 6 digits'),
   }),
 });
 
 export const resendVerificationCodeSchema = z.object({
   body: z.object({
-    email: z.string().email('Invalid email address'),
+    email: z
+      .string()
+      .trim()
+      .min(1, 'Email is required')
+      .email('Invalid email address')
+      .transform((value) => value.toLowerCase()),
   }),
 });
 
@@ -58,7 +63,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   body: z.object({
-    token: z.string().min(1, 'Reset token is required'),
+    code: z.string().regex(/^\d{6}$/, 'Reset code must be exactly 6 digits'),
     password: passwordSchema,
   }),
 });

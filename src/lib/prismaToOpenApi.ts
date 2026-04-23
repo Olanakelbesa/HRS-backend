@@ -127,8 +127,7 @@ function parseField(line: string, enumNames: Set<string>): PrismaField | null {
   const isId = rest.includes('@id');
   const hasDefault = rest.includes('@default');
   const isUpdatedAt = rest.includes('@updatedAt');
-  const isRelation =
-    !SCALAR_TYPES.has(type) && (enumNames.has(type) || /^[A-Z]/.test(type));
+  const isRelation = !SCALAR_TYPES.has(type) && (enumNames.has(type) || /^[A-Z]/.test(type));
   return {
     name,
     type,
@@ -168,8 +167,7 @@ function prismaTypeToOpenApi(prismaType: string, enums: PrismaEnum[]): OpenApiSc
 function isExcludedFromInput(field: PrismaField): boolean {
   if (INPUT_EXCLUDE.has(field.name)) return true;
   if (field.isId || field.isUpdatedAt) return true;
-  if (field.hasDefault && (field.name === 'createdAt' || field.name === 'updatedAt'))
-    return true;
+  if (field.hasDefault && (field.name === 'createdAt' || field.name === 'updatedAt')) return true;
   return false;
 }
 
@@ -228,24 +226,26 @@ function generateAuthSchemas(
   const out: Record<string, OpenApiSchema> = {};
 
   if (user) {
-    out.LoginInput = modelPickToOpenApi(user, parsed.enums, ['email', 'password'], [
-      'email',
-      'password',
-    ]);
+    out.LoginInput = modelPickToOpenApi(
+      user,
+      parsed.enums,
+      ['email', 'password'],
+      ['email', 'password']
+    );
     out.ForgotPasswordInput = modelPickToOpenApi(user, parsed.enums, ['email'], ['email']);
     const pwd = modelPickToOpenApi(user, parsed.enums, ['password'], ['password']);
     const p = (pwd as Record<string, unknown>).properties as Record<string, OpenApiSchema>;
     out.ResetPasswordInput = {
       type: 'object',
-      required: ['token', 'password'],
-      properties: { token: { type: 'string' }, ...p },
+      required: ['code', 'password'],
+      properties: { code: { type: 'string' }, ...p },
     };
   }
 
   out.VerifyEmailInput = {
     type: 'object',
-    required: ['token'],
-    properties: { token: { type: 'string' } },
+    required: ['code'],
+    properties: { code: { type: 'string' } },
   };
 
   out.AuthUserEnvelope = {
@@ -294,12 +294,10 @@ export interface GenerateOptions {
 /**
  * All OpenAPI components.schemas from Prisma schema only. No hardcoded schemas.
  */
-export function generateOpenApiSchemas(options: GenerateOptions = {}): Record<string, OpenApiSchema> {
-  const {
-    schemaPath,
-    excludeModels = new Set(),
-    includeAuthSchemas = true,
-  } = options;
+export function generateOpenApiSchemas(
+  options: GenerateOptions = {}
+): Record<string, OpenApiSchema> {
+  const { schemaPath, excludeModels = new Set(), includeAuthSchemas = true } = options;
   const parsed = parsePrismaSchema(schemaPath);
   const { models, enums } = parsed;
   const schemas: Record<string, OpenApiSchema> = {};
