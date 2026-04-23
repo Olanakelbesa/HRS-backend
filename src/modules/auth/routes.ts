@@ -111,7 +111,7 @@ router.post('/logout', authController.logout);
  * @swagger
  * /api/v1/auth/verify-email:
  *   post:
- *     summary: Verify email using token
+ *     summary: Verify email using code
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -123,7 +123,7 @@ router.post('/logout', authController.logout);
  *       200:
  *         description: Email verified successfully
  *       400:
- *         description: Invalid or expired token
+ *         description: Invalid or expired code
  */
 router.post('/verify-email', authController.verifyEmail);
 
@@ -147,9 +147,11 @@ router.post('/verify-email', authController.verifyEmail);
  *                 format: email
  *     responses:
  *       200:
- *         description: Generic success response (anti-enumeration)
+ *         description: Verification code sent successfully
  *       400:
- *         description: Validation failed
+ *         description: Validation failed or email already verified
+ *       404:
+ *         description: Email not found
  */
 router.post('/resend-code', authController.resendVerificationCode);
 
@@ -157,7 +159,7 @@ router.post('/resend-code', authController.resendVerificationCode);
  * @swagger
  * /api/v1/auth/forgot-password:
  *   post:
- *     summary: Request password reset link
+ *     summary: Request password reset code
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -177,7 +179,7 @@ router.post('/forgot-password', authController.forgotPassword);
  * @swagger
  * /api/v1/auth/reset-password:
  *   post:
- *     summary: Reset password using token
+ *     summary: Reset password using code
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -189,7 +191,7 @@ router.post('/forgot-password', authController.forgotPassword);
  *       200:
  *         description: Password reset successfully
  *       400:
- *         description: Invalid or expired token
+ *         description: Invalid or expired code
  */
 router.post('/reset-password', authController.resetPassword);
 
