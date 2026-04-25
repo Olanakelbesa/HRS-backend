@@ -304,4 +304,81 @@ export const propertyService = {
       },
     });
   },
+  async trackPropertyView(propertyId: string, userId: string) {
+    if (!userId) return;
+
+    const existingView = await prisma.userInteraction.findFirst({
+      where: {
+        propertyId,
+        type: "VIEW",
+        userId,
+        createdAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      },
+    });
+
+    if (existingView) return;
+
+    await prisma.userInteraction.create({
+      data: {
+        propertyId,
+        userId,
+        type: "VIEW",
+      },
+    });
+
+    await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        viewsCount: { increment: 1 },
+      },
+    });
+  },
+
+  /**
+   * Increment view count for ALL visitors (authenticated or not)
+   * This ensures the view count works for anonymous users too
+   */
+  async incrementViewCount(propertyId: string) {
+    await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        viewsCount: { increment: 1 },
+      },
+    });
+  },
+
+  /**
+   * Get analytics for a specific owner's properties
+   * Returns: Total Properties, Available, Rented, Total Views
+   */
+  async getOwnerPropertyAnalytics(ownerId: string) {
+    // Get all properties for this owner
+    const properties = await prisma.property.findMany({
+      where: {
+        ownerId,
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        status: true,
+        viewsCount: true,
+      },
+    });
+
+    const totalProperties = properties.length;
+    const availableProperties = properties.filter((p) => p.status === 'AVAILABLE').length;
+    const rentedProperties = properties.filter((p) => p.status === 'RENTED').length;
+    const pendingProperties = properties.filter((p) => p.status === 'PENDING').length;
+    const totalViews = properties.reduce((sum, p) => sum + (p.viewsCount || 0), 0);
+
+    return {
+      totalProperties,
+      available: availableProperties,
+      rented: rentedProperties,
+      pending: pendingProperties,
+      totalViews,
+    };
+  }
 };

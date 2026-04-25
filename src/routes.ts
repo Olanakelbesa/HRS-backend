@@ -36,6 +36,6 @@ router.use('/admin', adminRoutes);
 router.use('/review', reviewRoutes);
 
 //RecommendationRoute
-router.use("/api", recommendationRoutes);
+router.use("/recommend", recommendationRoutes);
 
 export default router;

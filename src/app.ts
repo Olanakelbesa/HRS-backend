@@ -58,7 +58,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use(cookieParser());
 app.use(morgan('dev'));
 app.use(rateLimiter);
-
+app.set('trust proxy', true);
 // Swagger Documentation
 app.get('/swagger.json', (req, res) => {
   res.json(swaggerSpec);

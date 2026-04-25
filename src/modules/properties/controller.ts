@@ -6,7 +6,8 @@ import { UpdatePropertyInput } from './schema';
 import { UpdatePropertyStatusInput } from './schema';
 import { AddPropertyTranslationInput } from './schema';
 import { UpdatePropertyTranslationInput } from './schema';
-
+import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
+import { getClientIp } from '../../utils/getClientIp';
 const resolveLanguage = (req: Request): 'en' | 'am' => {
   const queryLang = typeof req.query.lang === 'string' ? req.query.lang.toLowerCase() : undefined;
   if (queryLang === 'en' || queryLang === 'am') return queryLang;
@@ -33,14 +34,11 @@ const resolveLanguage = (req: Request): 'en' | 'am' => {
  * Create Property Controller
  * POST /api/properties
  */
+
+
 export const createPropertyController = async (req: Request, res: Response) => {
   try {
-    /**
-     * IMPORTANT:
-     * req.user must exist from your auth middleware
-     * Example: req.user = { id: "..." }
-     */
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId;
 
     if (!ownerId) {
       return res.status(401).json({
@@ -50,7 +48,56 @@ export const createPropertyController = async (req: Request, res: Response) => {
 
     const body = req.body as CreatePropertyInput;
 
-    const property = await propertyService.createProperty(ownerId, body);
+    /**
+     * 📦 Files from multer
+     */
+    const files = req.files as {
+      images?: Express.Multer.File[];
+      videos?: Express.Multer.File[];
+    };
+
+    console.log('[createProperty] Files received:', {
+      imagesCount: files?.images?.length || 0,
+      videosCount: files?.videos?.length || 0,
+      hasBuffer: files?.images?.[0]?.buffer ? true : false,
+    });
+
+    /**
+     * ☁️ Upload images → Cloudinary
+     */
+    const imageUrls = await Promise.all(
+      (files?.images || []).map((file, index) => {
+        if (!file.buffer) {
+          console.error(`[createProperty] Image ${index} missing buffer`);
+          return null;
+        }
+        return uploadToCloudinary(file.buffer, 'properties/images', 'image');
+      })
+    ).then(results => results.filter((url): url is string => url !== null));
+
+    /**
+     * 🎥 Upload videos → Cloudinary
+     */
+    const videoUrls = await Promise.all(
+      (files?.videos || []).map((file, index) => {
+        if (!file.buffer) {
+          console.error(`[createProperty] Video ${index} missing buffer`);
+          return null;
+        }
+        return uploadToCloudinary(file.buffer, 'properties/videos', 'video');
+      })
+    ).then(results => results.filter((url): url is string => url !== null));
+
+    console.log('[createProperty] Uploaded URLs:', { imageUrls, videoUrls });
+
+    /**
+     * 💾 Save ONLY URLs in DB
+     */
+    const property = await propertyService.createProperty(ownerId, {
+      ...body,
+      images: imageUrls.length > 0 ? imageUrls : body.images || [],
+      videos: videoUrls.length > 0 ? videoUrls : body.videos || [],
+    });
 
     return res.status(201).json({
       message: 'Property created successfully',
@@ -65,7 +112,6 @@ export const createPropertyController = async (req: Request, res: Response) => {
     });
   }
 };
-
 /**
  * GET /api/properties
  */
@@ -104,6 +150,25 @@ export const getPropertyByIdController = async (req: Request, res: Response) => 
       });
     }
 
+    // =========================
+    // 🔥 VIEW TRACKING - Increment for ALL visitors (logged in or not)
+    // =========================
+
+    const userId = (req as any).userId;
+    console.log("👤 userId:", (req as any).userId);
+    
+    if (userId) {
+      // For logged-in users: track interaction (which also increments view count)
+      propertyService
+        .trackPropertyView(propertyId, userId)
+        .catch((err) => console.error('View tracking error:', err));
+    } else {
+      // For anonymous users: just increment the view count
+      propertyService
+        .incrementViewCount(propertyId)
+        .catch((err) => console.error('View count increment error:', err));
+    }
+    // =========================
     return res.status(200).json({
       message: 'Property fetched successfully',
       data: property,
@@ -120,7 +185,7 @@ export const getPropertyByIdController = async (req: Request, res: Response) => 
 
 export const updatePropertyController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId
 
     if (!ownerId) {
       return res.status(401).json({
@@ -161,8 +226,7 @@ export const updatePropertyController = async (req: Request, res: Response) => {
 
 export const deletePropertyController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
-
+    const ownerId = (req as any).userId
     if (!ownerId) {
       return res.status(401).json({
         message: 'Unauthorized. Please login.',
@@ -201,7 +265,7 @@ export const deletePropertyController = async (req: Request, res: Response) => {
 
 export const getMyPropertiesController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId
 
     if (!ownerId) {
       return res.status(401).json({
@@ -227,7 +291,7 @@ export const getMyPropertiesController = async (req: Request, res: Response) => 
 
 export const updatePropertyStatusController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId
 
     if (!ownerId) {
       return res.status(401).json({
@@ -268,7 +332,7 @@ export const updatePropertyStatusController = async (req: Request, res: Response
 
 export const addPropertyTranslationController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId
     if (!ownerId) {
       return res.status(401).json({
         message: 'Unauthorized. Please login.',
@@ -310,7 +374,7 @@ export const addPropertyTranslationController = async (req: Request, res: Respon
 
 export const updatePropertyTranslationController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId
     if (!ownerId) {
       return res.status(401).json({
         message: 'Unauthorized. Please login.',
@@ -356,7 +420,7 @@ export const updatePropertyTranslationController = async (req: Request, res: Res
 
 export const deletePropertyTranslationController = async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).user?.id;
+    const ownerId = (req as any).userId
     if (!ownerId) {
       return res.status(401).json({
         message: 'Unauthorized. Please login.',
@@ -389,6 +453,36 @@ export const deletePropertyTranslationController = async (req: Request, res: Res
     });
   } catch (error: any) {
     console.error('Delete property translation error:', error);
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/v1/properties/analytics
+ * Get property analytics for the authenticated owner
+ */
+export const getOwnerPropertyAnalyticsController = async (req: Request, res: Response) => {
+  try {
+    const ownerId = (req as any).userId;
+
+    if (!ownerId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const analytics = await propertyService.getOwnerPropertyAnalytics(ownerId);
+
+    return res.status(200).json({
+      message: 'Property analytics fetched successfully',
+      data: analytics,
+    });
+  } catch (error: any) {
+    console.error('Get property analytics error:', error);
+
     return res.status(500).json({
       message: 'Internal server error',
       error: error.message,
