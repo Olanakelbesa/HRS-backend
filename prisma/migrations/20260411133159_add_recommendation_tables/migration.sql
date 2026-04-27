@@ -14,9 +14,21 @@ CREATE TYPE "InteractionType" AS ENUM ('VIEW', 'LIKE', 'SAVE');
 DROP INDEX "Review_targetId_targetType_idx";
 
 -- AlterTable
+ALTER TABLE "Review" ADD COLUMN "propertyId" TEXT;
+
+-- Backfill propertyId from legacy target fields.
+-- Keep only reviews that target properties; owner-target reviews are incompatible with this schema.
+UPDATE "Review"
+SET "propertyId" = "targetId"
+WHERE "targetType" = 'property';
+
+DELETE FROM "Review"
+WHERE "propertyId" IS NULL;
+
+ALTER TABLE "Review" ALTER COLUMN "propertyId" SET NOT NULL;
+
 ALTER TABLE "Review" DROP COLUMN "targetId",
-DROP COLUMN "targetType",
-ADD COLUMN     "propertyId" TEXT NOT NULL;
+DROP COLUMN "targetType";
 
 -- CreateTable
 CREATE TABLE "UserPreference" (
