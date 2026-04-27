@@ -3,9 +3,30 @@ import { z } from 'zod';
 /**
  * MUST match Prisma enums EXACTLY
  */
-export const PropertyTypeEnum = z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE']);
+export const PropertyTypeEnum = z.preprocess(
+  (val) => {
+    if (typeof val === 'string') {
+      // Remove whitespace and possible exact literal quotes
+      let clean = val.trim();
+      if (clean.startsWith('"') && clean.endsWith('"')) {
+        clean = clean.slice(1, -1);
+      }
+      return clean.toUpperCase();
+    }
+    return val;
+  },
+  z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE','PENTHOUSE'])
+);
 
-export const PropertyStatusEnum = z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE']);
+const PROPERTY_STATUS_VALUES = ['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE'] as const;
+
+export const PropertyStatusEnum = z
+  .string()
+  .transform((val) => val.toUpperCase())
+  .refine((val): val is (typeof PROPERTY_STATUS_VALUES)[number] =>
+    PROPERTY_STATUS_VALUES.includes(val as any),
+    { message: 'Invalid status' }
+  );
 export const SupportedLanguageEnum = z.enum(['en', 'am']);
 
 export const SortByEnum = z.enum(['createdAt', 'price', 'viewsCount']);
@@ -17,70 +38,73 @@ export const MultiLangTextSchema = z.object({
 });
 
 /**
+ * Helper to parse JSON strings from multipart/form-data
+ */
+const jsonPreprocess = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => {
+    if (typeof val === 'string') {
+      try {
+        return JSON.parse(val);
+      } catch (e) {
+        return val;
+      }
+    }
+    return val;
+  }, schema);
+
+/**
  * CREATE
  */
 export const createPropertySchema = z.object({
-  body: z.object({
-    type: PropertyTypeEnum,
-    title: MultiLangTextSchema,
-    description: MultiLangTextSchema,
-    location: z.string().min(1),
-    address: z.string().optional(),
+  type: PropertyTypeEnum,
+  title: jsonPreprocess(MultiLangTextSchema),
+  description: jsonPreprocess(MultiLangTextSchema),
+  location: z.string().min(1),
+  address: z.string().optional(),
 
-    price: z.number().positive(),
+  price: z.coerce.number().positive(),
 
-    bedrooms: z.number().int().min(0).optional(),
-    bathrooms: z.number().int().min(0).optional(),
-    area: z.number().positive().optional(),
+  bedrooms: z.coerce.number().int().min(0).optional(),
+  bathrooms: z.coerce.number().int().min(0).optional(),
+  area: z.coerce.number().positive().optional(),
 
-    amenities: z.any().optional(),
-    furnishingType: z.string().optional(),
+  amenities: jsonPreprocess(z.any().optional()),
+  furnishingType: z.string().optional(),
 
-    images: z.array(z.string().url()).min(1),
-    videos: z.array(z.string().url()).optional(),
+  images: jsonPreprocess(z.array(z.string()).optional()), // Files uploaded via multer, URLs added in controller
+  videos: jsonPreprocess(z.array(z.string()).optional()),
 
-    rentTerms: z.any().optional(),
-  }),
+  rentTerms: jsonPreprocess(z.any().optional()),
 });
 
 /**
  * Update Property Schema
  */
-export const updatePropertySchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
-  body: z
-    .object({
-      type: PropertyTypeEnum.optional(),
-      title: MultiLangTextSchema.optional(),
-      description: MultiLangTextSchema.optional(),
-      location: z.string().min(1).optional(),
-      address: z.string().optional(),
-      price: z.number().positive().optional(),
-      bedrooms: z.number().int().min(0).optional(),
-      bathrooms: z.number().int().min(0).optional(),
-      area: z.number().positive().optional(),
-      amenities: z.any().optional(),
-      furnishingType: z.string().optional(),
-      images: z.array(z.string().url()).optional(),
-      videos: z.array(z.string().url()).optional(),
-      rentTerms: z.any().optional(),
-      status: PropertyStatusEnum.optional(),
-    })
-    .strict(),
-});
+export const updatePropertySchema = z
+  .object({
+    type: PropertyTypeEnum.optional(),
+    title: jsonPreprocess(MultiLangTextSchema).optional(),
+    description: jsonPreprocess(MultiLangTextSchema).optional(),
+    location: z.string().min(1).optional(),
+    address: z.string().optional(),
+    price: z.coerce.number().positive().optional(),
+    bedrooms: z.coerce.number().int().min(0).optional(),
+    bathrooms: z.coerce.number().int().min(0).optional(),
+    area: z.coerce.number().positive().optional(),
+    amenities: jsonPreprocess(z.any().optional()),
+    furnishingType: z.string().optional(),
+    images: jsonPreprocess(z.array(z.string().url()).optional()),
+    videos: jsonPreprocess(z.array(z.string().url()).optional()),
+    rentTerms: jsonPreprocess(z.any().optional()),
+    status: PropertyStatusEnum.optional(),
+  })
+  .strict();
 
 /**
  * Update Property Status
  */
 export const updatePropertyStatusSchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
-  body: z.object({
-    status: PropertyStatusEnum,
-  }),
+  status: PropertyStatusEnum,
 });
 
 /**
@@ -104,18 +128,14 @@ export const getPropertiesSchema = z.object({
  * Get Property By Id Schema
  */
 export const getPropertyByIdSchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
+  propertyId: z.string().min(1, 'propertyId is required'),
 });
 
 /**
  * Delete Property Schema
  */
 export const deletePropertySchema = z.object({
-  params: z.object({
-    propertyId: z.string().min(1, 'propertyId is required'),
-  }),
+  propertyId: z.string().min(1, 'propertyId is required'),
 });
 
 export const addPropertyTranslationSchema = z.object({
@@ -142,11 +162,11 @@ export const translationParamsSchema = z.object({
 /**
  * Types inferred from schemas
  */
-export type CreatePropertyInput = z.infer<typeof createPropertySchema>['body'];
-export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>['body'];
-export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>['body'];
+export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
+export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
+export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>;
 export type GetPropertiesQueryInput = z.infer<typeof getPropertiesSchema>;
-export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>['params'];
+export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>;
 export type SupportedLanguage = z.infer<typeof SupportedLanguageEnum>;
 export type AddPropertyTranslationInput = z.infer<typeof addPropertyTranslationSchema>;
 export type UpdatePropertyTranslationInput = z.infer<typeof updatePropertyTranslationSchema>;

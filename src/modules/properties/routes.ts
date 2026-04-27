@@ -5,6 +5,7 @@ import { createPropertyController } from './controller';
 import { createPropertySchema } from './schema';
 import { validate } from '../../middlewares/validate';
 import { requireAuth } from '../../middlewares/auth.middleware';
+import { memoryUpload } from '../../middlewares/multer.middleware';
 import { getPropertiesSchema } from './schema';
 import { getPropertiesController } from './controller';
 import { getPropertyByIdSchema } from './schema';
@@ -24,6 +25,7 @@ import {
   addPropertyTranslationController,
   updatePropertyTranslationController,
   deletePropertyTranslationController,
+  getOwnerPropertyAnalyticsController,
 } from './controller';
 /**
  * @openapi
@@ -94,8 +96,102 @@ import {
  *     responses:
  *       200:
  *         description: Properties fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Properties fetched successfully"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Property'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
  */
 router.get('/', validate(getPropertiesSchema, 'query'), getPropertiesController);
+
+
+/**
+ * @openapi
+ * /api/v1/properties/my:
+ *   get:
+ *     summary: Get properties created by logged-in owner
+ *     tags: [Property]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Owner properties fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Owner properties fetched successfully"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Property'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/my', requireAuth, getMyPropertiesController);
+
+/**
+ * @openapi
+ * /api/v1/properties/analytics:
+ *   get:
+ *     summary: Get property analytics for the authenticated owner
+ *     tags: [Property]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Property analytics fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property analytics fetched successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalProperties:
+ *                       type: integer
+ *                       example: 6
+ *                     available:
+ *                       type: integer
+ *                       example: 3
+ *                     rented:
+ *                       type: integer
+ *                       example: 2
+ *                     pending:
+ *                       type: integer
+ *                       example: 1
+ *                     totalViews:
+ *                       type: integer
+ *                       example: 5171
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/analytics', requireAuth, getOwnerPropertyAnalyticsController);
 
 /**
  * @openapi
@@ -113,6 +209,16 @@ router.get('/', validate(getPropertiesSchema, 'query'), getPropertiesController)
  *     responses:
  *       200:
  *         description: Property fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property fetched successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Property'
  *       404:
  *         description: Property not found
  */
@@ -183,10 +289,29 @@ router.get('/:propertyId', validate(getPropertyByIdSchema, 'params'), getPropert
  *     responses:
  *       201:
  *         description: Property created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property created successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Property'
  *       401:
  *         description: Unauthorized
  */
-router.post('/', requireAuth, validate(createPropertySchema, 'body'), createPropertyController);
+router.post(
+  '/',
+  requireAuth,
+  memoryUpload.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'videos', maxCount: 5 },
+  ]),
+  validate(createPropertySchema, 'body'),
+  createPropertyController
+);
 
 /**
  * @openapi
@@ -211,6 +336,16 @@ router.post('/', requireAuth, validate(createPropertySchema, 'body'), createProp
  *     responses:
  *       200:
  *         description: Property updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property updated successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Property'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -240,6 +375,16 @@ router.patch(
  *     responses:
  *       200:
  *         description: Property soft deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property soft deleted successfully"
+ *                 data:
+ *                   type: null
  *       401:
  *         description: Unauthorized
  *       404:
@@ -252,21 +397,7 @@ router.delete(
   deletePropertyController
 );
 
-/**
- * @openapi
- * /api/v1/properties/my:
- *   get:
- *     summary: Get properties created by logged-in owner
- *     tags: [Property]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Owner properties fetched successfully
- *       401:
- *         description: Unauthorized
- */
-router.get('/my', requireAuth, getMyPropertiesController);
+
 
 /**
  * @openapi
@@ -292,11 +423,21 @@ router.get('/my', requireAuth, getMyPropertiesController);
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [available, pending, rented, unavailable]
- *                 example: rented
+ *                 enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE, MAINTENANCE]
+ *                 example: "RENTED"
  *     responses:
  *       200:
  *         description: Property status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property status updated successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Property'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -309,26 +450,168 @@ router.patch(
   updatePropertyStatusController
 );
 
-router.post(
-  '/:propertyId/translations',
-  requireAuth,
-  validate(addPropertyTranslationSchema, 'body'),
-  addPropertyTranslationController
-);
+// /**
+//  * @openapi
+//  * /api/v1/properties/{propertyId}/translations:
+//  *   post:
+//  *     summary: Add a new translation for a property
+//  *     tags: [Property]
+//  *     security:
+//  *       - bearerAuth: []
+//  *     parameters:
+//  *       - in: path
+//  *         name: propertyId
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             required: [language, title, description]
+//  *             properties:
+//  *               language:
+//  *                 type: string
+//  *                 enum: [en, am]
+//  *                 example: "am"
+//  *               title:
+//  *                 type: string
+//  *                 example: "ዘመናዊ አፓርታማ"
+//  *               description:
+//  *                 type: string
+//  *                 example: "ጥሩ ቤት"
+//  *     responses:
+//  *       201:
+//  *         description: Translation saved successfully
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               type: object
+//  *               properties:
+//  *                 message:
+//  *                   type: string
+//  *                   example: "Translation saved successfully"
+//  *                 data:
+//  *                   type: object
+//  *       401:
+//  *         description: Unauthorized
+//  *       404:
+//  *         description: Property not found
+//  */
+// // router.post(
+// //   '/:propertyId/translations',
+// //   requireAuth,
+// //   validate(addPropertyTranslationSchema, 'body'),
+// //   addPropertyTranslationController
+// // );
 
-router.put(
-  '/:propertyId/translations/:lang',
-  requireAuth,
-  validate(translationParamsSchema, 'params'),
-  validate(updatePropertyTranslationSchema, 'body'),
-  updatePropertyTranslationController
-);
+// /**
+//  * @openapi
+//  * /api/v1/properties/{propertyId}/translations/{lang}:
+//  *   put:
+//  *     summary: Update an existing translation for a property
+//  *     tags: [Property]
+//  *     security:
+//  *       - bearerAuth: []
+//  *     parameters:
+//  *       - in: path
+//  *         name: propertyId
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *       - in: path
+//  *         name: lang
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *           enum: [en, am]
+//  *         example: "am"
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             required: [title, description]
+//  *             properties:
+//  *               title:
+//  *                 type: string
+//  *                 example: "ዘመናዊ አፓርታማ"
+//  *               description:
+//  *                 type: string
+//  *                 example: "ጥሩ ቤት"
+//  *     responses:
+//  *       200:
+//  *         description: Translation updated successfully
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               type: object
+//  *               properties:
+//  *                 message:
+//  *                   type: string
+//  *                   example: "Translation updated successfully"
+//  *                 data:
+//  *                   type: object
+//  *       401:
+//  *         description: Unauthorized
+//  *       404:
+//  *         description: Translation not found
+//  */
+// // router.put(
+// //   '/:propertyId/translations/:lang',
+// //   requireAuth,
+// //   validate(translationParamsSchema, 'params'),
+// //   validate(updatePropertyTranslationSchema, 'body'),
+// //   updatePropertyTranslationController
+// // );
 
-router.delete(
-  '/:propertyId/translations/:lang',
-  requireAuth,
-  validate(deletePropertyTranslationSchema, 'params'),
-  deletePropertyTranslationController
-);
+// /**
+//  * @openapi
+//  * /api/v1/properties/{propertyId}/translations/{lang}:
+//  *   delete:
+//  *     summary: Delete a translation for a property
+//  *     tags: [Property]
+//  *     security:
+//  *       - bearerAuth: []
+//  *     parameters:
+//  *       - in: path
+//  *         name: propertyId
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *       - in: path
+//  *         name: lang
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *           enum: [en, am]
+//  *         example: "am"
+//  *     responses:
+//  *       200:
+//  *         description: Translation deleted successfully
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               type: object
+//  *               properties:
+//  *                 message:
+//  *                   type: string
+//  *                   example: "Translation deleted successfully"
+//  *                 data:
+//  *                   type: null
+//  *       401:
+//  *         description: Unauthorized
+//  *       404:
+//  *         description: Translation not found
+//  */
+// // router.delete(
+// //   '/:propertyId/translations/:lang',
+// //   requireAuth,
+// //   validate(deletePropertyTranslationSchema, 'params'),
+// //   deletePropertyTranslationController
+// // );
 
 export default router;
