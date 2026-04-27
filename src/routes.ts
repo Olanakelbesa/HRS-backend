@@ -7,7 +7,6 @@ import appointmentRoutes from './modules/appointments/routes';
 import notificationRoutes from './modules/notifications/routes';
 import adminRoutes from './modules/admin/routes';
 import reviewRoutes from './modules/review-rate/routes';
-import recommendationRoutes from "./modules/recommendation/routes";
 
 const router = Router();
 
@@ -34,8 +33,5 @@ router.use('/admin', adminRoutes);
 
 //Review Routes
 router.use('/review', reviewRoutes);
-
-//RecommendationRoute
-router.use("/recommend", recommendationRoutes);
 
 export default router;
