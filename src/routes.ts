@@ -33,7 +33,7 @@ router.use('/notifications', notificationRoutes);
 router.use('/admin', adminRoutes);
 
 //Review Routes
-router.use('/review', reviewRoutes);
+router.use('/reviews', reviewRoutes);
 
 //RecommendationRoute
 router.use("/recommend", recommendationRoutes);

@@ -2,7 +2,8 @@ import { Router } from "express";
 import reviewController from "./controller";
 import { requireAuth } from "../../middlewares/auth.middleware";
 import { validate } from "../../middlewares/validate";
-import { createReviewSchema, updateReviewSchema } from "./schema";
+import { createReviewSchema, updateReviewSchema, replyReviewSchema } from "./schema";
+import { z } from "zod";
 
 const router = Router();
 
@@ -126,10 +127,10 @@ router.get("/me", requireAuth, reviewController.getMyReviews);
 router.patch(
   "/:reviewId",
   requireAuth,
-  validate(updateReviewSchema),
+  validate(z.object({ reviewId: z.string() }), "params"), // 👈 validate params
+  validate(updateReviewSchema, "body"),                  // 👈 validate body
   reviewController.update
 );
-
 /**
  * @swagger
  * /reviews/{reviewId}:
@@ -171,6 +172,102 @@ router.delete("/:reviewId", requireAuth, reviewController.remove);
 router.get(
   "/property/:propertyId/stats",
   reviewController.getPropertyStats
+);
+
+/**
+ * @swagger
+ * /reviews/owner:
+ *   get:
+ *     summary: Get all reviews for properties owned by the logged-in user
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: rating
+ *         schema:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [newest, oldest]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: number
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: number
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: List of owner's property reviews
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/owner", requireAuth, reviewController.getOwnerReviews);
+
+/**
+ * @swagger
+ * /reviews/owner/stats:
+ *   get:
+ *     summary: Get aggregated review stats for all properties owned by the logged-in user
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Owner review statistics
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/owner/stats", requireAuth, reviewController.getOwnerStats);
+
+/**
+ * @swagger
+ * /reviews/{reviewId}/reply:
+ *   patch:
+ *     summary: Reply to a review (property owner only)
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reviewId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reply
+ *             properties:
+ *               reply:
+ *                 type: string
+ *                 maxLength: 1000
+ *     responses:
+ *       200:
+ *         description: Review reply updated
+ *       403:
+ *         description: Not authorized to reply to this review
+ *       404:
+ *         description: Review not found
+ */
+router.patch(
+  "/:reviewId/reply",
+  requireAuth,
+  validate(z.object({ reviewId: z.string() }), "params"),
+  validate(replyReviewSchema, "body"),
+  reviewController.replyToReview
 );
 
 export default router;
