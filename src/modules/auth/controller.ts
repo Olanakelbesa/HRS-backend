@@ -160,7 +160,7 @@ export async function forgotPassword(req: Request, res: Response) {
 
   return res.status(200).json({
     status: 'success',
-    message: 'A password reset email has been sent.',
+    message: 'A password reset code has been sent.',
   });
 }
 
