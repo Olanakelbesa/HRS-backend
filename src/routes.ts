@@ -8,6 +8,8 @@ import notificationRoutes from './modules/notifications/routes';
 import adminRoutes from './modules/admin/routes';
 import reviewRoutes from './modules/review-rate/routes';
 import recommendationRoutes from "./modules/recommendation/routes";
+import reportsRoutes from './modules/reports/routes';
+
 
 const router = Router();
 
@@ -37,5 +39,8 @@ router.use('/reviews', reviewRoutes);
 
 //RecommendationRoute
 router.use("/recommend", recommendationRoutes);
+
+// Owner Reports Routes (Reports Against Me)
+router.use('/reports', reportsRoutes);
 
 export default router;
