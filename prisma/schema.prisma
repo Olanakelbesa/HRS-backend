@@ -418,16 +418,18 @@ enum PaymentStatus {
 }
 
 model Report {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   reportedById   String
-  reportedBy     User     @relation("SubmittedReports", fields: [reportedById], references: [id])
+  reportedBy     User      @relation("SubmittedReports", fields: [reportedById], references: [id])
   targetId       String
   targetType     ReportTargetType
   category       String
   description    String
   status         ReportStatus @default(open)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  ownerResponse  String?
+  respondedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([reportedById])
   @@index([targetId])
