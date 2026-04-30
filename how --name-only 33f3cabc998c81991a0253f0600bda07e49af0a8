@@ -1,0 +1,7 @@
+[33mcommit 0cce597f14619488ac52b23dfa45d32d650a57a8[m[33m ([m[1;31morigin/recommendation-feature[m[33m)[m
+Merge: 33f3cab 1e5bf07
+Author: nebutty <nebathussen2@gmail.com>
+Date:   Sun Apr 19 21:41:30 2026 +0300
+
+    Merge branch 'main' of https://github.com/SmartHouseRental/backend into recommendation-feature
+
