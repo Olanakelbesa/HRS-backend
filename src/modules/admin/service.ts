@@ -49,7 +49,7 @@ export async function getPlatformAnalytics(range?: '7d' | '30d' | '90d') {
     prisma.property.count({ where: { isDeleted: false, status: 'RENTED' } }),
     prisma.appointment.count(),
     prisma.appointment.count({ where: { status: 'PENDING' } }),
-    prisma.appointment.count({ where: { status: 'CONFIRMED' } }),
+    prisma.appointment.count({ where: { status: 'ACCEPTED' } }),
     prisma.conversation.count(),
     prisma.message.count(),
     prisma.notification.count(),
@@ -84,7 +84,7 @@ export async function getPlatformAnalytics(range?: '7d' | '30d' | '90d') {
     appointments: {
       total: totalAppointments,
       pending: pendingAppointments,
-      confirmed: confirmedAppointments,
+      accepted: confirmedAppointments,
     },
     engagement: {
       conversations: totalConversations,
@@ -297,22 +297,38 @@ export async function updateUserStatus(adminId: string, id: string, status: any)
     where: { id },
     data: { status },
   });
-  
+
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'USER_STATUS_UPDATE', entityType: 'User', entityId: id, metadata: { status } },
+    data: {
+      actorId: adminId,
+      eventType: 'USER_STATUS_UPDATE',
+      entityType: 'User',
+      entityId: id,
+      metadata: { status },
+    },
   });
 
   return user;
 }
 
-export async function updateUserVerificationState(adminId: string, id: string, verificationState: any) {
+export async function updateUserVerificationState(
+  adminId: string,
+  id: string,
+  verificationState: any
+) {
   const user = await prisma.user.update({
     where: { id },
     data: { verificationState },
   });
-  
+
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'USER_VERIFICATION_UPDATE', entityType: 'User', entityId: id, metadata: { verificationState } },
+    data: {
+      actorId: adminId,
+      eventType: 'USER_VERIFICATION_UPDATE',
+      entityType: 'User',
+      entityId: id,
+      metadata: { verificationState },
+    },
   });
 
   return user;
@@ -321,7 +337,12 @@ export async function updateUserVerificationState(adminId: string, id: string, v
 export async function getProperties(query: any) {
   const skip = (query.page - 1) * query.limit;
   const [items, total] = await Promise.all([
-    prisma.property.findMany({ skip, take: query.limit, orderBy: { createdAt: 'desc' }, include: { owner: true } }),
+    prisma.property.findMany({
+      skip,
+      take: query.limit,
+      orderBy: { createdAt: 'desc' },
+      include: { owner: true },
+    }),
     prisma.property.count(),
   ]);
   return { items, meta: { total, page: query.page, limit: query.limit } };
@@ -343,7 +364,12 @@ export async function getAgreementById(id: string) {
 export async function createAgreement(adminId: string, data: any) {
   const agreement = await prisma.agreement.create({ data });
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'AGREEMENT_CREATED', entityType: 'Agreement', entityId: agreement.id },
+    data: {
+      actorId: adminId,
+      eventType: 'AGREEMENT_CREATED',
+      entityType: 'Agreement',
+      entityId: agreement.id,
+    },
   });
   return agreement;
 }
@@ -351,7 +377,13 @@ export async function createAgreement(adminId: string, data: any) {
 export async function updateAgreementStatus(adminId: string, id: string, status: any) {
   const agreement = await prisma.agreement.update({ where: { id }, data: { status } });
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'AGREEMENT_STATUS_UPDATE', entityType: 'Agreement', entityId: id, metadata: { status } },
+    data: {
+      actorId: adminId,
+      eventType: 'AGREEMENT_STATUS_UPDATE',
+      entityType: 'Agreement',
+      entityId: id,
+      metadata: { status },
+    },
   });
   return agreement;
 }
@@ -359,7 +391,12 @@ export async function updateAgreementStatus(adminId: string, id: string, status:
 export async function getReports(query: any) {
   const skip = (query.page - 1) * query.limit;
   const [items, total] = await Promise.all([
-    prisma.report.findMany({ skip, take: query.limit, orderBy: { createdAt: 'desc' }, include: { reportedBy: true } }),
+    prisma.report.findMany({
+      skip,
+      take: query.limit,
+      orderBy: { createdAt: 'desc' },
+      include: { reportedBy: true },
+    }),
     prisma.report.count(),
   ]);
   return { items, meta: { total, page: query.page, limit: query.limit } };
@@ -368,7 +405,13 @@ export async function getReports(query: any) {
 export async function updateReportStatus(adminId: string, id: string, status: any) {
   const report = await prisma.report.update({ where: { id }, data: { status } });
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'REPORT_STATUS_UPDATE', entityType: 'Report', entityId: id, metadata: { status } },
+    data: {
+      actorId: adminId,
+      eventType: 'REPORT_STATUS_UPDATE',
+      entityType: 'Report',
+      entityId: id,
+      metadata: { status },
+    },
   });
   return report;
 }
@@ -378,15 +421,27 @@ export async function resolveVerification(adminId: string, id: string, status: a
     where: { id },
     data: { status, reviewedAt: new Date(), reviewedById: adminId },
   });
-  
+
   if (status === 'approved') {
-    await prisma.user.update({ where: { id: doc.userId }, data: { verificationState: 'verified', isVerified: true } });
+    await prisma.user.update({
+      where: { id: doc.userId },
+      data: { verificationState: 'verified', isVerified: true },
+    });
   } else if (status === 'rejected') {
-    await prisma.user.update({ where: { id: doc.userId }, data: { verificationState: 'rejected' } });
+    await prisma.user.update({
+      where: { id: doc.userId },
+      data: { verificationState: 'rejected' },
+    });
   }
 
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'VERIFICATION_RESOLVED', entityType: 'VerificationDocument', entityId: id, metadata: { status } },
+    data: {
+      actorId: adminId,
+      eventType: 'VERIFICATION_RESOLVED',
+      entityType: 'VerificationDocument',
+      entityId: id,
+      metadata: { status },
+    },
   });
 
   return doc;
@@ -395,14 +450,16 @@ export async function resolveVerification(adminId: string, id: string, status: a
 export async function getPropertyById(id: string) {
   return await prisma.property.findUnique({
     where: { id },
-    include: { owner: { select: { id: true, first_name: true, last_name: true, image: true, phone: true } } }
+    include: {
+      owner: { select: { id: true, first_name: true, last_name: true, image: true, phone: true } },
+    },
   });
 }
 
 export async function getReportById(id: string) {
   return await prisma.report.findUnique({
     where: { id },
-    include: { reportedBy: { select: { id: true, first_name: true, last_name: true } } }
+    include: { reportedBy: { select: { id: true, first_name: true, last_name: true } } },
   });
 }
 
@@ -414,7 +471,7 @@ export async function getNotifications(query: any) {
     skip,
     take: limit,
     orderBy: { createdAt: 'desc' },
-    include: { user: { select: { id: true, first_name: true, last_name: true } } }
+    include: { user: { select: { id: true, first_name: true, last_name: true } } },
   });
   const total = await prisma.notification.count();
 
@@ -423,20 +480,20 @@ export async function getNotifications(query: any) {
 
 export async function broadcastNotification(adminId: string, payload: any) {
   const { audience, title, message } = payload;
-  
+
   let userFilter: any = {};
   if (audience === 'renters') userFilter = { role: 'renter' };
   else if (audience === 'owners') userFilter = { role: 'owner' };
   else if (audience === 'verified_owners') userFilter = { role: 'owner', isVerified: true };
 
   const users = await prisma.user.findMany({ where: userFilter, select: { id: true } });
-  
-  const notifications = users.map(u => ({
+
+  const notifications = users.map((u) => ({
     userId: u.id,
     type: 'MESSAGE_NEW' as const,
     title,
     body: message,
-    payload: { broadcast: true }
+    payload: { broadcast: true },
   }));
 
   if (notifications.length > 0) {
@@ -444,7 +501,12 @@ export async function broadcastNotification(adminId: string, payload: any) {
   }
 
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'BROADCAST_SENT', entityType: 'Notification', metadata: { audience, title, count: notifications.length } },
+    data: {
+      actorId: adminId,
+      eventType: 'BROADCAST_SENT',
+      entityType: 'Notification',
+      metadata: { audience, title, count: notifications.length },
+    },
   });
 
   return { success: true, count: notifications.length };
@@ -461,7 +523,7 @@ export async function getReviews(query: any) {
     skip,
     take: limit,
     orderBy: { createdAt: 'desc' },
-    include: { reviewer: { select: { id: true, first_name: true, last_name: true } } }
+    include: { reviewer: { select: { id: true, first_name: true, last_name: true } } },
   });
   const total = await prismaAny.review.count();
 
@@ -470,15 +532,21 @@ export async function getReviews(query: any) {
 
 export async function updateReviewStatus(adminId: string, id: string, status: any) {
   const prismaAny = prisma as any;
-  if (!prismaAny.review) throw new Error("Review model not generated");
-  
+  if (!prismaAny.review) throw new Error('Review model not generated');
+
   const updated = await prismaAny.review.update({
     where: { id },
-    data: { status }
+    data: { status },
   });
 
   await prisma.auditLog.create({
-    data: { actorId: adminId, eventType: 'REVIEW_STATUS_UPDATED', entityType: 'Review', entityId: id, metadata: { status } },
+    data: {
+      actorId: adminId,
+      eventType: 'REVIEW_STATUS_UPDATED',
+      entityType: 'Review',
+      entityId: id,
+      metadata: { status },
+    },
   });
 
   return updated;
@@ -486,10 +554,10 @@ export async function updateReviewStatus(adminId: string, id: string, status: an
 
 export async function deleteReview(adminId: string, id: string) {
   const prismaAny = prisma as any;
-  if (!prismaAny.review) throw new Error("Review model not generated");
-  
+  if (!prismaAny.review) throw new Error('Review model not generated');
+
   const deleted = await prismaAny.review.delete({
-    where: { id }
+    where: { id },
   });
 
   await prisma.auditLog.create({

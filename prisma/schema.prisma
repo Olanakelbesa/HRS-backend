@@ -264,9 +264,8 @@ model Appointment {
 
 enum AppointmentStatus {
   PENDING
-  CONFIRMED
-  DECLINED
-  CANCELLED
+  ACCEPTED
+  REJECTED
 }
 
 model Message {
