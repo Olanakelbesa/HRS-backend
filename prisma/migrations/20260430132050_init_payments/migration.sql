@@ -10,8 +10,8 @@ ALTER TYPE "NotificationType" ADD VALUE 'PAYMENT_RECEIVED';
 ALTER TYPE "NotificationType" ADD VALUE 'PAYMENT_CONFIRMED';
 
 -- AlterTable
-ALTER TABLE "Report" ADD COLUMN     "ownerResponse" TEXT,
-ADD COLUMN     "respondedAt" TIMESTAMP(3);
+ALTER TABLE "Report" ADD COLUMN IF NOT EXISTS "ownerResponse" TEXT,
+ADD COLUMN IF NOT EXISTS "respondedAt" TIMESTAMP(3);
 
 -- CreateTable
 CREATE TABLE "Payment" (
