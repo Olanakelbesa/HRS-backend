@@ -76,6 +76,7 @@ async function main() {
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
   await prisma.verificationToken.deleteMany();
+  await prisma.payment.deleteMany();
   await prisma.user.deleteMany();
 
   // 1) Users
@@ -575,7 +576,7 @@ async function main() {
     },
   });
 
-  await prisma.agreement.create({
+  const ag2 = await prisma.agreement.create({
     data: {
       propertyId: prop2.id,
       renterId: renter2.id,
@@ -588,7 +589,7 @@ async function main() {
     },
   });
 
-  await prisma.agreement.create({
+  const ag3 = await prisma.agreement.create({
     data: {
       propertyId: prop4.id,
       renterId: renter1.id,
@@ -601,7 +602,107 @@ async function main() {
     },
   });
 
+  // additional sample agreements to populate owner dashboards
+  const ag4 = await prisma.agreement.create({
+    data: {
+      propertyId: prop5.id,
+      renterId: renter3.id,
+      ownerId: owner4.id,
+      monthlyRent: 12000,
+      startDate: new Date('2026-02-01'),
+      endDate: new Date('2027-02-01'),
+      status: AgreementStatus.pending_owner,
+      paymentStatus: PaymentStatus.pending,
+    },
+  });
+
+  const ag5 = await prisma.agreement.create({
+    data: {
+      propertyId: prop2.id,
+      renterId: renter2.id,
+      ownerId: owner2.id,
+      monthlyRent: 25000,
+      startDate: new Date('2026-06-01'),
+      endDate: new Date('2027-06-01'),
+      status: AgreementStatus.pending_renter,
+      paymentStatus: PaymentStatus.pending,
+    },
+  });
+
   console.log('Created Agreements');
+
+  // 7.5) Payments
+  // Create several payments with richer fields to match schema (stripeId, currency, proofUrl)
+  await prisma.payment.createMany({
+    data: [
+      // ag1: first month - confirmed via stripe
+      {
+        agreementId: ag1.id,
+        amount: 45000,
+        currency: 'ETB',
+        status: PaymentStatus.confirmed,
+        paidAt: new Date('2026-04-05'),
+        confirmedAt: new Date('2026-04-06'),
+        stripeId: crypto.randomUUID(),
+      },
+      // ag1: second month - proof uploaded but not yet confirmed
+      {
+        agreementId: ag1.id,
+        amount: 45000,
+        currency: 'ETB',
+        status: PaymentStatus.proof_uploaded,
+        paidAt: new Date('2026-05-05'),
+        proofUrl: 'https://example.com/proofs/may-payment.jpg',
+        stripeId: crypto.randomUUID(),
+      },
+      // ag1: third month - pending (no proof yet)
+      {
+        agreementId: ag1.id,
+        amount: 45000,
+        currency: 'ETB',
+        status: PaymentStatus.pending,
+        paidAt: new Date('2026-06-05'),
+      },
+      // ag2: initial pending payment
+      {
+        agreementId: ag2.id,
+        amount: 25000,
+        currency: 'ETB',
+        status: PaymentStatus.pending,
+        paidAt: new Date(),
+      },
+      // ag3: historical confirmed payment
+      {
+        agreementId: ag3.id,
+        amount: 15000,
+        currency: 'ETB',
+        status: PaymentStatus.confirmed,
+        paidAt: new Date('2025-12-05'),
+        confirmedAt: new Date('2025-12-06'),
+        stripeId: crypto.randomUUID(),
+      },
+      // ag4: proof uploaded awaiting confirmation
+      {
+        agreementId: ag4.id,
+        amount: 12000,
+        currency: 'ETB',
+        status: PaymentStatus.proof_uploaded,
+        paidAt: new Date('2026-02-02'),
+        proofUrl: 'https://example.com/proofs/ag4-feb-payment.jpg',
+        stripeId: crypto.randomUUID(),
+      },
+      // ag5: pending initial payment
+      {
+        agreementId: ag5.id,
+        amount: 25000,
+        currency: 'ETB',
+        status: PaymentStatus.pending,
+        paidAt: new Date(),
+      },
+    ],
+  });
+
+  console.log('Created Payments');
 
   // 8) Reports
   await prisma.report.createMany({
