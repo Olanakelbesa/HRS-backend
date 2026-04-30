@@ -439,9 +439,9 @@ model Payment {
 }
 
 model Report {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   reportedById   String
-  reportedBy     User     @relation("SubmittedReports", fields: [reportedById], references: [id])
+  reportedBy     User      @relation("SubmittedReports", fields: [reportedById], references: [id])
   targetId       String
   targetType     ReportTargetType
   category       String
@@ -449,8 +449,8 @@ model Report {
   status         ReportStatus @default(open)
   ownerResponse  String?
   respondedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([reportedById])
   @@index([targetId])
@@ -508,6 +508,8 @@ model Review {
 
   rating  Int
   comment String
+  reply   String?
+  repliedAt DateTime?
 
   status ReviewStatus @default(published)
 
