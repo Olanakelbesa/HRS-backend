@@ -13,7 +13,6 @@ import {
   VerificationDocumentType,
   VerificationStatus,
   ReviewStatus,
-  ReviewTargetType,
   AppointmentStatus,
   NotificationType,
   MessageStatus,
@@ -34,6 +33,27 @@ function daysFromNow(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date;
+}
+
+function addHours(date: Date, hours: number) {
+  const next = new Date(date);
+  next.setHours(next.getHours() + hours);
+  return next;
+}
+
+function addMinutes(date: Date, minutes: number) {
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
+  return next;
+}
+
+function appointmentSlot(daysAhead: number, startHour: number, durationMinutes = 45) {
+  const start = daysFromNow(daysAhead);
+  start.setHours(startHour, 0, 0, 0);
+  return {
+    startsAt: start,
+    endsAt: addMinutes(start, durationMinutes),
+  };
 }
 
 async function main() {
@@ -473,13 +493,19 @@ async function main() {
   console.log('Created Messaging data');
 
   // 6) Appointments
+  const slotPending = appointmentSlot(2, 10, 30);
+  const slotConfirmed = appointmentSlot(3, 14, 45);
+  const slotCancelled = appointmentSlot(5, 9, 30);
+  const slotDeclined = appointmentSlot(1, 16, 60);
+  const slotPastConfirmed = appointmentSlot(-2, 11, 45);
+
   const appointment1 = await prisma.appointment.create({
     data: {
       propertyId: prop1.id,
       renterId: renter1.id,
       ownerId: owner1.id,
-      startsAt: daysFromNow(2),
-      endsAt: daysFromNow(2),
+      startsAt: slotPending.startsAt,
+      endsAt: slotPending.endsAt,
       status: AppointmentStatus.PENDING,
       note: 'Please confirm if parking is available.',
     },
@@ -490,9 +516,9 @@ async function main() {
       propertyId: prop2.id,
       renterId: renter2.id,
       ownerId: owner2.id,
-      startsAt: daysFromNow(3),
-      endsAt: daysFromNow(3),
-      status: AppointmentStatus.CONFIRMED,
+      startsAt: slotConfirmed.startsAt,
+      endsAt: slotConfirmed.endsAt,
+      status: AppointmentStatus.ACCEPTED,
       note: 'Will arrive with family member.',
     },
   });
@@ -502,10 +528,34 @@ async function main() {
       propertyId: prop5.id,
       renterId: renter3.id,
       ownerId: owner4.id,
-      startsAt: daysFromNow(5),
-      endsAt: daysFromNow(5),
-      status: AppointmentStatus.CANCELLED,
+      startsAt: slotCancelled.startsAt,
+      endsAt: slotCancelled.endsAt,
+      status: AppointmentStatus.REJECTED,
       note: 'Rescheduling due to work.',
+    },
+  });
+
+  const appointment4 = await prisma.appointment.create({
+    data: {
+      propertyId: prop1.id,
+      renterId: renter2.id,
+      ownerId: owner1.id,
+      startsAt: slotDeclined.startsAt,
+      endsAt: slotDeclined.endsAt,
+      status: AppointmentStatus.REJECTED,
+      note: 'Requested slot conflicts with owner travel plans.',
+    },
+  });
+
+  const appointment5 = await prisma.appointment.create({
+    data: {
+      propertyId: prop4.id,
+      renterId: renter1.id,
+      ownerId: owner1.id,
+      startsAt: slotPastConfirmed.startsAt,
+      endsAt: slotPastConfirmed.endsAt,
+      status: AppointmentStatus.ACCEPTED,
+      note: 'Visited and discussed lease terms.',
     },
   });
 
@@ -590,40 +640,35 @@ async function main() {
     data: [
       {
         reviewerId: renter1.id,
-        targetType: ReviewTargetType.property,
-        targetId: prop1.id,
+        propertyId: prop1.id,
         rating: 5,
         comment: 'Outstanding property! Exceeded all expectations.',
         status: ReviewStatus.published,
       },
       {
         reviewerId: renter2.id,
-        targetType: ReviewTargetType.property,
-        targetId: prop2.id,
+        propertyId: prop2.id,
         rating: 4,
         comment: 'Great location and reasonable price.',
         status: ReviewStatus.published,
       },
       {
-        reviewerId: renter1.id,
-        targetType: ReviewTargetType.owner,
-        targetId: owner1.id,
-        rating: 5,
-        comment: 'Michael is very professional and responds quickly.',
+        reviewerId: renter3.id,
+        propertyId: prop5.id,
+        rating: 4,
+        comment: 'Compact and practical for one person.',
         status: ReviewStatus.published,
       },
       {
-        reviewerId: renter2.id,
-        targetType: ReviewTargetType.owner,
-        targetId: owner3.id,
+        reviewerId: renter1.id,
+        propertyId: prop3.id,
         rating: 1,
-        comment: 'Terrible experience with this owner.',
+        comment: 'Listing information looked inaccurate during inspection.',
         status: ReviewStatus.flagged,
       },
       {
         reviewerId: admin.id,
-        targetType: ReviewTargetType.property,
-        targetId: prop3.id,
+        propertyId: prop4.id,
         rating: 1,
         comment: 'Spam-style review removed by moderation.',
         status: ReviewStatus.removed,
@@ -693,6 +738,20 @@ async function main() {
         entityType: 'Appointment',
         entityId: appointment1.id,
         metadata: { propertyId: prop1.id },
+      },
+      {
+        actorId: owner1.id,
+        eventType: 'APPOINTMENT_STATUS_UPDATED',
+        entityType: 'Appointment',
+        entityId: appointment4.id,
+        metadata: { status: 'REJECTED' },
+      },
+      {
+        actorId: owner1.id,
+        eventType: 'APPOINTMENT_NOTE_UPDATED',
+        entityType: 'Appointment',
+        entityId: appointment5.id,
+        metadata: { note: 'Visited and discussed lease terms.' },
       },
       {
         actorId: renter2.id,
