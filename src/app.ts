@@ -52,7 +52,13 @@ app.use(
     credentials: true, // Allow cookies
   })
 );
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use(cookieParser());

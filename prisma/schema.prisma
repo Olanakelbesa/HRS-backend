@@ -373,6 +373,8 @@ enum NotificationType {
   MESSAGE_NEW
   APPOINTMENT_BOOKED
   APPOINTMENT_UPDATED
+  PAYMENT_RECEIVED
+  PAYMENT_CONFIRMED
 }
 
 // =======================
@@ -393,6 +395,7 @@ model Agreement {
   endDate       DateTime
   status        AgreementStatus @default(draft)
   paymentStatus PaymentStatus @default(pending)
+  payments      Payment[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -414,6 +417,25 @@ enum PaymentStatus {
   confirmed
   proof_uploaded
   pending
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  agreementId String
+  agreement   Agreement     @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String        @default("ETB")
+  proofUrl    String?
+  status      PaymentStatus @default(pending)
+  paidAt      DateTime      @default(now())
+  confirmedAt DateTime?
+  stripeId    String?       @unique // Added for Stripe integration
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([agreementId])
+  @@index([status])
+  @@index([paidAt])
 }
 
 model Report {

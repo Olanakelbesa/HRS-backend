@@ -7,6 +7,8 @@ import appointmentRoutes from './modules/appointments/routes';
 import notificationRoutes from './modules/notifications/routes';
 import adminRoutes from './modules/admin/routes';
 import reviewRoutes from './modules/review-rate/routes';
+import paymentRoutes from './modules/payments/routes';
+import agreementRoutes from './modules/agreements/routes';
 import recommendationRoutes from './modules/recommendation/routes';
 import repotsroute from './modules/reports/routes';
 const router = Router();
@@ -40,5 +42,11 @@ router.use('/recommendations', recommendationRoutes);
 
 //Reports Routes
 router.use('/reports', repotsroute);
+
+// Payment Routes
+router.use('/payments', paymentRoutes);
+
+// Agreements
+router.use('/', agreementRoutes);
 
 export default router;
