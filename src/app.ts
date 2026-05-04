@@ -7,7 +7,7 @@ import path from 'path';
 import { engine } from 'express-handlebars';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
-import { allowedOrigins } from './config/cors';
+import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
 import { rateLimiter } from './middlewares/rateLimiter';
 
@@ -49,7 +49,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: env.ALLOWED_ORIGINS,
     credentials: true, // Allow cookies
   })
 );

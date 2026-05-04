@@ -50,7 +50,17 @@ function deriveBaseUrl(appBaseUrl: string | undefined, nodeEnv: string, port: st
   }
 }
 
+const localOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const configuredOrigins = rawEnv.ALLOWED_ORIGINS
+  ? rawEnv.ALLOWED_ORIGINS.split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  : [];
+
 export const env = {
   ...rawEnv,
   APP_BASE_URL: deriveBaseUrl(rawEnv.APP_BASE_URL, rawEnv.NODE_ENV, rawEnv.PORT),
+  ALLOWED_ORIGINS: Array.from(
+    new Set([rawEnv.FRONTEND_URL, ...localOrigins, ...configuredOrigins].filter(Boolean))
+  ),
 };
