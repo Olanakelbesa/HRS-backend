@@ -50,7 +50,12 @@ function deriveBaseUrl(appBaseUrl: string | undefined, nodeEnv: string, port: st
   }
 }
 
-const localOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const localOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
 const configuredOrigins = rawEnv.ALLOWED_ORIGINS
   ? rawEnv.ALLOWED_ORIGINS.split(',')
       .map((origin) => origin.trim())
