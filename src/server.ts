@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import type { AddressInfo } from 'net';
 import app from './app';
 import { env } from './config/env';
+import { allowedOrigins } from './config/cors';
 import prisma from './config/database';
 import { initMessagingSocket } from './modules/messaging/socket';
 
@@ -15,7 +16,7 @@ const httpServer = http.createServer(app);
 // Create Socket.io server
 export const io = new Server(httpServer, {
   cors: {
-    origin: env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true,
   },
 });

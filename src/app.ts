@@ -7,6 +7,7 @@ import path from 'path';
 import { engine } from 'express-handlebars';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
+import { allowedOrigins } from './config/cors';
 import { errorHandler } from './middlewares/error.middleware';
 import { rateLimiter } from './middlewares/rateLimiter';
 
@@ -48,7 +49,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true, // Allow cookies
   })
 );
