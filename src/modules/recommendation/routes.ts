@@ -1,12 +1,8 @@
-import { Router } from "express";
-import controller from "./controller";
-import { requireAuth } from "../../middlewares/auth.middleware";
-import { validate } from "../../middlewares/validate";
-import {
-  preferenceSchema,
-  searchSchema,
-  interactionSchema
-} from "./schema";
+import { Router } from 'express';
+import controller from './controller';
+import { requireAuth } from '../../middlewares/auth.middleware';
+import { validate } from '../../middlewares/validate';
+import { preferenceSchema, searchSchema, interactionSchema } from './schema';
 
 const router = Router();
 
@@ -32,33 +28,164 @@ const router = Router();
  *           schema:
  *             type: object
  *             properties:
- *               preferredPriceMin:
- *                 type: number
- *                 example: 10000
- *               preferredPriceMax:
- *                 type: number
- *                 example: 50000
- *               preferredBedrooms:
- *                 type: integer
- *                 example: 2
  *               preferredLocations:
  *                 type: array
  *                 items:
- *                   type: string
- *                 example: ["Addis Ababa"]
- *               preferredAmenities:
+ *                   type: object
+ *                   properties:
+ *                     city:
+ *                       type: string
+ *                       example: "Seattle"
+ *                     state:
+ *                       type: string
+ *                       example: "WA"
+ *                     lat:
+ *                       type: number
+ *                       example: 47.6062
+ *                     lng:
+ *                       type: number
+ *                       example: -122.3321
+ *               budget:
+ *                 type: object
+ *                 properties:
+ *                   min:
+ *                     type: number
+ *                     example: 800
+ *                   max:
+ *                     type: number
+ *                     example: 1600
+ *               bedrooms:
+ *                 type: object
+ *                 properties:
+ *                   min:
+ *                     type: integer
+ *                     example: 1
+ *                   max:
+ *                     type: integer
+ *                     example: 2
+ *               bathrooms:
+ *                 type: object
+ *                 properties:
+ *                   min:
+ *                     type: integer
+ *                     example: 1
+ *                   max:
+ *                     type: integer
+ *                     example: 2
+ *               petsAllowed:
+ *                 type: boolean
+ *                 example: true
+ *               amenities:
  *                 type: array
  *                 items:
  *                   type: string
- *                 example: ["wifi", "parking"]
+ *                 example: ["parking", "in-unit-laundry", "dishwasher"]
+ *               furnished:
+ *                 type: boolean
+ *                 example: false
+ *               moveInDate:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2026-06-01T00:00:00.000Z"
+ *               leaseLengthMonths:
+ *                 type: integer
+ *                 example: 12
+ *               searchRadiusKm:
+ *                 type: number
+ *                 example: 10
+ *               commuteMinutes:
+ *                 type: number
+ *                 example: 45
+ *               smokingAllowed:
+ *                 type: boolean
+ *                 example: false
+ *               languages:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["en"]
+ *               notes:
+ *                 type: string
+ *                 example: "Prefer quiet buildings near transit"
  *               preferredType:
  *                 type: string
  *                 enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE]
  *     responses:
  *       200:
  *         description: Preferences saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 preferredLocations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       city:
+ *                         type: string
+ *                       state:
+ *                         type: string
+ *                       lat:
+ *                         type: number
+ *                       lng:
+ *                         type: number
+ *                 budget:
+ *                   type: object
+ *                   properties:
+ *                     min:
+ *                       type: number
+ *                     max:
+ *                       type: number
+ *                 bedrooms:
+ *                   type: object
+ *                   properties:
+ *                     min:
+ *                       type: integer
+ *                     max:
+ *                       type: integer
+ *                 bathrooms:
+ *                   type: object
+ *                   properties:
+ *                     min:
+ *                       type: integer
+ *                     max:
+ *                       type: integer
+ *                 petsAllowed:
+ *                   type: boolean
+ *                 amenities:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 furnished:
+ *                   type: boolean
+ *                 moveInDate:
+ *                   type: string
+ *                   format: date-time
+ *                 leaseLengthMonths:
+ *                   type: integer
+ *                 searchRadiusKm:
+ *                   type: number
+ *                 commuteMinutes:
+ *                   type: number
+ *                 smokingAllowed:
+ *                   type: boolean
+ *                 languages:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 notes:
+ *                   type: string
+ *                 preferredType:
+ *                   type: string
  */
-router.post("/user/preferences", requireAuth, validate(preferenceSchema), controller.savePreferences);
+router.post(
+  '/user/preferences',
+  requireAuth,
+  validate(preferenceSchema),
+  controller.savePreferences
+);
 
 /**
  * @openapi
@@ -71,8 +198,74 @@ router.post("/user/preferences", requireAuth, validate(preferenceSchema), contro
  *     responses:
  *       200:
  *         description: User preferences fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 preferredLocations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       city:
+ *                         type: string
+ *                       state:
+ *                         type: string
+ *                       lat:
+ *                         type: number
+ *                       lng:
+ *                         type: number
+ *                 budget:
+ *                   type: object
+ *                   properties:
+ *                     min:
+ *                       type: number
+ *                     max:
+ *                       type: number
+ *                 bedrooms:
+ *                   type: object
+ *                   properties:
+ *                     min:
+ *                       type: integer
+ *                     max:
+ *                       type: integer
+ *                 bathrooms:
+ *                   type: object
+ *                   properties:
+ *                     min:
+ *                       type: integer
+ *                     max:
+ *                       type: integer
+ *                 petsAllowed:
+ *                   type: boolean
+ *                 amenities:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 furnished:
+ *                   type: boolean
+ *                 moveInDate:
+ *                   type: string
+ *                   format: date-time
+ *                 leaseLengthMonths:
+ *                   type: integer
+ *                 searchRadiusKm:
+ *                   type: number
+ *                 commuteMinutes:
+ *                   type: number
+ *                 smokingAllowed:
+ *                   type: boolean
+ *                 languages:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 notes:
+ *                   type: string
+ *                 preferredType:
+ *                   type: string
  */
-router.get("/user/preferences", requireAuth, controller.getPreferences);
+router.get('/user/preferences', requireAuth, controller.getPreferences);
 
 /**
  * @openapi
@@ -101,7 +294,7 @@ router.get("/user/preferences", requireAuth, controller.getPreferences);
  *       200:
  *         description: Search saved successfully
  */
-router.post("/search/history", requireAuth, validate(searchSchema), controller.saveSearch);
+router.post('/search/history', requireAuth, validate(searchSchema), controller.saveSearch);
 
 /**
  * @openapi
@@ -115,7 +308,7 @@ router.post("/search/history", requireAuth, validate(searchSchema), controller.s
  *       200:
  *         description: Search history fetched successfully
  */
-router.get("/search/history", requireAuth, controller.getSearchHistory);
+router.get('/search/history', requireAuth, controller.getSearchHistory);
 
 /**
  * @openapi
@@ -146,7 +339,7 @@ router.get("/search/history", requireAuth, controller.getSearchHistory);
  *       200:
  *         description: Interaction recorded successfully
  */
-router.post("/interactions", requireAuth, validate(interactionSchema), controller.trackInteraction);
+router.post('/interactions', requireAuth, validate(interactionSchema), controller.trackInteraction);
 
 /**
  * @openapi
@@ -160,7 +353,7 @@ router.post("/interactions", requireAuth, validate(interactionSchema), controlle
  *       200:
  *         description: Recommended properties fetched successfully
  */
-router.get("/properties/recommendations", requireAuth, controller.getRecommendations);
+router.get('/properties/recommendations', requireAuth, controller.getRecommendations);
 
 /**
  * @openapi
@@ -181,6 +374,6 @@ router.get("/properties/recommendations", requireAuth, controller.getRecommendat
  *       200:
  *         description: Similar properties fetched successfully
  */
-router.get("/properties/:id/similar", requireAuth, controller.getSimilarProperties);
+router.get('/properties/:id/similar', requireAuth, controller.getSimilarProperties);
 
 export default router;
