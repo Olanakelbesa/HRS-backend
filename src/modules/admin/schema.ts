@@ -80,6 +80,7 @@ export const updateUserStatusSchema = z.object({
 
 export const updateUserVerificationSchema = z.object({
   verificationState: z.enum(['verified', 'pending', 'rejected', 'resubmit']),
+  comment: z.string().trim().min(1).max(1000).optional(),
 });
 
 export const createAgreementSchema = z.object({

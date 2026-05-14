@@ -350,6 +350,9 @@ router.patch(
  *               verificationState:
  *                 type: string
  *                 enum: [verified, pending, rejected, resubmit]
+ *               comment:
+ *                 type: string
+ *                 description: Optional comment about the verification change
  *     responses:
  *       200:
  *         description: Verification state updated successfully

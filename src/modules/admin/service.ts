@@ -348,11 +348,21 @@ export async function updateUserStatus(adminId: string, id: string, status: any)
 export async function updateUserVerificationState(
   adminId: string,
   id: string,
-  verificationState: any
+  verificationState: any,
+  comment?: string
 ) {
+  // Set isVerified and status appropriately when marking verified
+  const dataToUpdate: any = { verificationState };
+  if (verificationState === 'verified') {
+    dataToUpdate.isVerified = true;
+    dataToUpdate.status = 'active';
+  } else {
+    dataToUpdate.isVerified = false;
+  }
+
   const user = await prisma.user.update({
     where: { id },
-    data: { verificationState },
+    data: dataToUpdate,
   });
 
   await prisma.auditLog.create({
@@ -361,7 +371,7 @@ export async function updateUserVerificationState(
       eventType: 'USER_VERIFICATION_UPDATE',
       entityType: 'User',
       entityId: id,
-      metadata: { verificationState },
+      metadata: { verificationState, comment } as Prisma.InputJsonValue,
     },
   });
 

@@ -64,7 +64,7 @@ export async function overrideProperty(req: Request, res: Response) {
 }
 
 // -------------------------------------------------------------------------------- //
-// NEW ADMIN CONTROLLERS 
+// NEW ADMIN CONTROLLERS
 // -------------------------------------------------------------------------------- //
 
 import * as adminService from './service';
@@ -107,7 +107,13 @@ export async function userUpdateVerification(req: Request, res: Response) {
   const auth = req as AuthenticatedRequest;
   const params = paramIdSchema.parse(req.params);
   const body = updateUserVerificationSchema.parse(req.body);
-  const data = await adminService.updateUserVerificationState(auth.userId, params.id, body.verificationState);
+  const data = await adminService.updateUserVerificationState(
+    auth.userId,
+    params.id,
+    body.verificationState,
+    // pass optional comment through to service
+    (body as any).comment
+  );
   return res.status(200).json({ status: 'success', data });
 }
 
