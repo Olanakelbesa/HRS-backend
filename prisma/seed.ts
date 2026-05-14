@@ -11,7 +11,6 @@ import {
   PaymentStatus,
   ReportStatus,
   ReportTargetType,
-  VerificationDocumentType,
   VerificationStatus,
   ReviewStatus,
   AppointmentStatus,
@@ -357,36 +356,33 @@ async function main() {
 
   console.log('Created Auth records');
 
-  // 3) Verification documents
+  // 3) Verification documents — one record per user, admin reviews all at once
   await prisma.verificationDocument.createMany({
     data: [
       {
+        // owner2 (Sarah) — submitted front + back, pending admin review
         userId: owner2.id,
-        documentType: VerificationDocumentType.national_id,
         frontUrl: 'https://example.com/docs/sarah-national-id-front.jpg',
         backUrl: 'https://example.com/docs/sarah-national-id-back.jpg',
-        livePhotoUrl: 'https://example.com/docs/sarah-national-id-live.jpg',
         status: VerificationStatus.pending,
       },
       {
+        // owner3 (David) — needs to resubmit
         userId: owner3.id,
-        documentType: VerificationDocumentType.national_id,
         frontUrl: 'https://example.com/docs/david-national-id-front.jpg',
         backUrl: 'https://example.com/docs/david-national-id-back.jpg',
         livePhotoUrl: 'https://example.com/docs/david-national-id-live.jpg',
         status: VerificationStatus.resubmit,
       },
       {
+        // owner4 (Mulugeta) — only front submitted, pending
         userId: owner4.id,
-        documentType: VerificationDocumentType.national_id,
         frontUrl: 'https://example.com/docs/mulugeta-national-id-front.jpg',
-        backUrl: 'https://example.com/docs/mulugeta-national-id-back.jpg',
-        livePhotoUrl: 'https://example.com/docs/mulugeta-national-id-live.jpg',
         status: VerificationStatus.pending,
       },
       {
+        // owner5 (Dawit) — fully verified with all three docs
         userId: owner5.id,
-        documentType: VerificationDocumentType.national_id,
         frontUrl: 'national-id-front-2026.pdf',
         backUrl: 'national-id-back-2026.pdf',
         livePhotoUrl: 'owner-photo-2026.jpg',

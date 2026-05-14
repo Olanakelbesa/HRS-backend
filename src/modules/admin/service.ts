@@ -504,10 +504,13 @@ export async function getPendingVerifications(query: GetPendingVerificationsQuer
         email: true,
         phone: true,
         verificationDocs: {
-          orderBy: { submittedAt: 'desc' },
           select: {
+            id: true,
             submittedAt: true,
-            documentType: true,
+            frontUrl: true,
+            backUrl: true,
+            livePhotoUrl: true,
+            status: true,
           },
         },
       },
@@ -517,11 +520,17 @@ export async function getPendingVerifications(query: GetPendingVerificationsQuer
 
   const now = new Date();
   const items = users.map((user) => {
-    const latestDoc = user.verificationDocs[0] ?? null;
-    const submittedDate = latestDoc?.submittedAt ?? null;
+    const doc = user.verificationDocs[0] ?? null;
+    const submittedDate = doc?.submittedAt ?? null;
     const daysWaiting = submittedDate
       ? Math.max(0, Math.floor((now.getTime() - submittedDate.getTime()) / (1000 * 60 * 60 * 24)))
       : null;
+
+    // Report which of the three files have been uploaded
+    const documents: string[] = [];
+    if (doc?.frontUrl) documents.push('NATIONAL_ID_FRONT');
+    if (doc?.backUrl) documents.push('NATIONAL_ID_BACK');
+    if (doc?.livePhotoUrl) documents.push('OWNER_PHOTO');
 
     return {
       id: user.id,
@@ -530,7 +539,8 @@ export async function getPendingVerifications(query: GetPendingVerificationsQuer
       phone: user.phone,
       submittedDate,
       daysWaiting,
-      documents: user.verificationDocs.map((doc) => doc.documentType),
+      documents,
+      docStatus: doc?.status ?? null,
     };
   });
 

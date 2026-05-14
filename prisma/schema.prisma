@@ -477,13 +477,12 @@ enum ReportStatus {
 
 model VerificationDocument {
   id             String   @id @default(cuid())
-  userId         String
+  userId         String   @unique                            // one record per user
   user           User     @relation("VerificationDocuments", fields: [userId], references: [id])
-  documentType   VerificationDocumentType
-  frontUrl       String?
-  backUrl        String?
-  livePhotoUrl   String?
-  status         VerificationStatus @default(pending)
+  frontUrl       String?                                     // NATIONAL_ID_FRONT
+  backUrl        String?                                     // NATIONAL_ID_BACK
+  livePhotoUrl   String?                                     // OWNER_PHOTO
+  status         VerificationStatus @default(pending)        // admin reviews once
   submittedAt    DateTime @default(now())
   reviewedAt     DateTime?
   reviewedById   String?
@@ -492,11 +491,11 @@ model VerificationDocument {
   @@index([userId])
 }
 
-enum VerificationDocumentType {
-  national_id
-  passport
-  ownership_deed
-}
+// enum VerificationDocumentType {
+//   national_id
+//   passport
+//   ownership_deed
+// }
 
 enum VerificationStatus {
   pending
