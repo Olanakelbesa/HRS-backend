@@ -6,6 +6,40 @@ import type {
   GetPendingVerificationsQueryInput,
 } from './schema';
 
+function mapVerificationDocumentStatusToUserUpdate(
+  status: 'approved' | 'rejected' | 'resubmit' | 'pending'
+) {
+  if (status === 'approved') {
+    return {
+      status: 'active' as const,
+      verificationState: 'verified' as const,
+      isVerified: true,
+    };
+  }
+
+  if (status === 'rejected') {
+    return {
+      status: 'suspended' as const,
+      verificationState: 'rejected' as const,
+      isVerified: false,
+    };
+  }
+
+  if (status === 'resubmit') {
+    return {
+      status: 'pending' as const,
+      verificationState: 'resubmit' as const,
+      isVerified: false,
+    };
+  }
+
+  return {
+    status: 'pending' as const,
+    verificationState: 'pending' as const,
+    isVerified: false,
+  };
+}
+
 function getRangeStart(range?: '7d' | '30d' | '90d') {
   const now = new Date();
 
@@ -416,23 +450,22 @@ export async function updateReportStatus(adminId: string, id: string, status: an
   return report;
 }
 
-export async function resolveVerification(adminId: string, id: string, status: any) {
+export async function resolveVerification(
+  adminId: string,
+  id: string,
+  status: 'approved' | 'rejected' | 'resubmit' | 'pending'
+) {
   const doc = await prisma.verificationDocument.update({
     where: { id },
     data: { status, reviewedAt: new Date(), reviewedById: adminId },
   });
 
-  if (status === 'approved') {
-    await prisma.user.update({
-      where: { id: doc.userId },
-      data: { verificationState: 'verified', isVerified: true },
-    });
-  } else if (status === 'rejected') {
-    await prisma.user.update({
-      where: { id: doc.userId },
-      data: { verificationState: 'rejected' },
-    });
-  }
+  const userUpdate = mapVerificationDocumentStatusToUserUpdate(status);
+
+  await prisma.user.update({
+    where: { id: doc.userId },
+    data: userUpdate,
+  });
 
   await prisma.auditLog.create({
     data: {

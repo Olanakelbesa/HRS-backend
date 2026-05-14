@@ -139,7 +139,7 @@ async function main() {
       role: Role.owner,
       emailVerified: true,
       isVerified: false,
-      verificationState: VerificationState.rejected,
+      verificationState: VerificationState.resubmit,
       status: UserStatus.suspended,
       image: 'https://i.pravatar.cc/150?u=david',
     },
@@ -280,7 +280,7 @@ async function main() {
         userId: owner3.id,
         documentType: VerificationDocumentType.national_id,
         documentUrl: 'https://example.com/docs/david-national-id.jpg',
-        status: VerificationStatus.rejected,
+        status: VerificationStatus.resubmit,
       },
       {
         userId: owner4.id,

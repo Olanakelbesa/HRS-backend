@@ -67,7 +67,7 @@ export const adminUpdatePropertyBodySchema = z
 // Newly Added Schemas for Admin
 export const getUsersQuerySchema = paginationQuerySchema.extend({
   role: z.enum(['renter', 'owner', 'admin']).optional(),
-  status: z.enum(['active', 'suspended', 'banned']).optional(),
+  status: z.enum(['active', 'suspended', 'pending']).optional(),
 });
 
 export const paramIdSchema = z.object({
@@ -75,11 +75,11 @@ export const paramIdSchema = z.object({
 });
 
 export const updateUserStatusSchema = z.object({
-  status: z.enum(['active', 'suspended', 'banned']),
+  status: z.enum(['active', 'suspended', 'pending']),
 });
 
 export const updateUserVerificationSchema = z.object({
-  verificationState: z.enum(['verified', 'pending_otp', 'pending_documents', 'rejected']),
+  verificationState: z.enum(['verified', 'pending', 'rejected', 'resubmit']),
 });
 
 export const createAgreementSchema = z.object({
@@ -89,7 +89,9 @@ export const createAgreementSchema = z.object({
   monthlyRent: z.number().positive(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
-  status: z.enum(['active', 'pending_renter', 'pending_owner', 'draft', 'terminated', 'expired']).default('draft'),
+  status: z
+    .enum(['active', 'pending_renter', 'pending_owner', 'draft', 'terminated', 'expired'])
+    .default('draft'),
 });
 
 export const updateAgreementStatusSchema = z.object({
@@ -101,7 +103,7 @@ export const updateReportStatusSchema = z.object({
 });
 
 export const resolveVerificationSchema = z.object({
-  status: z.enum(['approved', 'rejected']),
+  status: z.enum(['approved', 'rejected', 'resubmit', 'pending']),
 });
 
 export const broadcastNotificationSchema = z.object({

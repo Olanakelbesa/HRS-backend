@@ -296,7 +296,7 @@ router.get('/users/:id', controller.userGet);
  * @swagger
  * /api/v1/admin/users/{id}/status:
  *   patch:
- *     summary: Update an existing user's status 
+ *     summary: Update an existing user's status
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -320,7 +320,11 @@ router.get('/users/:id', controller.userGet);
  *       200:
  *         description: Status updated successfully
  */
-router.patch('/users/:id/status', validate(adminUpdatePropertyParamsSchema, 'params'), controller.userUpdateStatus);
+router.patch(
+  '/users/:id/status',
+  validate(adminUpdatePropertyParamsSchema, 'params'),
+  controller.userUpdateStatus
+);
 
 /**
  * @swagger
@@ -345,12 +349,16 @@ router.patch('/users/:id/status', validate(adminUpdatePropertyParamsSchema, 'par
  *             properties:
  *               verificationState:
  *                 type: string
- *                 enum: [verified, pending_otp, pending_documents, rejected]
+ *                 enum: [verified, pending, rejected, resubmit]
  *     responses:
  *       200:
  *         description: Verification state updated successfully
  */
-router.patch('/users/:id/verification', validate(adminUpdatePropertyParamsSchema, 'params'), controller.userUpdateVerification);
+router.patch(
+  '/users/:id/verification',
+  validate(adminUpdatePropertyParamsSchema, 'params'),
+  controller.userUpdateVerification
+);
 
 // Properties
 /**

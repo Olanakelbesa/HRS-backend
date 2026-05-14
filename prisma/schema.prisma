@@ -59,7 +59,7 @@ model User {
   auditLogs           AuditLog[]
 
   status            UserStatus @default(active)
-  verificationState VerificationState @default(pending_otp)
+  verificationState VerificationState @default(pending)
 
   renterAgreements  Agreement[] @relation("RenterAgreements")
   ownerAgreements   Agreement[] @relation("OwnerAgreements")
@@ -138,14 +138,14 @@ enum Role {
 enum UserStatus {
   active
   suspended
-  banned
+  pending
 }
 
 enum VerificationState {
   verified
-  pending_otp
-  pending_documents
+  pending
   rejected
+  resubmit
 }
 
 // =======================
@@ -495,6 +495,7 @@ enum VerificationStatus {
   pending
   approved
   rejected
+  resubmit
 }
 
 model Review {
