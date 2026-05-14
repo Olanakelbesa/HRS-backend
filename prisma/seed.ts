@@ -322,8 +322,15 @@ async function main() {
       area: 250,
       furnishingType: 'furnished',
       rentTerms: {
+        minDuration: '6',
         minMonths: 6,
+        secureDeposit: 45000,
+        currency: 'ETB',
         petsAllowed: false,
+        conditions: {
+          en: '6 months minimum, first and last month upfront',
+          am: 'ቢያንስ 6 ወር፣ የመጀመሪያ እና የመጨረሻ ወር ቅድሚያ ክፍያ',
+        },
       },
     },
   });
@@ -347,6 +354,16 @@ async function main() {
       bathrooms: 1,
       area: 90,
       furnishingType: 'semi-furnished',
+      rentTerms: {
+        minDuration: '3',
+        minMonths: 3,
+        secureDeposit: 25000,
+        currency: 'ETB',
+        conditions: {
+          en: '3 months minimum, first month upfront',
+          am: 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ',
+        },
+      },
     },
   });
 
@@ -368,6 +385,16 @@ async function main() {
       bedrooms: 1,
       bathrooms: 1,
       area: 50,
+      rentTerms: {
+        minDuration: '1',
+        minMonths: 1,
+        secureDeposit: 5000,
+        currency: 'ETB',
+        conditions: {
+          en: '1 month minimum',
+          am: 'ቢያንስ 1 ወር',
+        },
+      },
     },
   });
 
@@ -389,6 +416,16 @@ async function main() {
       bedrooms: 3,
       bathrooms: 2,
       area: 120,
+      rentTerms: {
+        minDuration: '12',
+        minMonths: 12,
+        secureDeposit: 15000,
+        currency: 'ETB',
+        conditions: {
+          en: '12 months minimum, negotiable for long-term leases',
+          am: 'ቢያንስ 12 ወር፣ ረጅም ጊዜ ኪራይ ከሆነ ይከናወናል',
+        },
+      },
     },
   });
 
@@ -410,6 +447,16 @@ async function main() {
       bedrooms: 1,
       bathrooms: 1,
       area: 45,
+      rentTerms: {
+        minDuration: '3',
+        minMonths: 3,
+        secureDeposit: 12000,
+        currency: 'ETB',
+        conditions: {
+          en: '3 months minimum, first month deposit',
+          am: 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ',
+        },
+      },
     },
   });
 
