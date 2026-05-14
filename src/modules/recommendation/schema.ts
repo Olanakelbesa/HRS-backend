@@ -16,6 +16,7 @@ const locationSchema = z.object({
 });
 
 const propertyTypeSchema = z.union([localizedTextSchema, z.string().min(1)]);
+const furnishStatusSchema = z.enum(['furnished', 'semiFurnished', 'unfunished']);
 
 export const preferenceSchema = z.object({
   preferredLocations: z.array(locationSchema).optional(),
@@ -40,6 +41,7 @@ export const preferenceSchema = z.object({
     .optional(),
   petsAllowed: z.boolean().optional(),
   amenities: z.array(z.string()).optional(),
+  furnishStatus: furnishStatusSchema.optional(),
   furnished: z.boolean().optional(),
   moveInDate: z.string().optional(),
   leaseLengthMonths: z.number().int().positive().optional(),

@@ -210,6 +210,77 @@ async function main() {
 
   console.log('Created Users');
 
+  // 1b) User preferences aligned with the recommendation endpoint payload
+  const renter1Preference = {
+    preferredLocations: [
+      {
+        city: textPair('Seattle', 'ሲያትል'),
+        region: textPair('Washington', 'ዋሽንግተን'),
+        lat: 47.6062,
+        lng: -122.3321,
+      },
+    ],
+    budget: { min: 800, max: 1600, currency: 'ETB' },
+    bedrooms: { min: 1, max: 2 },
+    bathrooms: { min: 1, max: 2 },
+    amenities: ['parking', 'wifi', 'dishwasher'],
+    furnishStatus: 'unfunished' as const,
+    notes: textPair('Prefer quiet buildings near transit', 'በትራንስፖርት አቅራቢያ ጸጥ ያሉ ህንፃዎችን እመርጣለሁ'),
+    preferredPropertyType: textPair('Villa', 'ቪላ'),
+    locale: 'en',
+    supportedLocales: ['en', 'am'],
+  };
+
+  await prisma.userPreference.create({
+    data: {
+      userId: renter1.id,
+      preferredPriceMin: renter1Preference.budget.min,
+      preferredPriceMax: renter1Preference.budget.max,
+      preferredBedrooms: renter1Preference.bedrooms.min,
+      preferredLocations: renter1Preference.preferredLocations.map(
+        (location) => `${location.city.en}, ${location.region.en}`
+      ),
+      preferredAmenities: renter1Preference.amenities,
+      preferredType: PropertyType.VILLA,
+    },
+  });
+
+  const renter2Preference = {
+    preferredLocations: [
+      {
+        city: textPair('Kazanchis', 'ካዛንቺስ'),
+        region: textPair('Addis Ababa', 'አዲስ አበባ'),
+        lat: 8.9955,
+        lng: 38.7898,
+      },
+    ],
+    budget: { min: 12000, max: 28000, currency: 'ETB' },
+    bedrooms: { min: 2, max: 2 },
+    bathrooms: { min: 1, max: 1 },
+    amenities: ['wifi', 'elevator', 'backup power'],
+    furnishStatus: 'semiFurnished' as const,
+    notes: textPair('Prefers walkable neighborhoods', 'በእግር የሚደርሱ አካባቢዎችን ይመርጣል'),
+    preferredPropertyType: textPair('Apartment', 'አፓርትመንት'),
+    locale: 'en',
+    supportedLocales: ['en', 'am'],
+  };
+
+  await prisma.userPreference.create({
+    data: {
+      userId: renter2.id,
+      preferredPriceMin: renter2Preference.budget.min,
+      preferredPriceMax: renter2Preference.budget.max,
+      preferredBedrooms: renter2Preference.bedrooms.min,
+      preferredLocations: renter2Preference.preferredLocations.map(
+        (location) => `${location.city.en}, ${location.region.en}`
+      ),
+      preferredAmenities: renter2Preference.amenities,
+      preferredType: PropertyType.APARTMENT,
+    },
+  });
+
+  console.log('Created User Preferences');
+
   // 2) Auth-supporting records
   await prisma.account.createMany({
     data: [

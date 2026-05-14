@@ -26,6 +26,7 @@ type PreferencePayload = {
   bedrooms?: { min?: number; max?: number };
   bathrooms?: { min?: number; max?: number };
   amenities?: string[];
+  furnishStatus?: 'furnished' | 'semiFurnished' | 'unfunished';
   furnished?: boolean;
   notes?: string | { en?: string; am?: string };
   preferredPropertyType?: string | { en?: string; am?: string };
@@ -80,6 +81,25 @@ function normalizePropertyTypeLabel(value: unknown): LocalizedText {
   };
 }
 
+function normalizeFurnishStatus(
+  value: unknown,
+  fallback?: boolean
+): 'furnished' | 'semiFurnished' | 'unfunished' {
+  if (value === 'furnished' || value === 'semiFurnished' || value === 'unfunished') {
+    return value;
+  }
+
+  if (fallback === true) {
+    return 'furnished';
+  }
+
+  if (fallback === false) {
+    return 'unfunished';
+  }
+
+  return 'unfunished';
+}
+
 function normalizePreferenceLocation(
   value: NonNullable<PreferencePayload['preferredLocations']>[number]
 ): string {
@@ -114,6 +134,7 @@ function buildPreferenceResponse(
   const budgetCurrency =
     input?.budget?.currency ?? (pref?.preferredPriceMin || pref?.preferredPriceMax ? 'ETB' : null);
   const notes = normalizeLocalizedText(input?.notes);
+  const furnishStatus = normalizeFurnishStatus(input?.furnishStatus, input?.furnished);
   const preferredPropertyType = normalizePropertyTypeLabel(
     input?.preferredPropertyType ?? input?.preferredType ?? pref?.preferredType
   );
@@ -141,7 +162,7 @@ function buildPreferenceResponse(
       max: input?.bathrooms?.max ?? null,
     },
     amenities: input?.amenities ?? pref?.preferredAmenities ?? [],
-    furnished: input?.furnished ?? false,
+    furnishStatus,
     notes: notes.en || notes.am ? notes : { en: null, am: null },
     preferredPropertyType,
     locale: input?.locale ?? 'en',

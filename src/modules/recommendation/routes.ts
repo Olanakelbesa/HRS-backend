@@ -80,9 +80,10 @@ const router = Router();
  *                 items:
  *                   type: string
  *                 example: ["parking", "in-unit-laundry", "dishwasher"]
- *               furnished:
- *                 type: boolean
- *                 example: false
+ *               furnishStatus:
+ *                 type: string
+ *                 enum: [furnished, semiFurnished, unfunished]
+ *                 example: unfunished
  *               moveInDate:
  *                 type: string
  *                 format: date-time
@@ -158,8 +159,9 @@ const router = Router();
  *                   type: array
  *                   items:
  *                     type: string
- *                 furnished:
- *                   type: boolean
+ *                 furnishStatus:
+ *                   type: string
+ *                   enum: [furnished, semiFurnished, unfunished]
  *                 moveInDate:
  *                   type: string
  *                   format: date-time
@@ -243,8 +245,9 @@ router.post(
  *                   type: array
  *                   items:
  *                     type: string
- *                 furnished:
- *                   type: boolean
+ *                 furnishStatus:
+ *                   type: string
+ *                   enum: [furnished, semiFurnished, unfunished]
  *                 moveInDate:
  *                   type: string
  *                   format: date-time
