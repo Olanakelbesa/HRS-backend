@@ -46,7 +46,7 @@ router.use('/admin', adminRoutes);
 router.use('/reviews', reviewRoutes);
 
 //Recommendation Routes
-router.use('/recommendations', recommendationRoutes);
+router.use('/recommendation', recommendationRoutes);
 
 // Expose user preferences at /user/preferences for backward-compatible client paths
 router.post('/user/preferences', requireAuth, recommendationController.savePreferences as any);

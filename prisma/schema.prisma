@@ -545,11 +545,12 @@ model UserPreference {
   userId             String   @unique
   preferredPriceMin  Float?
   preferredPriceMax  Float?
+  preferredCurrency  String?  @default("ETB")
   preferredBedrooms  Int?
-  preferredLocations String[]
+  preferredLocations Json?    // Array of { address: string, lat: number, lng: number }
   preferredAmenities String[]
-
   preferredType      PropertyType?
+  furnishStatus      String?  // furnished, semi-furnished, unfurnished
 
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

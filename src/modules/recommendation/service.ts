@@ -15,158 +15,50 @@ type PreferenceLocation = {
 };
 
 type PreferencePayload = {
+  budget?: { min?: number; max?: number; currency?: string };
+  bedrooms?: number | { min?: number; max?: number };
   preferredLocations?: Array<{
-    city?: string | { en?: string; am?: string };
-    region?: string | { en?: string; am?: string };
-    state?: string | { en?: string; am?: string };
+    address: string;
     lat?: number;
     lng?: number;
   }>;
-  budget?: { min?: number; max?: number; currency?: string };
-  bedrooms?: { min?: number; max?: number };
-  bathrooms?: { min?: number; max?: number };
+  preferredType?: 'VILLA' | 'APARTMENT' | 'CONDO' | 'STUDIO' | 'HOUSE' | 'PENTHOUSE';
   amenities?: string[];
-  furnishStatus?: 'furnished' | 'semiFurnished' | 'unfunished';
-  furnished?: boolean;
-  notes?: string | { en?: string; am?: string };
-  preferredPropertyType?: string | { en?: string; am?: string };
-  preferredType?: string;
-  locale?: 'en' | 'am';
-  supportedLocales?: Array<'en' | 'am'>;
+  furnishStatus?: 'furnished' | 'semi-furnished' | 'unfurnished';
 };
 
-function isLocalizedText(value: unknown): value is { en?: string; am?: string } {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
+function buildPreferenceResponse(pref: any) {
+  if (!pref) return null;
 
-function normalizeLocalizedText(value: unknown): LocalizedText {
-  if (typeof value === 'string') {
-    return { en: value, am: value };
-  }
-
-  if (isLocalizedText(value)) {
-    const en = typeof value.en === 'string' && value.en.trim() ? value.en.trim() : null;
-    const am = typeof value.am === 'string' && value.am.trim() ? value.am.trim() : en;
-
-    return { en, am };
-  }
-
-  return { en: null, am: null };
-}
-
-function normalizePropertyTypeLabel(value: unknown): LocalizedText {
-  const text = normalizeLocalizedText(value);
-
-  if (!text.en) {
-    return { en: null, am: null };
-  }
-
-  const mapped: Record<string, LocalizedText> = {
-    VILLA: { en: 'Villa', am: 'ቪላ' },
-    APARTMENT: { en: 'Apartment', am: 'አፓርትመንት' },
-    CONDO: { en: 'Condo', am: 'ኮንዶ' },
-    STUDIO: { en: 'Studio', am: 'ስቱዲዮ' },
-    HOUSE: { en: 'House', am: 'ቤት' },
-    PENTHOUSE: { en: 'Penthouse', am: 'ፔንትሃውስ' },
+  // Multilingual mapping for Property Type
+  const propertyTypeMap: Record<string, { en: string; am: string }> = {
+    VILLA: { en: 'VILLA', am: 'ቪላ' },
+    APARTMENT: { en: 'APARTMENT', am: 'አፓርትመንት' },
+    CONDO: { en: 'CONDO', am: 'ኮንዶ' },
+    STUDIO: { en: 'STUDIO', am: 'ስቱዲዮ' },
+    HOUSE: { en: 'HOUSE', am: 'ቤት' },
+    PENTHOUSE: { en: 'PENTHOUSE', am: 'ፔንትሃውስ' },
   };
 
-  const candidate = text.en.toUpperCase();
-  if (mapped[candidate]) {
-    return mapped[candidate];
-  }
-
-  return {
-    en: text.en,
-    am: text.am ?? text.en,
+  // Multilingual mapping for Furnish Status
+  const furnishStatusMap: Record<string, { en: string; am: string }> = {
+    furnished: { en: 'furnished', am: 'የታጠቀ' },
+    'semi-furnished': { en: 'semi-furnished', am: 'በከፊል የታጠቀ' },
+    unfurnished: { en: 'unfurnished', am: 'ያልታጠቀ' },
   };
-}
-
-function normalizeFurnishStatus(
-  value: unknown,
-  fallback?: boolean
-): 'furnished' | 'semiFurnished' | 'unfunished' {
-  if (value === 'furnished' || value === 'semiFurnished' || value === 'unfunished') {
-    return value;
-  }
-
-  if (fallback === true) {
-    return 'furnished';
-  }
-
-  if (fallback === false) {
-    return 'unfunished';
-  }
-
-  return 'unfunished';
-}
-
-function normalizePreferenceLocation(
-  value: NonNullable<PreferencePayload['preferredLocations']>[number]
-): string {
-  const city = normalizeLocalizedText(value?.city);
-  const region = normalizeLocalizedText(value?.region ?? value?.state);
-
-  return [city.en, region.en].filter(Boolean).join(', ');
-}
-
-function parseStoredLocation(value: string): PreferenceLocation {
-  const [cityPart = '', regionPart = ''] = value.split(',').map((part) => part.trim());
 
   return {
-    city: { en: cityPart || null, am: cityPart || null },
-    region: { en: regionPart || null, am: regionPart || null },
-    lat: null,
-    lng: null,
-  };
-}
-
-function buildPreferenceResponse(
-  pref: {
-    preferredPriceMin: number | null;
-    preferredPriceMax: number | null;
-    preferredBedrooms: number | null;
-    preferredLocations: string[];
-    preferredAmenities: string[];
-    preferredType: string | null;
-  } | null,
-  input?: PreferencePayload
-) {
-  const budgetCurrency =
-    input?.budget?.currency ?? (pref?.preferredPriceMin || pref?.preferredPriceMax ? 'ETB' : null);
-  const notes = normalizeLocalizedText(input?.notes);
-  const furnishStatus = normalizeFurnishStatus(input?.furnishStatus, input?.furnished);
-  const preferredPropertyType = normalizePropertyTypeLabel(
-    input?.preferredPropertyType ?? input?.preferredType ?? pref?.preferredType
-  );
-
-  return {
-    preferredLocations: input?.preferredLocations?.length
-      ? input.preferredLocations.map((location) => ({
-          city: normalizeLocalizedText(location?.city),
-          region: normalizeLocalizedText(location?.region ?? location?.state),
-          lat: typeof location?.lat === 'number' ? location.lat : null,
-          lng: typeof location?.lng === 'number' ? location.lng : null,
-        }))
-      : (pref?.preferredLocations?.map(parseStoredLocation) ?? []),
     budget: {
-      min: input?.budget?.min ?? pref?.preferredPriceMin ?? null,
-      max: input?.budget?.max ?? pref?.preferredPriceMax ?? null,
-      currency: budgetCurrency,
+      min: pref.preferredPriceMin,
+      max: pref.preferredPriceMax,
+      currency: pref.preferredCurrency || 'ETB',
     },
-    bedrooms: {
-      min: input?.bedrooms?.min ?? pref?.preferredBedrooms ?? null,
-      max: input?.bedrooms?.max ?? pref?.preferredBedrooms ?? null,
-    },
-    bathrooms: {
-      min: input?.bathrooms?.min ?? null,
-      max: input?.bathrooms?.max ?? null,
-    },
-    amenities: input?.amenities ?? pref?.preferredAmenities ?? [],
-    furnishStatus,
-    notes: notes.en || notes.am ? notes : { en: null, am: null },
-    preferredPropertyType,
-    locale: input?.locale ?? 'en',
-    supportedLocales: input?.supportedLocales ?? ['en', 'am'],
+    bedrooms: pref.preferredBedrooms,
+    preferredLocations: pref.preferredLocations || [],
+    preferredType: pref.preferredType ? (propertyTypeMap[pref.preferredType] || { en: pref.preferredType, am: pref.preferredType }) : null,
+    amenities: pref.preferredAmenities || [],
+    furnishStatus: pref.furnishStatus ? (furnishStatusMap[pref.furnishStatus] || { en: pref.furnishStatus, am: pref.furnishStatus }) : null,
+    updatedAt: pref.updatedAt,
   };
 }
 
@@ -175,37 +67,36 @@ class RecommendationService {
   // USER PREFERENCES
   // ========================
   async savePreferences(userId: string, data: PreferencePayload) {
-    // Map the richer frontend payload to existing Prisma fields
     const dbData: any = {};
 
     if (data.budget) {
-      if (typeof data.budget.min === 'number') dbData.preferredPriceMin = data.budget.min;
-      if (typeof data.budget.max === 'number') dbData.preferredPriceMax = data.budget.max;
+      dbData.preferredPriceMin = data.budget.min;
+      dbData.preferredPriceMax = data.budget.max;
+      dbData.preferredCurrency = data.budget.currency;
     }
 
-    if (data.bedrooms) {
-      // store minimum bedrooms preference if provided, otherwise max
-      dbData.preferredBedrooms =
-        typeof data.bedrooms.min === 'number' ? data.bedrooms.min : data.bedrooms.max;
+    if (data.bedrooms !== undefined) {
+      if (typeof data.bedrooms === 'number') {
+        dbData.preferredBedrooms = data.bedrooms;
+      } else {
+        dbData.preferredBedrooms = data.bedrooms.min || data.bedrooms.max;
+      }
     }
 
-    if (Array.isArray(data.preferredLocations)) {
-      // store as an array of city strings (fall back to "city, state" when state exists)
-      dbData.preferredLocations = data.preferredLocations
-        .map(normalizePreferenceLocation)
-        .filter(Boolean);
+    if (data.preferredLocations) {
+      dbData.preferredLocations = data.preferredLocations;
     }
 
-    if (Array.isArray(data.amenities)) {
+    if (data.preferredType) {
+      dbData.preferredType = data.preferredType;
+    }
+
+    if (data.amenities) {
       dbData.preferredAmenities = data.amenities;
     }
 
-    if (data.preferredPropertyType) {
-      const preferredType = normalizePropertyTypeLabel(data.preferredPropertyType).en;
-
-      if (preferredType) dbData.preferredType = preferredType.toUpperCase();
-    } else if (data.preferredType) {
-      dbData.preferredType = data.preferredType;
+    if (data.furnishStatus) {
+      dbData.furnishStatus = data.furnishStatus;
     }
 
     const pref = await prisma.userPreference.upsert({
@@ -214,12 +105,12 @@ class RecommendationService {
       create: { userId, ...dbData },
     });
 
-    return buildPreferenceResponse(pref, data);
+    return buildPreferenceResponse(pref);
   }
 
   async getPreferences(userId: string) {
     const pref = await prisma.userPreference.findUnique({ where: { userId } });
-    return buildPreferenceResponse(pref, undefined);
+    return buildPreferenceResponse(pref);
   }
 
   // ========================
@@ -379,7 +270,11 @@ class RecommendationService {
           reasons.push('matches your budget');
         }
 
-        if (preferences.preferredLocations?.includes(property.location)) {
+        const preferredLocations = preferences.preferredLocations as any[];
+        if (
+          Array.isArray(preferredLocations) &&
+          preferredLocations.some((loc: any) => loc.address === property.location)
+        ) {
           score += 25;
           reasons.push('preferred location');
         }

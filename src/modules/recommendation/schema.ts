@@ -19,41 +19,27 @@ const propertyTypeSchema = z.union([localizedTextSchema, z.string().min(1)]);
 const furnishStatusSchema = z.enum(['furnished', 'semiFurnished', 'unfunished']);
 
 export const preferenceSchema = z.object({
-  preferredLocations: z.array(locationSchema).optional(),
   budget: z
     .object({
       min: z.number().nonnegative().optional(),
       max: z.number().nonnegative().optional(),
-      currency: z.string().min(1).optional(),
+      currency: z.string().default('ETB'),
     })
     .optional(),
-  bedrooms: z
-    .object({
-      min: z.number().int().nonnegative().optional(),
-      max: z.number().int().nonnegative().optional(),
+  bedrooms: z.union([z.number().int().nonnegative(), z.object({
+    min: z.number().int().nonnegative().optional(),
+    max: z.number().int().nonnegative().optional(),
+  })]).optional(),
+  preferredLocations: z.array(
+    z.object({
+      address: z.string().min(1),
+      lat: z.number().optional(),
+      lng: z.number().optional(),
     })
-    .optional(),
-  bathrooms: z
-    .object({
-      min: z.number().int().nonnegative().optional(),
-      max: z.number().int().nonnegative().optional(),
-    })
-    .optional(),
-  petsAllowed: z.boolean().optional(),
-  amenities: z.array(z.string()).optional(),
-  furnishStatus: furnishStatusSchema.optional(),
-  furnished: z.boolean().optional(),
-  moveInDate: z.string().optional(),
-  leaseLengthMonths: z.number().int().positive().optional(),
-  searchRadiusKm: z.number().nonnegative().optional(),
-  commuteMinutes: z.number().nonnegative().optional(),
-  smokingAllowed: z.boolean().optional(),
-  languages: z.array(z.string()).optional(),
-  notes: z.union([localizedTextSchema, z.string().min(1)]).optional(),
-  preferredPropertyType: propertyTypeSchema.optional(),
+  ).optional(),
   preferredType: z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE', 'PENTHOUSE']).optional(),
-  locale: z.enum(['en', 'am']).optional(),
-  supportedLocales: z.array(z.enum(['en', 'am'])).optional(),
+  amenities: z.array(z.string()).optional(),
+  furnishStatus: z.enum(['furnished', 'semi-furnished', 'unfurnished']).optional(),
 });
 
 export const searchSchema = z.object({

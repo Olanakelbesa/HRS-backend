@@ -15,9 +15,11 @@ const router = Router();
 
 /**
  * @openapi
- * /api/v1/user/preferences:
+ * /api/v1/recommendations/preferences:
  *   post:
  *     summary: Save user preferences
+ *     description: |
+ *       Store or update the renter's search preferences including budget, location, and property type.
  *     tags: [Recommendation]
  *     security:
  *       - bearerAuth: []
@@ -28,89 +30,48 @@ const router = Router();
  *           schema:
  *             type: object
  *             properties:
- *               preferredLocations:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     city:
- *                       type: string
- *                       example: "Seattle"
- *                     state:
- *                       type: string
- *                       example: "WA"
- *                     lat:
- *                       type: number
- *                       example: 47.6062
- *                     lng:
- *                       type: number
- *                       example: -122.3321
  *               budget:
  *                 type: object
  *                 properties:
  *                   min:
  *                     type: number
- *                     example: 800
+ *                     example: 15000
  *                   max:
  *                     type: number
- *                     example: 1600
+ *                     example: 80000
+ *                   currency:
+ *                     type: string
+ *                     example: "ETB"
  *               bedrooms:
- *                 type: object
- *                 properties:
- *                   min:
- *                     type: integer
- *                     example: 1
- *                   max:
- *                     type: integer
- *                     example: 2
- *               bathrooms:
- *                 type: object
- *                 properties:
- *                   min:
- *                     type: integer
- *                     example: 1
- *                   max:
- *                     type: integer
- *                     example: 2
- *               petsAllowed:
- *                 type: boolean
- *                 example: true
+ *                 type: integer
+ *                 example: 2
+ *               preferredLocations:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     address:
+ *                       type: string
+ *                       example: "Bole, Addis Ababa"
+ *                     lat:
+ *                       type: number
+ *                       example: 9.0044
+ *                     lng:
+ *                       type: number
+ *                       example: 38.7758
+ *               preferredType:
+ *                 type: string
+ *                 enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE, PENTHOUSE]
+ *                 example: APARTMENT
  *               amenities:
  *                 type: array
  *                 items:
  *                   type: string
- *                 example: ["parking", "in-unit-laundry", "dishwasher"]
+ *                 example: ["Parking", "Security", "WiFi / Broadband"]
  *               furnishStatus:
  *                 type: string
- *                 enum: [furnished, semiFurnished, unfunished]
- *                 example: unfunished
- *               moveInDate:
- *                 type: string
- *                 format: date-time
- *                 example: "2026-06-01T00:00:00.000Z"
- *               leaseLengthMonths:
- *                 type: integer
- *                 example: 12
- *               searchRadiusKm:
- *                 type: number
- *                 example: 10
- *               commuteMinutes:
- *                 type: number
- *                 example: 45
- *               smokingAllowed:
- *                 type: boolean
- *                 example: false
- *               languages:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ["en"]
- *               notes:
- *                 type: string
- *                 example: "Prefer quiet buildings near transit"
- *               preferredType:
- *                 type: string
- *                 enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE]
+ *                 enum: [furnished, semi-furnished, unfurnished]
+ *                 example: furnished
  *     responses:
  *       200:
  *         description: Preferences saved successfully
@@ -119,79 +80,12 @@ const router = Router();
  *             schema:
  *               type: object
  *               properties:
- *                 preferredLocations:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       city:
- *                         type: string
- *                       state:
- *                         type: string
- *                       lat:
- *                         type: number
- *                       lng:
- *                         type: number
- *                 budget:
+ *                 status:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                 data:
  *                   type: object
- *                   properties:
- *                     min:
- *                       type: number
- *                     max:
- *                       type: number
- *                 bedrooms:
- *                   type: object
- *                   properties:
- *                     min:
- *                       type: integer
- *                     max:
- *                       type: integer
- *                 bathrooms:
- *                   type: object
- *                   properties:
- *                     min:
- *                       type: integer
- *                     max:
- *                       type: integer
- *                 petsAllowed:
- *                   type: boolean
- *                 amenities:
- *                   type: array
- *                   items:
- *                     type: string
- *                 furnishStatus:
- *                   type: string
- *                   enum: [furnished, semiFurnished, unfunished]
- *                 moveInDate:
- *                   type: string
- *                   format: date-time
- *                 leaseLengthMonths:
- *                   type: integer
- *                 searchRadiusKm:
- *                   type: number
- *                 commuteMinutes:
- *                   type: number
- *                 smokingAllowed:
- *                   type: boolean
- *                 languages:
- *                   type: array
- *                   items:
- *                     type: string
- *                 notes:
- *                   type: string
- *                 preferredType:
- *                   type: string
- */
-router.post(
-  '/user/preferences',
-  requireAuth,
-  validate(preferenceSchema),
-  controller.savePreferences
-);
-
-/**
- * @openapi
- * /api/v1/user/preferences:
  *   get:
  *     summary: Get user preferences
  *     tags: [Recommendation]
@@ -200,75 +94,15 @@ router.post(
  *     responses:
  *       200:
  *         description: User preferences fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 preferredLocations:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       city:
- *                         type: string
- *                       state:
- *                         type: string
- *                       lat:
- *                         type: number
- *                       lng:
- *                         type: number
- *                 budget:
- *                   type: object
- *                   properties:
- *                     min:
- *                       type: number
- *                     max:
- *                       type: number
- *                 bedrooms:
- *                   type: object
- *                   properties:
- *                     min:
- *                       type: integer
- *                     max:
- *                       type: integer
- *                 bathrooms:
- *                   type: object
- *                   properties:
- *                     min:
- *                       type: integer
- *                     max:
- *                       type: integer
- *                 petsAllowed:
- *                   type: boolean
- *                 amenities:
- *                   type: array
- *                   items:
- *                     type: string
- *                 furnishStatus:
- *                   type: string
- *                   enum: [furnished, semiFurnished, unfunished]
- *                 moveInDate:
- *                   type: string
- *                   format: date-time
- *                 leaseLengthMonths:
- *                   type: integer
- *                 searchRadiusKm:
- *                   type: number
- *                 commuteMinutes:
- *                   type: number
- *                 smokingAllowed:
- *                   type: boolean
- *                 languages:
- *                   type: array
- *                   items:
- *                     type: string
- *                 notes:
- *                   type: string
- *                 preferredType:
- *                   type: string
  */
-router.get('/user/preferences', requireAuth, controller.getPreferences);
+router.post(
+  '/preferences',
+  requireAuth,
+  validate(preferenceSchema),
+  controller.savePreferences
+);
+
+router.get('/preferences', requireAuth, controller.getPreferences);
 
 /**
  * @openapi
