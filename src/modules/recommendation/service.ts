@@ -2,11 +2,158 @@ import prisma from '../../config/database';
 import { cosineSimilarity } from '../../utils/similarity.utils';
 import { InteractionType } from '@prisma/client';
 
+type LocalizedText = {
+  en: string | null;
+  am: string | null;
+};
+
+type PreferenceLocation = {
+  city: LocalizedText;
+  region: LocalizedText;
+  lat: number | null;
+  lng: number | null;
+};
+
+type PreferencePayload = {
+  preferredLocations?: Array<{
+    city?: string | { en?: string; am?: string };
+    region?: string | { en?: string; am?: string };
+    state?: string | { en?: string; am?: string };
+    lat?: number;
+    lng?: number;
+  }>;
+  budget?: { min?: number; max?: number; currency?: string };
+  bedrooms?: { min?: number; max?: number };
+  bathrooms?: { min?: number; max?: number };
+  amenities?: string[];
+  furnished?: boolean;
+  notes?: string | { en?: string; am?: string };
+  preferredPropertyType?: string | { en?: string; am?: string };
+  preferredType?: string;
+  locale?: 'en' | 'am';
+  supportedLocales?: Array<'en' | 'am'>;
+};
+
+function isLocalizedText(value: unknown): value is { en?: string; am?: string } {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeLocalizedText(value: unknown): LocalizedText {
+  if (typeof value === 'string') {
+    return { en: value, am: value };
+  }
+
+  if (isLocalizedText(value)) {
+    const en = typeof value.en === 'string' && value.en.trim() ? value.en.trim() : null;
+    const am = typeof value.am === 'string' && value.am.trim() ? value.am.trim() : en;
+
+    return { en, am };
+  }
+
+  return { en: null, am: null };
+}
+
+function normalizePropertyTypeLabel(value: unknown): LocalizedText {
+  const text = normalizeLocalizedText(value);
+
+  if (!text.en) {
+    return { en: null, am: null };
+  }
+
+  const mapped: Record<string, LocalizedText> = {
+    VILLA: { en: 'Villa', am: 'ቪላ' },
+    APARTMENT: { en: 'Apartment', am: 'አፓርትመንት' },
+    CONDO: { en: 'Condo', am: 'ኮንዶ' },
+    STUDIO: { en: 'Studio', am: 'ስቱዲዮ' },
+    HOUSE: { en: 'House', am: 'ቤት' },
+    PENTHOUSE: { en: 'Penthouse', am: 'ፔንትሃውስ' },
+  };
+
+  const candidate = text.en.toUpperCase();
+  if (mapped[candidate]) {
+    return mapped[candidate];
+  }
+
+  return {
+    en: text.en,
+    am: text.am ?? text.en,
+  };
+}
+
+function normalizePreferenceLocation(
+  value: NonNullable<PreferencePayload['preferredLocations']>[number]
+): string {
+  const city = normalizeLocalizedText(value?.city);
+  const region = normalizeLocalizedText(value?.region ?? value?.state);
+
+  return [city.en, region.en].filter(Boolean).join(', ');
+}
+
+function parseStoredLocation(value: string): PreferenceLocation {
+  const [cityPart = '', regionPart = ''] = value.split(',').map((part) => part.trim());
+
+  return {
+    city: { en: cityPart || null, am: cityPart || null },
+    region: { en: regionPart || null, am: regionPart || null },
+    lat: null,
+    lng: null,
+  };
+}
+
+function buildPreferenceResponse(
+  pref: {
+    preferredPriceMin: number | null;
+    preferredPriceMax: number | null;
+    preferredBedrooms: number | null;
+    preferredLocations: string[];
+    preferredAmenities: string[];
+    preferredType: string | null;
+  } | null,
+  input?: PreferencePayload
+) {
+  const budgetCurrency =
+    input?.budget?.currency ?? (pref?.preferredPriceMin || pref?.preferredPriceMax ? 'ETB' : null);
+  const notes = normalizeLocalizedText(input?.notes);
+  const preferredPropertyType = normalizePropertyTypeLabel(
+    input?.preferredPropertyType ?? input?.preferredType ?? pref?.preferredType
+  );
+
+  return {
+    preferredLocations: input?.preferredLocations?.length
+      ? input.preferredLocations.map((location) => ({
+          city: normalizeLocalizedText(location?.city),
+          region: normalizeLocalizedText(location?.region ?? location?.state),
+          lat: typeof location?.lat === 'number' ? location.lat : null,
+          lng: typeof location?.lng === 'number' ? location.lng : null,
+        }))
+      : (pref?.preferredLocations?.map(parseStoredLocation) ?? []),
+    budget: {
+      min: input?.budget?.min ?? pref?.preferredPriceMin ?? null,
+      max: input?.budget?.max ?? pref?.preferredPriceMax ?? null,
+      currency: budgetCurrency,
+    },
+    bedrooms: {
+      min: input?.bedrooms?.min ?? pref?.preferredBedrooms ?? null,
+      max: input?.bedrooms?.max ?? pref?.preferredBedrooms ?? null,
+    },
+    bathrooms: {
+      min: input?.bathrooms?.min ?? null,
+      max: input?.bathrooms?.max ?? null,
+    },
+    amenities: input?.amenities ?? pref?.preferredAmenities ?? [],
+    furnished: input?.furnished ?? false,
+    notes: notes.en || notes.am ? notes : { en: null, am: null },
+    preferredPropertyType,
+    locale: input?.locale ?? 'en',
+    supportedLocales: input?.supportedLocales ?? ['en', 'am'],
+  };
+}
+
 class RecommendationService {
   // ========================
   // USER PREFERENCES
   // ========================
-  async savePreferences(userId: string, data: any) {
+  async savePreferences(userId: string, data: PreferencePayload) {
     // Map the richer frontend payload to existing Prisma fields
     const dbData: any = {};
 
@@ -24,11 +171,7 @@ class RecommendationService {
     if (Array.isArray(data.preferredLocations)) {
       // store as an array of city strings (fall back to "city, state" when state exists)
       dbData.preferredLocations = data.preferredLocations
-        .map((loc: any) => {
-          if (!loc) return '';
-          if (loc.city && loc.state) return `${loc.city}, ${loc.state}`;
-          return loc.city || '';
-        })
+        .map(normalizePreferenceLocation)
         .filter(Boolean);
     }
 
@@ -36,59 +179,26 @@ class RecommendationService {
       dbData.preferredAmenities = data.amenities;
     }
 
-    if (data.preferredType) dbData.preferredType = data.preferredType;
+    if (data.preferredPropertyType) {
+      const preferredType = normalizePropertyTypeLabel(data.preferredPropertyType).en;
 
-    return prisma.userPreference.upsert({
+      if (preferredType) dbData.preferredType = preferredType.toUpperCase();
+    } else if (data.preferredType) {
+      dbData.preferredType = data.preferredType;
+    }
+
+    const pref = await prisma.userPreference.upsert({
       where: { userId },
       update: dbData,
       create: { userId, ...dbData },
     });
+
+    return buildPreferenceResponse(pref, data);
   }
 
   async getPreferences(userId: string) {
     const pref = await prisma.userPreference.findUnique({ where: { userId } });
-
-    // Always return a full structured preference object (use sensible defaults)
-    const rebuilt: any = {
-      preferredLocations: [],
-      budget: { min: null, max: null },
-      bedrooms: { min: null, max: null },
-      bathrooms: { min: null, max: null },
-      petsAllowed: false,
-      amenities: [],
-      furnished: false,
-      moveInDate: null,
-      leaseLengthMonths: null,
-      searchRadiusKm: null,
-      commuteMinutes: null,
-      smokingAllowed: false,
-      languages: [],
-      notes: null,
-      preferredType: null,
-    };
-
-    if (!pref) return rebuilt;
-
-    // Populate fields from DB record
-    if (typeof pref.preferredPriceMin === 'number') rebuilt.budget.min = pref.preferredPriceMin;
-    if (typeof pref.preferredPriceMax === 'number') rebuilt.budget.max = pref.preferredPriceMax;
-
-    if (typeof pref.preferredBedrooms === 'number') {
-      rebuilt.bedrooms.min = pref.preferredBedrooms;
-      rebuilt.bedrooms.max = pref.preferredBedrooms;
-    }
-
-    if (Array.isArray(pref.preferredLocations) && pref.preferredLocations.length > 0) {
-      rebuilt.preferredLocations = pref.preferredLocations.map((s: string) => {
-        const parts = s.split(',').map((p) => p.trim());
-        return { city: parts[0] || null, state: parts[1] || null, lat: null, lng: null };
-      });
-    }
-
-    if (Array.isArray(pref.preferredAmenities)) rebuilt.amenities = pref.preferredAmenities;
-    if (pref.preferredType) rebuilt.preferredType = pref.preferredType;
-
-    return rebuilt;
+    return buildPreferenceResponse(pref, undefined);
   }
 
   // ========================
@@ -205,7 +315,7 @@ class RecommendationService {
   // MAIN RECOMMENDATION ENGINE
   // ========================
   async getRecommendations(userId: string) {
-    const preferences = await this.getPreferences(userId);
+    const preferences = await prisma.userPreference.findUnique({ where: { userId } });
     const searches = await this.getSearchHistory(userId);
 
     const interactions = await prisma.userInteraction.findMany({
@@ -239,8 +349,8 @@ class RecommendationService {
       // ========================
       if (preferences) {
         if (
-          preferences.preferredPriceMin &&
-          preferences.preferredPriceMax &&
+          preferences.preferredPriceMin !== null &&
+          preferences.preferredPriceMax !== null &&
           property.price >= preferences.preferredPriceMin &&
           property.price <= preferences.preferredPriceMax
         ) {

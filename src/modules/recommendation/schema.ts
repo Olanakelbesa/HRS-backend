@@ -1,16 +1,30 @@
 import { z } from 'zod';
 
+const localizedTextSchema = z.object({
+  en: z.string().min(1),
+  am: z.string().min(1).optional(),
+});
+
+const localizedValueSchema = z.union([localizedTextSchema, z.string().min(1)]);
+
 const locationSchema = z.object({
-  city: z.string().min(1),
-  state: z.string().optional(),
+  city: localizedValueSchema,
+  region: localizedValueSchema.optional(),
+  state: localizedValueSchema.optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
 });
 
+const propertyTypeSchema = z.union([localizedTextSchema, z.string().min(1)]);
+
 export const preferenceSchema = z.object({
   preferredLocations: z.array(locationSchema).optional(),
   budget: z
-    .object({ min: z.number().nonnegative().optional(), max: z.number().nonnegative().optional() })
+    .object({
+      min: z.number().nonnegative().optional(),
+      max: z.number().nonnegative().optional(),
+      currency: z.string().min(1).optional(),
+    })
     .optional(),
   bedrooms: z
     .object({
@@ -33,10 +47,11 @@ export const preferenceSchema = z.object({
   commuteMinutes: z.number().nonnegative().optional(),
   smokingAllowed: z.boolean().optional(),
   languages: z.array(z.string()).optional(),
-  notes: z.string().optional(),
-  preferredType: z
-    .enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE']) // keep existing enum mapping
-    .optional(),
+  notes: z.union([localizedTextSchema, z.string().min(1)]).optional(),
+  preferredPropertyType: propertyTypeSchema.optional(),
+  preferredType: z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE', 'PENTHOUSE']).optional(),
+  locale: z.enum(['en', 'am']).optional(),
+  supportedLocales: z.array(z.enum(['en', 'am'])).optional(),
 });
 
 export const searchSchema = z.object({
