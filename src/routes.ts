@@ -15,7 +15,7 @@ import recommendationController from './modules/recommendation/controller';
 import { requireAuth } from './middlewares/auth.middleware';
 import { validate } from './middlewares/validate';
 import { searchSchema, interactionSchema } from './modules/recommendation/schema';
-import repotsroute from './modules/reports/routes';
+import reportRoutes from './modules/reports/routes';
 const router = Router();
 
 // Auth Routes
@@ -76,7 +76,7 @@ router.get(
   recommendationController.getSimilarProperties as any
 );
 //Reports Routes
-router.use('/reports', repotsroute);
+router.use('/reports', reportRoutes);
 
 // Payment Routes
 router.use('/payments', paymentRoutes);
