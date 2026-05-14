@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /// <reference types="node" />
 import {
   PrismaClient,
@@ -123,7 +124,7 @@ async function main() {
       role: Role.owner,
       emailVerified: true,
       isVerified: false,
-      verificationState: VerificationState.pending_documents,
+      verificationState: VerificationState.pending,
       status: UserStatus.active,
       image: 'https://i.pravatar.cc/150?u=sarah',
     },
@@ -155,7 +156,7 @@ async function main() {
       role: Role.owner,
       emailVerified: false,
       isVerified: false,
-      verificationState: VerificationState.pending_documents,
+      verificationState: VerificationState.pending,
       status: UserStatus.active,
     },
   });
@@ -202,7 +203,7 @@ async function main() {
       role: Role.renter,
       emailVerified: false,
       isVerified: false,
-      verificationState: VerificationState.pending_otp,
+      verificationState: VerificationState.pending,
       status: UserStatus.active,
     },
   });
@@ -273,25 +274,25 @@ async function main() {
       {
         userId: owner2.id,
         documentType: VerificationDocumentType.national_id,
-        documentUrl: 'https://example.com/docs/sarah-national-id.jpg',
+        frontUrl: 'https://example.com/docs/sarah-national-id-front.jpg',
+        backUrl: 'https://example.com/docs/sarah-national-id-back.jpg',
+        livePhotoUrl: 'https://example.com/docs/sarah-national-id-live.jpg',
         status: VerificationStatus.pending,
       },
       {
         userId: owner3.id,
         documentType: VerificationDocumentType.national_id,
-        documentUrl: 'https://example.com/docs/david-national-id.jpg',
+        frontUrl: 'https://example.com/docs/david-national-id-front.jpg',
+        backUrl: 'https://example.com/docs/david-national-id-back.jpg',
+        livePhotoUrl: 'https://example.com/docs/david-national-id-live.jpg',
         status: VerificationStatus.resubmit,
       },
       {
         userId: owner4.id,
         documentType: VerificationDocumentType.national_id,
-        documentUrl: 'https://example.com/docs/mulugeta-national-id.jpg',
-        status: VerificationStatus.pending,
-      },
-      {
-        userId: owner4.id,
-        documentType: VerificationDocumentType.passport,
-        documentUrl: 'https://example.com/docs/mulugeta-passport.jpg',
+        frontUrl: 'https://example.com/docs/mulugeta-national-id-front.jpg',
+        backUrl: 'https://example.com/docs/mulugeta-national-id-back.jpg',
+        livePhotoUrl: 'https://example.com/docs/mulugeta-national-id-live.jpg',
         status: VerificationStatus.pending,
       },
     ],

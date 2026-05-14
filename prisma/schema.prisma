@@ -475,7 +475,9 @@ model VerificationDocument {
   userId         String
   user           User     @relation("VerificationDocuments", fields: [userId], references: [id])
   documentType   VerificationDocumentType
-  documentUrl    String
+  frontUrl       String?
+  backUrl        String?
+  livePhotoUrl   String?
   status         VerificationStatus @default(pending)
   submittedAt    DateTime @default(now())
   reviewedAt     DateTime?
