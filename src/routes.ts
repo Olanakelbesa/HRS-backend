@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from './modules/auth/routes';
 import userRoutes from './modules/users/routes';
+import profileRoutes from './modules/profile/routes';
 import propertyRoutes from './modules/properties/routes';
 import messagingRoutes from './modules/messaging/routes';
 import appointmentRoutes from './modules/appointments/routes';
@@ -22,6 +23,9 @@ router.use('/auth', authRoutes);
 
 // User Routes
 router.use('/users', userRoutes);
+
+// Profile Routes
+router.use('/profile', profileRoutes);
 
 // Property Routes
 router.use('/properties', propertyRoutes);

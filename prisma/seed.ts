@@ -161,6 +161,24 @@ async function main() {
     },
   });
 
+  const owner5 = await prisma.user.create({
+    data: {
+      email: 'dawit.m@email.com',
+      password: passwordHash,
+      first_name: 'Dawit',
+      last_name: 'Mekonnen',
+      phone: '+251 91 234 5678',
+      role: Role.owner,
+      emailVerified: true,
+      isVerified: true,
+      verificationState: VerificationState.verified,
+      status: UserStatus.active,
+      location: 'Addis Ababa, Ethiopia',
+      bio: 'Property owner with 5+ years of experience managing residential rentals in Addis Ababa. Specializing in premium villas and modern apartments.',
+      image: 'https://cdn.example.com/avatars/dawit.jpg',
+    },
+  });
+
   const renter1 = await prisma.user.create({
     data: {
       email: 'dawit.g@example.com',
@@ -366,7 +384,39 @@ async function main() {
         livePhotoUrl: 'https://example.com/docs/mulugeta-national-id-live.jpg',
         status: VerificationStatus.pending,
       },
+      {
+        userId: owner5.id,
+        documentType: VerificationDocumentType.national_id,
+        frontUrl: 'national-id-front-2026.pdf',
+        backUrl: 'national-id-back-2026.pdf',
+        livePhotoUrl: 'owner-photo-2026.jpg',
+        status: VerificationStatus.approved,
+        submittedAt: new Date('2026-03-15T10:00:00.000Z'),
+      },
     ],
+  });
+
+  // 3b) Profile related records for Dawit
+  await prisma.bankDetail.create({
+    data: {
+      userId: owner5.id,
+      bankName: 'Commercial Bank of Ethiopia',
+      accountNumber: '1000123456784521',
+      holderName: 'Dawit Mekonnen',
+      branch: 'Bole Branch',
+    },
+  });
+
+  await prisma.notificationPreference.create({
+    data: {
+      userId: owner5.id,
+      appointments: true,
+      agreements: true,
+      payments: true,
+      reviews: false,
+      reports: true,
+      system: false,
+    },
   });
 
   console.log('Created Verification Docs');

@@ -2,8 +2,12 @@ import prisma from '../../config/database';
 import type { Prisma } from '@prisma/client';
 import type {
   AdminUpdatePropertyBodyInput,
+  ApprovePropertyInput,
+  GetAdminPropertiesQueryInput,
   GetAuditLogsQueryInput,
+  GetOverviewQueryInput,
   GetPendingVerificationsQueryInput,
+  RejectPropertyInput,
 } from './schema';
 
 function mapVerificationDocumentStatusToUserUpdate(
@@ -50,6 +54,76 @@ function getRangeStart(range?: '7d' | '30d' | '90d') {
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
   const msInDay = 24 * 60 * 60 * 1000;
   return new Date(now.getTime() - days * msInDay);
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function shiftDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function shiftMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function roundPercent(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function calcTrend(current: number, previous: number) {
+  if (previous <= 0) {
+    return current > 0 ? 100 : 0;
+  }
+
+  return roundPercent(((current - previous) / previous) * 100);
+}
+
+function relativeTime(from: Date, to: Date) {
+  const diffMs = Math.max(0, to.getTime() - from.getTime());
+  const minutes = Math.floor(diffMs / (60 * 1000));
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+function statusLabelAndStyle(status: string) {
+  if (status === 'PENDING') {
+    return { statusLabel: 'Pending', statusStyle: 'bg-amber-100 text-amber-700' };
+  }
+
+  if (status === 'UNAVAILABLE') {
+    return { statusLabel: 'Needs Review', statusStyle: 'bg-rose-100 text-rose-700' };
+  }
+
+  if (status === 'AVAILABLE') {
+    return { statusLabel: 'Approved', statusStyle: 'bg-emerald-100 text-emerald-700' };
+  }
+
+  return { statusLabel: status, statusStyle: 'bg-slate-100 text-slate-700' };
 }
 
 export async function getPlatformAnalytics(range?: '7d' | '30d' | '90d') {
@@ -136,6 +210,269 @@ export async function getPlatformAnalytics(range?: '7d' | '30d' | '90d') {
   };
 }
 
+export async function getAdminOverview(query: GetOverviewQueryInput) {
+  const now = new Date();
+  const windowDays = query.range === 'weekly' ? 7 : 30;
+  const currentStart = startOfDay(shiftDays(now, -(windowDays - 1)));
+  const previousStart = startOfDay(shiftDays(currentStart, -windowDays));
+  const previousEnd = endOfDay(shiftDays(currentStart, -1));
+
+  const [
+    totalUsers,
+    activeListings,
+    pendingVerifications,
+    activeAgreements,
+    totalReport,
+    currentUsers,
+    previousUsers,
+    currentListings,
+    previousListings,
+    currentAgreements,
+    previousAgreements,
+    currentReports,
+    previousReports,
+    recentAudit,
+    pendingProperties,
+    totalPayments,
+    confirmedPayments,
+    confirmedCollection,
+    areaGroups,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.property.count({ where: { isDeleted: false, status: 'AVAILABLE' } }),
+    prisma.verificationDocument.count({ where: { status: 'pending' } }),
+    prisma.agreement.count({ where: { status: 'active' } }),
+    prisma.report.count(),
+    prisma.user.count({ where: { createdAt: { gte: currentStart } } }),
+    prisma.user.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
+    prisma.property.count({ where: { createdAt: { gte: currentStart }, isDeleted: false } }),
+    prisma.property.count({
+      where: { createdAt: { gte: previousStart, lte: previousEnd }, isDeleted: false },
+    }),
+    prisma.agreement.count({ where: { createdAt: { gte: currentStart } } }),
+    prisma.agreement.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
+    prisma.report.count({ where: { createdAt: { gte: currentStart } } }),
+    prisma.report.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
+    prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        eventType: true,
+        entityType: true,
+        entityId: true,
+        createdAt: true,
+      },
+    }),
+    prisma.property.findMany({
+      where: { isDeleted: false, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: {
+        owner: {
+          select: {
+            first_name: true,
+            last_name: true,
+            image: true,
+          },
+        },
+      },
+    }),
+    prisma.payment.count(),
+    prisma.payment.count({ where: { status: 'confirmed' } }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { status: 'confirmed' },
+    }),
+    prisma.property.groupBy({
+      by: ['address'],
+      _count: { _all: true },
+      where: { isDeleted: false },
+      orderBy: { _count: { address: 'desc' } },
+      take: 4,
+    }),
+  ]);
+
+  const trendTotalUsers = calcTrend(currentUsers, previousUsers);
+  const trendActiveListings = calcTrend(currentListings, previousListings);
+  const trendActiveAgreements = calcTrend(currentAgreements, previousAgreements);
+  const trendTotalReports = calcTrend(currentReports, previousReports);
+
+  const userGrowthLabels: string[] = [];
+  const userGrowthCurrent: number[] = [];
+  const userGrowthPrevious: number[] = [];
+
+  if (query.range === 'weekly') {
+    const weekdayFmt = new Intl.DateTimeFormat('en', { weekday: 'short' });
+
+    const weeklyBuckets = await Promise.all(
+      Array.from({ length: 7 }).map(async (_, index) => {
+        const currentDay = startOfDay(shiftDays(now, -(6 - index)));
+        const currentDayEnd = endOfDay(currentDay);
+        const previousDay = startOfDay(shiftDays(currentDay, -7));
+        const previousDayEnd = endOfDay(previousDay);
+
+        const [currentCount, previousCount] = await Promise.all([
+          prisma.user.count({ where: { createdAt: { gte: currentDay, lte: currentDayEnd } } }),
+          prisma.user.count({ where: { createdAt: { gte: previousDay, lte: previousDayEnd } } }),
+        ]);
+
+        return {
+          label: weekdayFmt.format(currentDay),
+          currentCount,
+          previousCount,
+        };
+      })
+    );
+
+    weeklyBuckets.forEach((bucket) => {
+      userGrowthLabels.push(bucket.label);
+      userGrowthCurrent.push(bucket.currentCount);
+      userGrowthPrevious.push(bucket.previousCount);
+    });
+  } else {
+    const monthFmt = new Intl.DateTimeFormat('en', { month: 'short' });
+
+    const monthlyBuckets = await Promise.all(
+      Array.from({ length: 6 }).map(async (_, index) => {
+        const offset = 5 - index;
+        const monthRef = shiftMonths(now, -offset);
+        const currentMonthStart = startOfMonth(monthRef);
+        const currentMonthEnd = endOfMonth(monthRef);
+
+        const previousMonthRef = shiftMonths(monthRef, -6);
+        const previousMonthStart = startOfMonth(previousMonthRef);
+        const previousMonthEnd = endOfMonth(previousMonthRef);
+
+        const [currentCount, previousCount] = await Promise.all([
+          prisma.user.count({
+            where: {
+              createdAt: {
+                gte: currentMonthStart,
+                lte: currentMonthEnd,
+              },
+            },
+          }),
+          prisma.user.count({
+            where: {
+              createdAt: {
+                gte: previousMonthStart,
+                lte: previousMonthEnd,
+              },
+            },
+          }),
+        ]);
+
+        return {
+          label: monthFmt.format(monthRef),
+          currentCount,
+          previousCount,
+        };
+      })
+    );
+
+    monthlyBuckets.forEach((bucket) => {
+      userGrowthLabels.push(bucket.label);
+      userGrowthCurrent.push(bucket.currentCount);
+      userGrowthPrevious.push(bucket.previousCount);
+    });
+  }
+
+  const recentActivity = recentAudit.map((item) => ({
+    id: item.id,
+    type: item.eventType,
+    text: item.eventType
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase()),
+    detail: item.entityId
+      ? `${item.entityType} (${item.entityId}) updated`
+      : `${item.entityType} updated`,
+    time: relativeTime(item.createdAt, now),
+    createdAt: item.createdAt,
+  }));
+
+  const recentProperties = pendingProperties.map((property) => {
+    const owner = `${property.owner.first_name ?? ''} ${property.owner.last_name ?? ''}`.trim() || 'Unknown';
+    const [firstImage] = property.images ?? [];
+    const statusMeta = statusLabelAndStyle(property.status);
+
+    return {
+      id: property.id,
+      name:
+        (property.title as { en?: string; am?: string } | null)?.en ??
+        (property.title as { en?: string; am?: string } | null)?.am ??
+        'Untitled Property',
+      owner,
+      ownerAvatar: property.owner.image,
+      location: property.address ?? property.location,
+      status: property.status,
+      statusLabel: statusMeta.statusLabel,
+      statusStyle: statusMeta.statusStyle,
+      dateSubmitted: property.createdAt,
+      image: firstImage ?? null,
+    };
+  });
+
+  const totalListingsCount = areaGroups.reduce((sum, item) => sum + item._count._all, 0);
+  const listingsByArea = areaGroups.map((item) => {
+    const rawAddress = (item.address ?? '').trim();
+    const area = rawAddress ? rawAddress.split(',')[0].trim() : 'Unknown';
+    const percentage = totalListingsCount
+      ? Math.round((item._count._all / totalListingsCount) * 100)
+      : 0;
+
+    return {
+      area,
+      count: item._count._all,
+      percentage,
+    };
+  });
+
+  const successRate = totalPayments > 0 ? Math.round((confirmedPayments / totalPayments) * 100) : 0;
+
+  return {
+    lastUpdated: now.toISOString(),
+    stats: {
+      totalUsers: {
+        value: totalUsers,
+        trendPercent: trendTotalUsers,
+      },
+      activeListings: {
+        value: activeListings,
+        trendPercent: trendActiveListings,
+      },
+      pendingVerifications: {
+        value: pendingVerifications,
+        actionNeeded: pendingVerifications > 0,
+      },
+      activeAgreements: {
+        value: activeAgreements,
+        trendPercent: trendActiveAgreements,
+      },
+      totalReport: {
+        value: totalReport,
+        trendPercent: trendTotalReports,
+      },
+    },
+    userGrowth: {
+      range: query.range,
+      labels: userGrowthLabels,
+      currentPeriod: userGrowthCurrent,
+      previousPeriod: userGrowthPrevious,
+    },
+    recentActivity,
+    listingsByArea,
+    paymentPerformance: {
+      successRate,
+      totalCollectionAmount: confirmedCollection._sum.amount ?? 0,
+      currency: 'ETB',
+      label: successRate >= 90 ? 'On Time Collection' : 'Needs Attention',
+    },
+    recentProperties,
+  };
+}
+
 export async function getPendingVerifications(query: GetPendingVerificationsQueryInput) {
   const skip = (query.page - 1) * query.limit;
   const where: Prisma.UserWhereInput = {
@@ -154,7 +491,7 @@ export async function getPendingVerifications(query: GetPendingVerificationsQuer
       : {}),
   };
 
-  const [items, total] = await Promise.all([
+  const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
       skip,
@@ -166,14 +503,36 @@ export async function getPendingVerifications(query: GetPendingVerificationsQuer
         last_name: true,
         email: true,
         phone: true,
-        emailVerified: true,
-        isVerified: true,
-        createdAt: true,
-        updatedAt: true,
+        verificationDocs: {
+          orderBy: { submittedAt: 'desc' },
+          select: {
+            submittedAt: true,
+            documentType: true,
+          },
+        },
       },
     }),
     prisma.user.count({ where }),
   ]);
+
+  const now = new Date();
+  const items = users.map((user) => {
+    const latestDoc = user.verificationDocs[0] ?? null;
+    const submittedDate = latestDoc?.submittedAt ?? null;
+    const daysWaiting = submittedDate
+      ? Math.max(0, Math.floor((now.getTime() - submittedDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : null;
+
+    return {
+      id: user.id,
+      name: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim(),
+      email: user.email,
+      phone: user.phone,
+      submittedDate,
+      daysWaiting,
+      documents: user.verificationDocs.map((doc) => doc.documentType),
+    };
+  });
 
   return {
     items,
@@ -272,6 +631,55 @@ export async function adminOverrideUpdateProperty(
       entityId: propertyId,
       metadata: {
         changedFields,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  return updated;
+}
+
+export async function approveProperty(adminId: string, propertyId: string, payload: ApprovePropertyInput) {
+  const existing = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!existing) return null;
+
+  const updated = await prisma.property.update({
+    where: { id: propertyId },
+    data: { status: 'AVAILABLE' },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: adminId,
+      eventType: 'ADMIN_PROPERTY_APPROVED',
+      entityType: 'Property',
+      entityId: propertyId,
+      metadata: {
+        note: payload.note ?? null,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  return updated;
+}
+
+export async function rejectProperty(adminId: string, propertyId: string, payload: RejectPropertyInput) {
+  const existing = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!existing) return null;
+
+  const updated = await prisma.property.update({
+    where: { id: propertyId },
+    data: { status: 'UNAVAILABLE' },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: adminId,
+      eventType: 'ADMIN_PROPERTY_REJECTED',
+      entityType: 'Property',
+      entityId: propertyId,
+      metadata: {
+        reason: payload.reason,
+        note: payload.note ?? null,
       } as Prisma.InputJsonValue,
     },
   });
@@ -378,18 +786,45 @@ export async function updateUserVerificationState(
   return user;
 }
 
-export async function getProperties(query: any) {
+export async function getProperties(query: GetAdminPropertiesQueryInput) {
   const skip = (query.page - 1) * query.limit;
+  const where: Prisma.PropertyWhereInput = {
+    isDeleted: false,
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.search
+      ? {
+          OR: [
+            { address: { contains: query.search, mode: 'insensitive' } },
+            { owner: { first_name: { contains: query.search, mode: 'insensitive' } } },
+            { owner: { last_name: { contains: query.search, mode: 'insensitive' } } },
+          ],
+        }
+      : {}),
+  };
+
   const [items, total] = await Promise.all([
     prisma.property.findMany({
+      where,
       skip,
       take: query.limit,
       orderBy: { createdAt: 'desc' },
-      include: { owner: true },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            image: true,
+          },
+        },
+      },
     }),
-    prisma.property.count(),
+    prisma.property.count({ where }),
   ]);
-  return { items, meta: { total, page: query.page, limit: query.limit } };
+  return {
+    items,
+    meta: { total, page: query.page, limit: query.limit, totalPages: Math.ceil(total / query.limit) },
+  };
 }
 
 export async function getAgreements(query: any) {
