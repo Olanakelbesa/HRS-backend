@@ -81,12 +81,24 @@ router.use(requireAuth);
  *                       type: string
  *                     phone:
  *                       type: string
+ *                     location:
+ *                       type: string
+ *                     bio:
+ *                       type: string
+ *                     image:
+ *                       type: string
+ *                     verificationState:
+ *                       type: string
+ *                     isVerified:
+ *                       type: boolean
+ *                     emailVerified:
+ *                       type: boolean
  *                     verification:
  *                       type: object
+ *                       nullable: true
  *                       properties:
  *                         status:
  *                           type: string
- *                           example: pending
  *                         submittedAt:
  *                           type: string
  *                           format: date-time
@@ -105,6 +117,26 @@ router.use(requireAuth);
  *                                 type: string
  *                               file:
  *                                 type: string
+ *                     bankDetails:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                         accountNumber:
+ *                           type: string
+ *                         accountHolder:
+ *                           type: string
+ *                     notificationPreferences:
+ *                       type: object
+ *                     language:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
  *       401:
  *         description: Unauthorized
  *       500:

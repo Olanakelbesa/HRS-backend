@@ -109,28 +109,20 @@ export async function getProfile(userId: string) {
     return num.replace(/.(?=.{4})/g, '*');
   };
 
-  return {
+  const fullName = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || 'Unknown';
+
+  const baseProfile = {
     id: user.id,
-    fullName: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || 'Unknown',
+    fullName,
     email: user.email,
     phone: user.phone,
-    location: (user as any).location || '',
-    bio: (user as any).bio || '',
+    location: user.location || '',
+    bio: user.bio || '',
     image: user.image,
     verificationState: user.verificationState,
     isVerified: user.isVerified,
     emailVerified: user.emailVerified,
-    verification,
-    bankDetails: (user as any).bankDetail
-      ? {
-          id: (user as any).bankDetail.id,
-          bankName: (user as any).bankDetail.bankName,
-          accountNumber: maskAccountNumber((user as any).bankDetail.accountNumber),
-          holderName: (user as any).bankDetail.holderName,
-          branch: (user as any).bankDetail.branch,
-        }
-      : null,
-    notificationPreferences: (user as any).notificationPreference || {
+    notificationPreferences: user.notificationPreference || {
       appointments: true,
       agreements: true,
       payments: true,
@@ -142,6 +134,24 @@ export async function getProfile(userId: string) {
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };
+
+  // Return full profile only for owners
+  if (user.role === 'owner') {
+    return {
+      ...baseProfile,
+      verification,
+      bankDetails: user.bankDetail
+        ? {
+            name: user.bankDetail.bankName,
+            accountNumber: user.bankDetail.accountNumber,
+            accountHolder: fullName, // Ensure fullName and accountHolder are the same as requested
+          }
+        : null,
+    };
+  }
+
+  // For admin and renter (rental), return base profile without verification and bankDetails
+  return baseProfile;
 }
 
 /**
@@ -271,9 +281,9 @@ export async function updateBankDetails(userId: string, data: UpdateBankDetailsI
 
   return {
     id: bankDetail.id,
-    bankName: bankDetail.bankName,
-    accountNumber: bankDetail.accountNumber.replace(/.(?=.{4})/g, '*'),
-    holderName: bankDetail.holderName,
+    name: bankDetail.bankName,
+    accountNumber: bankDetail.accountNumber,
+    accountHolder: bankDetail.holderName,
     branch: bankDetail.branch,
   };
 }
