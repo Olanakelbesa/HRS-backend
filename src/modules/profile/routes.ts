@@ -118,6 +118,36 @@ router.patch('/', fileUpload.single('image'), profileController.updatePersonalIn
 /**
  * @swagger
  * /api/v1/profile/documents:
+ *   get:
+ *     summary: Get user's verification documents
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Documents retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     overallStatus:
+ *                       type: string
+ *                     submittedAt:
+ *                       type: string
+ *                     uploadedFiles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       401:
+ *         description: Unauthorized
  *   post:
  *     summary: Upload all verification documents in a single request
  *     description: |
@@ -180,7 +210,6 @@ router.patch('/', fileUpload.single('image'), profileController.updatePersonalIn
  *                             type: string
  *                             enum: [NATIONAL_ID_FRONT, NATIONAL_ID_BACK, OWNER_PHOTO]
  *                           label:
- *                             type: string
  *                           file:
  *                             type: string
  *       400:
@@ -190,6 +219,7 @@ router.patch('/', fileUpload.single('image'), profileController.updatePersonalIn
  *       413:
  *         description: File exceeds 5 MB limit
  */
+router.get('/documents', profileController.getDocuments);
 router.post(
   '/documents',
   fileUpload.fields([

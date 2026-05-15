@@ -191,6 +191,68 @@ export async function uploadDocument(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/v1/owners/profile/documents
+ */
+export async function getDocuments(req: Request, res: Response) {
+  try {
+    const auth = req as AuthenticatedRequest;
+    const userId = auth.userId;
+
+    if (!userId) {
+      return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    }
+
+    const doc = await profileService.getVerificationDoc(userId);
+
+    if (!doc) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'No documents found',
+        data: null,
+      });
+    }
+
+    const uploadedFiles: { documentType: string; label: string; file: string; url: string }[] = [];
+    if (doc.frontUrl) {
+      uploadedFiles.push({
+        documentType: 'NATIONAL_ID_FRONT',
+        label: 'National ID - Front',
+        file: doc.frontUrl.split('/').pop()!,
+        url: doc.frontUrl,
+      });
+    }
+    if (doc.backUrl) {
+      uploadedFiles.push({
+        documentType: 'NATIONAL_ID_BACK',
+        label: 'National ID - Back',
+        file: doc.backUrl.split('/').pop()!,
+        url: doc.backUrl,
+      });
+    }
+    if (doc.livePhotoUrl) {
+      uploadedFiles.push({
+        documentType: 'OWNER_PHOTO',
+        label: 'Your Photo',
+        file: doc.livePhotoUrl.split('/').pop()!,
+        url: doc.livePhotoUrl,
+      });
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        id: doc.id,
+        overallStatus: doc.status,
+        submittedAt: doc.submittedAt,
+        uploadedFiles,
+      },
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+/**
  * PATCH /api/v1/owners/profile/bank
  */
 export async function updateBankDetails(req: Request, res: Response) {
