@@ -55,8 +55,8 @@ const localOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'https://shr-frontend.vercel.app'
 ];
+
 const configuredOrigins = rawEnv.ALLOWED_ORIGINS
   ? rawEnv.ALLOWED_ORIGINS.split(',')
       .map((origin) => origin.trim())
@@ -67,6 +67,12 @@ export const env = {
   ...rawEnv,
   APP_BASE_URL: deriveBaseUrl(rawEnv.APP_BASE_URL, rawEnv.NODE_ENV, rawEnv.PORT),
   ALLOWED_ORIGINS: Array.from(
-    new Set([rawEnv.FRONTEND_URL, ...localOrigins, ...configuredOrigins].filter(Boolean))
+    new Set(
+      [
+        rawEnv.FRONTEND_URL,
+        ...(rawEnv.NODE_ENV === 'production' ? [] : localOrigins),
+        ...configuredOrigins,
+      ].filter(Boolean) as string[]
+    )
   ),
 };
