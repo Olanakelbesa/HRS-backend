@@ -97,10 +97,10 @@ export async function getProfile(userId: string) {
 
   const verification = doc
     ? {
-        status: mapDocumentStatus(doc.status),
-        submittedAt: doc.submittedAt.toISOString(),
-        documents,
-      }
+      status: mapDocumentStatus(doc.status),
+      submittedAt: doc.submittedAt.toISOString(),
+      documents,
+    }
     : null;
 
   // Mask account number (show only last 4 digits) for security
@@ -109,16 +109,19 @@ export async function getProfile(userId: string) {
     return num.replace(/.(?=.{4})/g, '*');
   };
 
-  const fullName = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || 'Unknown';
 
   const baseProfile = {
     id: user.id,
-    fullName,
+    firstName: user.first_name,
+    lastName: user.last_name,
     email: user.email,
     phone: user.phone,
     location: user.location || '',
     bio: user.bio || '',
     image: user.image,
+    role: user.role,
+    status: user.status,
+    preferredLanguage: user.preferredLanguage,
     verificationState: user.verificationState,
     isVerified: user.isVerified,
     emailVerified: user.emailVerified,
@@ -142,10 +145,10 @@ export async function getProfile(userId: string) {
       verification,
       bankDetails: user.bankDetail
         ? {
-            name: user.bankDetail.bankName,
-            accountNumber: user.bankDetail.accountNumber,
-            accountHolder: fullName, // Ensure fullName and accountHolder are the same as requested
-          }
+          name: user.bankDetail.bankName,
+          accountNumber: user.bankDetail.accountNumber,
+          accountHolder: user.bankDetail.accountHolder, // Ensure fullName and accountHolder are the same as requested
+        }
         : null,
     };
   }
@@ -235,8 +238,8 @@ export async function uploadDocument(userId: string, documentType: string, file:
   // Map documentType → URL field on the single record
   const urlField: Record<string, string> = {
     NATIONAL_ID_FRONT: 'frontUrl',
-    NATIONAL_ID_BACK:  'backUrl',
-    OWNER_PHOTO:       'livePhotoUrl',
+    NATIONAL_ID_BACK: 'backUrl',
+    OWNER_PHOTO: 'livePhotoUrl',
   };
 
   const field = urlField[documentType];
@@ -245,7 +248,7 @@ export async function uploadDocument(userId: string, documentType: string, file:
   // Upsert one record per user — only update the relevant URL field,
   // reset overall status to pending so admin re-reviews
   return prisma.verificationDocument.upsert({
-    where:  { userId },
+    where: { userId },
     create: { userId, [field]: fileUrl, status: 'pending', submittedAt: new Date() },
     update: { [field]: fileUrl, status: 'pending', submittedAt: new Date() },
   });
