@@ -147,7 +147,7 @@ export async function getProfile(userId: string) {
         ? {
           name: user.bankDetail.bankName,
           accountNumber: user.bankDetail.accountNumber,
-          accountHolder: user.bankDetail.accountHolder, // Ensure fullName and accountHolder are the same as requested
+          accountHolder: user.bankDetail.holderName, // Ensure fullName and accountHolder are the same as requested
         }
         : null,
     };
