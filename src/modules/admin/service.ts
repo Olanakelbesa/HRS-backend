@@ -481,13 +481,13 @@ export async function getPendingVerifications(query: GetPendingVerificationsQuer
     ...(query.emailVerified !== undefined ? { emailVerified: query.emailVerified } : {}),
     ...(query.search
       ? {
-          OR: [
-            { first_name: { contains: query.search, mode: 'insensitive' } },
-            { last_name: { contains: query.search, mode: 'insensitive' } },
-            { email: { contains: query.search, mode: 'insensitive' } },
-            { phone: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { first_name: { contains: query.search, mode: 'insensitive' } },
+          { last_name: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+          { phone: { contains: query.search, mode: 'insensitive' } },
+        ],
+      }
       : {}),
   };
 
@@ -560,12 +560,12 @@ export async function getAuditLogs(query: GetAuditLogsQueryInput) {
   const where: Prisma.AuditLogWhereInput = {
     ...(query.search
       ? {
-          OR: [
-            { eventType: { contains: query.search, mode: 'insensitive' } },
-            { entityType: { contains: query.search, mode: 'insensitive' } },
-            { entityId: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { eventType: { contains: query.search, mode: 'insensitive' } },
+          { entityType: { contains: query.search, mode: 'insensitive' } },
+          { entityId: { contains: query.search, mode: 'insensitive' } },
+        ],
+      }
       : {}),
     ...(query.eventType ? { eventType: query.eventType } : {}),
     ...(query.entityType ? { entityType: query.entityType } : {}),
@@ -573,11 +573,11 @@ export async function getAuditLogs(query: GetAuditLogsQueryInput) {
     ...(query.entityId ? { entityId: query.entityId } : {}),
     ...(query.dateFrom || query.dateTo
       ? {
-          createdAt: {
-            ...(query.dateFrom ? { gte: query.dateFrom } : {}),
-            ...(query.dateTo ? { lte: query.dateTo } : {}),
-          },
-        }
+        createdAt: {
+          ...(query.dateFrom ? { gte: query.dateFrom } : {}),
+          ...(query.dateTo ? { lte: query.dateTo } : {}),
+        },
+      }
       : {}),
   };
 
@@ -708,12 +708,12 @@ export async function getUsers(query: import('./schema').GetUsersQueryInput) {
     ...(query.status ? { status: query.status } : {}),
     ...(query.search
       ? {
-          OR: [
-            { first_name: { contains: query.search, mode: 'insensitive' } },
-            { last_name: { contains: query.search, mode: 'insensitive' } },
-            { email: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { first_name: { contains: query.search, mode: 'insensitive' } },
+          { last_name: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ],
+      }
       : {}),
   };
 
@@ -741,7 +741,18 @@ export async function getUsers(query: import('./schema').GetUsersQueryInput) {
 }
 
 export async function getUserById(id: string) {
-  return prisma.user.findUnique({ where: { id } });
+  return prisma.user.findUnique({
+    where: { id },
+    include: { verificationDocs: true },
+  });
+}
+
+export async function getUserDocuments(userId: string) {
+  const docs = await prisma.verificationDocument.findMany({
+    where: { userId },
+    orderBy: { submittedAt: 'desc' },
+  });
+  return docs;
 }
 
 export async function updateUserStatus(adminId: string, id: string, status: any) {
@@ -803,12 +814,12 @@ export async function getProperties(query: GetAdminPropertiesQueryInput) {
     ...(query.status ? { status: query.status } : {}),
     ...(query.search
       ? {
-          OR: [
-            { address: { contains: query.search, mode: 'insensitive' } },
-            { owner: { first_name: { contains: query.search, mode: 'insensitive' } } },
-            { owner: { last_name: { contains: query.search, mode: 'insensitive' } } },
-          ],
-        }
+        OR: [
+          { address: { contains: query.search, mode: 'insensitive' } },
+          { owner: { first_name: { contains: query.search, mode: 'insensitive' } } },
+          { owner: { last_name: { contains: query.search, mode: 'insensitive' } } },
+        ],
+      }
       : {}),
   };
 

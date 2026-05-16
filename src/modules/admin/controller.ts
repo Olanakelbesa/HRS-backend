@@ -109,6 +109,12 @@ export async function userGet(req: Request, res: Response) {
   return res.status(200).json({ status: 'success', data });
 }
 
+export async function userGetDocuments(req: Request, res: Response) {
+  const params = paramIdSchema.parse(req.params);
+  const data = await adminService.getUserDocuments(params.id);
+  return res.status(200).json({ status: 'success', data });
+}
+
 export async function userUpdateStatus(req: Request, res: Response) {
   const auth = req as AuthenticatedRequest;
   const params = paramIdSchema.parse(req.params);

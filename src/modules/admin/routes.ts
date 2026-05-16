@@ -518,6 +518,7 @@ router.get('/users', controller.usersList);
  *         description: User not found
  */
 router.get('/users/:id', controller.userGet);
+router.get('/users/:id/documents', controller.userGetDocuments);
 
 /**
  * @swagger
