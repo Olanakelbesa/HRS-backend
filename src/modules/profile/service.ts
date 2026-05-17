@@ -10,6 +10,7 @@ import type {
 import type { UploadedFile } from '../../types/request';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { uploadDocumentToCloudinary, uploadAvatarToCloudinary } from '../../lib/cloudinary';
 
 /**
  * Senior Developer Note: Standardizing status and metadata mapping
@@ -172,14 +173,7 @@ export async function updatePersonalInfo(
 
   let imageUrl: string | undefined;
   if (file) {
-    const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    const filename = `avatar-${userId}-${timestamp}${ext}`;
-    const filepath = path.join(process.cwd(), 'uploads/avatars', filename);
-
-    await fs.mkdir(path.dirname(filepath), { recursive: true });
-    await fs.writeFile(filepath, file.buffer);
-    imageUrl = `/uploads/avatars/${filename}`;
+    imageUrl = await uploadAvatarToCloudinary(file, userId);
   }
 
   const user = await prisma.user.update({
@@ -225,15 +219,7 @@ export async function updatePersonalInfo(
  * Returns the full updated record (not per-file) so the caller can build one overall response.
  */
 export async function uploadDocument(userId: string, documentType: string, file: UploadedFile) {
-  const timestamp = Date.now();
-  const ext = path.extname(file.originalname);
-  const filename = `doc-${userId}-${documentType.toLowerCase()}-${timestamp}${ext}`;
-  const filepath = path.join(process.cwd(), 'uploads/documents', filename);
-
-  await fs.mkdir(path.dirname(filepath), { recursive: true });
-  await fs.writeFile(filepath, file.buffer);
-
-  const fileUrl = `/uploads/documents/${filename}`;
+  const fileUrl = await uploadDocumentToCloudinary(file, userId, documentType);
 
   // Map documentType → URL field on the single record
   const urlField: Record<string, string> = {
