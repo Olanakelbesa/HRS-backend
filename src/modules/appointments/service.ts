@@ -46,6 +46,32 @@ const appointmentSelect = {
   },
 } as const;
 
+/**
+ * Check if a user is verified (helper function)
+ * Owners must be verified to interact with appointments
+ */
+async function checkOwnerVerification(ownerId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { role: true, isVerified: true },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.role !== 'owner') {
+    throw new AppError('Only owners can perform this action', 403);
+  }
+
+  if (!user.isVerified) {
+    throw new AppError(
+      'Your account is not verified. Please upload your verification documents and wait for approval.',
+      403
+    );
+  }
+}
+
 async function notifyOwnerOfNewBooking(appointmentId: string) {
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
@@ -230,6 +256,11 @@ export async function updateAppointmentStatus(
   const canManage = userRole === 'admin' || appointment.ownerId === userId;
   if (!canManage) throw new AppError('Only owner/agent can update appointment status', 403);
 
+  // Check if owner is verified (only applies to owners, not admins)
+  if (userRole === 'owner' && appointment.ownerId === userId) {
+    await checkOwnerVerification(userId);
+  }
+
   if (input.status === 'ACCEPTED') {
     const overlap = await prisma.appointment.findFirst({
       where: {
@@ -297,6 +328,11 @@ export async function deleteAppointment(userId: string, userRole: string, appoin
     throw new AppError('You do not have permission to delete this appointment', 403);
   }
 
+  // Check if owner is verified (only applies to owners, not admins or renters)
+  if (userRole === 'owner' && appointment.ownerId === userId) {
+    await checkOwnerVerification(userId);
+  }
+
   await prisma.appointment.delete({ where: { id: appointmentId } });
 
   const notificationRecipientId =
@@ -346,6 +382,11 @@ export async function updateAppointmentNote(
   const canUpdateNote = userRole === 'admin' || appointment.ownerId === userId;
   if (!canUpdateNote) {
     throw new AppError('Only owner/agent can update appointment note', 403);
+  }
+
+  // Check if owner is verified (only applies to owners, not admins)
+  if (userRole === 'owner' && appointment.ownerId === userId) {
+    await checkOwnerVerification(userId);
   }
 
   const updated = await prisma.appointment.update({

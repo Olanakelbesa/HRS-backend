@@ -15,11 +15,11 @@ import {
  */
 const handleError = (res: Response, error: any) => {
   console.error('[ProfileController Error]:', error);
-  
+
   if (error.message === 'User not found') {
     return res.status(404).json({ status: 'error', message: error.message });
   }
-  
+
   if (error.message === 'Current password is incorrect') {
     return res.status(400).json({ status: 'error', message: error.message });
   }
@@ -129,8 +129,8 @@ export async function uploadDocument(req: Request, res: Response) {
 
     const fieldToDocType: Record<string, string> = {
       nationalIdFront: 'NATIONAL_ID_FRONT',
-      nationalIdBack:  'NATIONAL_ID_BACK',
-      ownerPhoto:      'OWNER_PHOTO',
+      nationalIdBack: 'NATIONAL_ID_BACK',
+      ownerPhoto: 'OWNER_PHOTO',
     };
 
     // Validate all provided files before saving any
@@ -164,24 +164,24 @@ export async function uploadDocument(req: Request, res: Response) {
     // After all uploads, fetch the single record to build one consolidated response
     const doc = await profileService.getVerificationDoc(userId);
 
-    const uploadedFiles: { documentType: string; label: string; file: string }[] = [];
+    const uploadedFiles: { documentType: string; label: string; file: string; url: string }[] = [];
     if (doc?.frontUrl) {
-      uploadedFiles.push({ documentType: 'NATIONAL_ID_FRONT', label: 'National ID - Front', file: doc.frontUrl.split('/').pop()! });
+      uploadedFiles.push({ documentType: 'NATIONAL_ID_FRONT', label: 'National ID - Front', file: doc.frontUrl.split('/').pop()!, url: doc.frontUrl });
     }
     if (doc?.backUrl) {
-      uploadedFiles.push({ documentType: 'NATIONAL_ID_BACK',  label: 'National ID - Back',  file: doc.backUrl.split('/').pop()!  });
+      uploadedFiles.push({ documentType: 'NATIONAL_ID_BACK', label: 'National ID - Back', file: doc.backUrl.split('/').pop()!, url: doc.backUrl });
     }
     if (doc?.livePhotoUrl) {
-      uploadedFiles.push({ documentType: 'OWNER_PHOTO',       label: 'Your Photo',           file: doc.livePhotoUrl.split('/').pop()! });
+      uploadedFiles.push({ documentType: 'OWNER_PHOTO', label: 'Your Photo', file: doc.livePhotoUrl.split('/').pop()!, url: doc.livePhotoUrl });
     }
 
     return res.status(200).json({
       status: 'success',
       message: 'Documents uploaded successfully',
       data: {
-        id:           doc!.id,
+        id: doc!.id,
         overallStatus: doc!.status,   // single status — admin reviews once
-        submittedAt:  doc!.submittedAt,
+        submittedAt: doc!.submittedAt,
         uploadedFiles,
       },
     });
@@ -243,7 +243,9 @@ export async function getDocuments(req: Request, res: Response) {
       data: {
         id: doc.id,
         overallStatus: doc.status,
+        note: doc.note,
         submittedAt: doc.submittedAt,
+        reviewedAt: doc.reviewedAt,
         uploadedFiles,
       },
     });

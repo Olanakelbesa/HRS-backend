@@ -26,6 +26,10 @@ const envSchema = z.object({
   GOOGLE_EMAIL_USER: z.string().email().optional(),
   GOOGLE_EMAIL_PASS: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_URL: z.string().optional(),
 });
 
 const rawEnv = envSchema.parse(process.env);

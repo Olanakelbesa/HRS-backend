@@ -16,6 +16,7 @@ import { requireAuth } from './middlewares/auth.middleware';
 import { validate } from './middlewares/validate';
 import { searchSchema, interactionSchema } from './modules/recommendation/schema';
 import reportRoutes from './modules/reports/routes';
+import verificationRoutes from './modules/verification/routes';
 const router = Router();
 
 // Auth Routes
@@ -80,6 +81,9 @@ router.use('/reports', reportRoutes);
 
 // Payment Routes
 router.use('/payments', paymentRoutes);
+
+// Verification Routes
+router.use('/verification', verificationRoutes);
 
 // Agreements
 router.use('/', agreementRoutes);

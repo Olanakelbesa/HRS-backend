@@ -210,6 +210,8 @@ model Property {
 
   viewsCount Int @default(0)
 
+  isVerified Boolean @default(false)
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
@@ -483,6 +485,7 @@ model VerificationDocument {
   backUrl        String?                                     // NATIONAL_ID_BACK
   livePhotoUrl   String?                                     // OWNER_PHOTO
   status         VerificationStatus @default(pending)        // admin reviews once
+  note           String?                                     // admin note when changing status
   submittedAt    DateTime @default(now())
   reviewedAt     DateTime?
   reviewedById   String?
@@ -499,6 +502,7 @@ model VerificationDocument {
 
 enum VerificationStatus {
   pending
+  under_review
   approved
   rejected
   resubmit

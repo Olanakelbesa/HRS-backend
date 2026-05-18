@@ -1,8 +1,35 @@
 import prisma from '../../config/database';
 import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from './schema';
 import { PropertyStatus } from '@prisma/client';
+import { AppError } from '../../core/AppError';
 
 const SUPPORTED_LANGUAGES = new Set(['en', 'am']);
+
+/**
+ * Check if a user is verified (helper function)
+ * Owners must be verified to create/update/delete properties
+ */
+async function checkOwnerVerification(ownerId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { role: true, isVerified: true },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.role !== 'owner') {
+    throw new AppError('Only owners can create properties', 403);
+  }
+
+  if (!user.isVerified) {
+    throw new AppError(
+      'Your account is not verified. Please upload your verification documents and wait for approval before creating properties.',
+      403
+    );
+  }
+}
 
 function toRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -79,6 +106,7 @@ function formatPropertyResponse(property: any) {
       property.availableFrom ??
       (property.createdAt ? property.createdAt.toISOString().slice(0, 10) : null),
     status: property.status,
+    isVerified: property.isVerified ?? false,
     owner: property.owner ?? null,
     createdAt: property.createdAt,
   };
@@ -86,6 +114,16 @@ function formatPropertyResponse(property: any) {
 
 export const propertyService = {
   async createProperty(ownerId: string, data: CreatePropertyInput) {
+    // Check if owner is verified
+    await checkOwnerVerification(ownerId);
+
+    const owner = await prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { isVerified: true },
+    });
+
+    const isVerified = owner?.isVerified || false;
+
     return await prisma.property.create({
       data: {
         owner: {
@@ -107,6 +145,8 @@ export const propertyService = {
         images: data.images,
         videos: data.videos ?? [],
         rentTerms: data.rentTerms ?? null,
+        // Auto-verify property if owner is verified
+        isVerified,
       },
     });
   },
@@ -211,6 +251,9 @@ export const propertyService = {
   },
 
   async updateProperty(ownerId: string, propertyId: string, data: UpdatePropertyInput) {
+    // Check if owner is verified
+    await checkOwnerVerification(ownerId);
+
     const existing = await prisma.property.findFirst({
       where: { id: propertyId, isDeleted: false },
     });
@@ -225,6 +268,9 @@ export const propertyService = {
   },
 
   async softDeleteProperty(ownerId: string, propertyId: string) {
+    // Check if owner is verified
+    await checkOwnerVerification(ownerId);
+
     const existing = await prisma.property.findFirst({
       where: { id: propertyId, isDeleted: false },
     });
@@ -255,6 +301,9 @@ export const propertyService = {
   },
 
   async updatePropertyStatus(ownerId: string, propertyId: string, status: PropertyStatus) {
+    // Check if owner is verified
+    await checkOwnerVerification(ownerId);
+
     const existing = await prisma.property.findFirst({
       where: { id: propertyId, isDeleted: false },
     });

@@ -4,9 +4,9 @@ import type { UploadedFile } from '../types/request';
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dkqthvuy2',
-  api_key: process.env.CLOUDINARY_API_KEY || '671985636631885',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'ABLfgvTa95HSwImQd7T-gR6kYc8',
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 /**
@@ -38,7 +38,7 @@ export async function uploadAvatarToCloudinary(
       }
     );
 
-    streamifier.createReadStream(file.buffer).pipe(uploadStream);
+    uploadStream.end(file.buffer);
   });
 }
 
@@ -54,14 +54,18 @@ export async function uploadDocumentToCloudinary(
     const publicId = `documents/${userId}-${documentType}-${Date.now()}`;
     const isImage = file.mimetype.startsWith('image/');
 
+    const uploadOptions: Record<string, any> = {
+      public_id: publicId,
+      folder: 'house-rental/documents',
+      resource_type: isImage ? 'image' : 'raw',
+    };
+    if (isImage) {
+      uploadOptions.quality = 'auto';
+      uploadOptions.fetch_format = 'auto';
+    }
+
     const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        public_id: publicId,
-        folder: 'house-rental/documents',
-        resource_type: isImage ? 'image' : 'raw',
-        quality: isImage ? 'auto' : undefined,
-        fetch_format: isImage ? 'auto' : undefined,
-      },
+      uploadOptions,
       (error, result) => {
         if (error) {
           reject(new Error(`Cloudinary upload failed: ${error.message}`));
@@ -73,7 +77,7 @@ export async function uploadDocumentToCloudinary(
       }
     );
 
-    streamifier.createReadStream(file.buffer).pipe(uploadStream);
+    uploadStream.end(file.buffer);
   });
 }
 

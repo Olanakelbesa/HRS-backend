@@ -113,7 +113,8 @@ export const updateReportStatusSchema = z.object({
 });
 
 export const resolveVerificationSchema = z.object({
-  status: z.enum(['approved', 'rejected', 'resubmit', 'pending']),
+  status: z.enum(['pending', 'under_review', 'approved', 'rejected', 'resubmit']),
+  note: z.string().trim().min(1).max(1000).optional(),
 });
 
 export const broadcastNotificationSchema = z.object({

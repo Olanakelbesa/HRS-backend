@@ -77,10 +77,12 @@ async function sendVerificationEmail(email: string, firstName?: string | null): 
  * Set HTTP-Only cookie with refresh token
  */
 export function setRefreshTokenCookie(res: Response, refreshToken: string) {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: isDevelopment ? 'lax' : 'strict',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
   });
@@ -90,10 +92,12 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string) {
  * Clear refresh token cookie
  */
 export function clearRefreshTokenCookie(res: Response) {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: isDevelopment ? 'lax' : 'strict',
     path: '/',
   });
 }

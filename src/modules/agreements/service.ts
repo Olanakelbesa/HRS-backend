@@ -3,7 +3,36 @@ import { AppError } from '../../core/AppError';
 
 type ListQuery = { page: number; limit: number; search?: string; status?: string };
 
+/**
+ * Check if a user is verified (helper function)
+ * Owners must be verified to interact with agreements
+ */
+async function checkOwnerVerification(ownerId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { role: true, isVerified: true },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.role !== 'owner') {
+    throw new AppError('Only owners can perform this action', 403);
+  }
+
+  if (!user.isVerified) {
+    throw new AppError(
+      'Your account is not verified. Please upload your verification documents and wait for approval.',
+      403
+    );
+  }
+}
+
 export async function listOwnerAgreements(ownerId: string, query: ListQuery) {
+  // Check if owner is verified
+  await checkOwnerVerification(ownerId);
+
   const where: any = { ownerId };
 
   if (query.search) {
@@ -35,6 +64,9 @@ export async function listOwnerAgreements(ownerId: string, query: ListQuery) {
 }
 
 export async function exportOwnerAgreements(ownerId: string, _query: any) {
+  // Check if owner is verified
+  await checkOwnerVerification(ownerId);
+
   const agreements = await prisma.agreement.findMany({
     where: { ownerId },
     include: { property: true, renter: true },
@@ -134,6 +166,9 @@ export async function updateAgreement(
     throw new AppError('Forbidden', 403);
   }
 
+  // Check if owner is verified
+  await checkOwnerVerification(requesterId);
+
   const updated = await prisma.agreement.update({
     where: { id: agreementId },
     data: { status: data.status as any, paymentStatus: data.paymentStatus as any },
@@ -149,6 +184,9 @@ export async function terminateAgreement(
   const agreement = await prisma.agreement.findUnique({ where: { id: agreementId } });
   if (!agreement) throw new AppError('Agreement not found', 404);
   if (agreement.ownerId !== requesterId) throw new AppError('Forbidden', 403);
+
+  // Check if owner is verified
+  await checkOwnerVerification(requesterId);
 
   const updated = await prisma.agreement.update({
     where: { id: agreementId },

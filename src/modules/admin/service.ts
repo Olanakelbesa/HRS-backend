@@ -11,7 +11,7 @@ import type {
 } from './schema';
 
 function mapVerificationDocumentStatusToUserUpdate(
-  status: 'approved' | 'rejected' | 'resubmit' | 'pending'
+  status: 'approved' | 'rejected' | 'resubmit' | 'pending' | 'under_review'
 ) {
   if (status === 'approved') {
     return {
@@ -33,6 +33,14 @@ function mapVerificationDocumentStatusToUserUpdate(
     return {
       status: 'pending' as const,
       verificationState: 'resubmit' as const,
+      isVerified: false,
+    };
+  }
+
+  if (status === 'under_review') {
+    return {
+      status: 'pending' as const,
+      verificationState: 'pending' as const,
       isVerified: false,
     };
   }
@@ -919,11 +927,12 @@ export async function updateReportStatus(adminId: string, id: string, status: an
 export async function resolveVerification(
   adminId: string,
   id: string,
-  status: 'approved' | 'rejected' | 'resubmit' | 'pending'
+  status: 'approved' | 'rejected' | 'resubmit' | 'pending' | 'under_review',
+  note?: string
 ) {
   const doc = await prisma.verificationDocument.update({
     where: { id },
-    data: { status, reviewedAt: new Date(), reviewedById: adminId },
+    data: { status, note, reviewedAt: new Date(), reviewedById: adminId },
   });
 
   const userUpdate = mapVerificationDocumentStatusToUserUpdate(status);
@@ -933,13 +942,21 @@ export async function resolveVerification(
     data: userUpdate,
   });
 
+  // If owner is approved, automatically verify all their properties
+  if (status === 'approved') {
+    await prisma.property.updateMany({
+      where: { ownerId: doc.userId },
+      data: { isVerified: true },
+    });
+  }
+
   await prisma.auditLog.create({
     data: {
       actorId: adminId,
       eventType: 'VERIFICATION_RESOLVED',
       entityType: 'VerificationDocument',
       entityId: id,
-      metadata: { status },
+      metadata: { status, note },
     },
   });
 

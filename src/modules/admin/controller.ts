@@ -189,7 +189,7 @@ export async function verificationResolve(req: Request, res: Response) {
   const auth = req as AuthenticatedRequest;
   const params = paramIdSchema.parse(req.params);
   const body = resolveVerificationSchema.parse(req.body);
-  const data = await adminService.resolveVerification(auth.userId, params.id, body.status);
+  const data = await adminService.resolveVerification(auth.userId, params.id, body.status, body.note);
   return res.status(200).json({ status: 'success', data });
 }
 

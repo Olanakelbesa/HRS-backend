@@ -9,6 +9,7 @@ import {
   getAuditLogsQuerySchema,
   getOverviewQuerySchema,
   getPendingVerificationsQuerySchema,
+  resolveVerificationSchema,
 } from './schema';
 import {
   analytics,
@@ -811,7 +812,12 @@ router.patch('/reports/:id/status', controller.reportUpdateStatus);
  *       200:
  *         description: Verification request completed
  */
-router.patch('/verifications/:id/resolve', controller.verificationResolve);
+router.patch(
+  '/verifications/:id/resolve',
+  validate(adminUpdatePropertyParamsSchema, 'params'),
+  validate(resolveVerificationSchema),
+  controller.verificationResolve
+);
 
 // Properties (Detail)
 /**
