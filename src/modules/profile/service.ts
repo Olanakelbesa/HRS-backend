@@ -41,6 +41,7 @@ function mapDocumentStatus(status: string): string {
     approved: 'verified',
     rejected: 'rejected',
     resubmit: 'resubmit',
+    under_review: 'under_review', 
   };
   return statusMap[status] || status;
 }
