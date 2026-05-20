@@ -196,7 +196,32 @@ export const updatePropertyController = async (req: Request, res: Response) => {
     const propertyId = req.params.propertyId as string;
     const body = req.body as UpdatePropertyInput;
 
-    const result = await propertyService.updateProperty(ownerId, propertyId, body);
+    const files = req.files as {
+      images?: Express.Multer.File[];
+      videos?: Express.Multer.File[];
+    };
+
+    const imageUrls = await Promise.all(
+      (files?.images || []).map((file) => {
+        if (!file.buffer) return null;
+        return uploadToCloudinary(file.buffer, 'properties/images', 'image');
+      })
+    ).then(results => results.filter((url): url is string => url !== null));
+
+    const videoUrls = await Promise.all(
+      (files?.videos || []).map((file) => {
+        if (!file.buffer) return null;
+        return uploadToCloudinary(file.buffer, 'properties/videos', 'video');
+      })
+    ).then(results => results.filter((url): url is string => url !== null));
+
+    const finalBody = {
+      ...body,
+      images: imageUrls.length > 0 ? [...(body.images || []), ...imageUrls] : body.images,
+      videos: videoUrls.length > 0 ? [...(body.videos || []), ...videoUrls] : body.videos,
+    };
+
+    const result = await propertyService.updateProperty(ownerId, propertyId, finalBody);
 
     if (result === null) {
       return res.status(404).json({

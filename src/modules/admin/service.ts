@@ -424,7 +424,7 @@ export async function getAdminOverview(query: GetOverviewQueryInput) {
 
   const totalListingsCount = areaGroups.reduce((sum, item) => sum + item._count._all, 0);
   const listingsByArea = areaGroups.map((item) => {
-    const rawAddress = (item.address ?? '').trim();
+    const rawAddress = String(item.address ?? '').trim();
     const area = rawAddress ? rawAddress.split(',')[0].trim() : 'Unknown';
     const percentage = totalListingsCount
       ? Math.round((item._count._all / totalListingsCount) * 100)
@@ -823,7 +823,6 @@ export async function getProperties(query: GetAdminPropertiesQueryInput) {
     ...(query.search
       ? {
         OR: [
-          { address: { contains: query.search, mode: 'insensitive' } },
           { owner: { first_name: { contains: query.search, mode: 'insensitive' } } },
           { owner: { last_name: { contains: query.search, mode: 'insensitive' } } },
         ],

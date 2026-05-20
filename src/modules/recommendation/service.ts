@@ -260,11 +260,13 @@ class RecommendationService {
       // PREFERENCES
       // ========================
       if (preferences) {
+        const priceValue = typeof property.price === 'object' && property.price ? (property.price as any).value : undefined;
         if (
           preferences.preferredPriceMin !== null &&
           preferences.preferredPriceMax !== null &&
-          property.price >= preferences.preferredPriceMin &&
-          property.price <= preferences.preferredPriceMax
+          priceValue !== undefined &&
+          priceValue >= preferences.preferredPriceMin &&
+          priceValue <= preferences.preferredPriceMax
         ) {
           score += 30;
           reasons.push('matches your budget');

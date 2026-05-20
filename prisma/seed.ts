@@ -60,24 +60,24 @@ async function main() {
   console.log('Seeding database...');
 
   // Cleanup in dependency-safe order
-  await prisma.messageReaction.deleteMany();
-  await prisma.messageAttachment.deleteMany();
-  await prisma.message.deleteMany();
-  await prisma.conversation.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.verificationDocument.deleteMany();
-  await prisma.report.deleteMany();
-  await prisma.agreement.deleteMany();
-  await prisma.appointment.deleteMany();
-  await prisma.property.deleteMany();
-  await prisma.refreshToken.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.verificationToken.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.user.deleteMany();
+  // await prisma.messageReaction.deleteMany();
+  // await prisma.messageAttachment.deleteMany();
+  // await prisma.message.deleteMany();
+  // await prisma.conversation.deleteMany();
+  // await prisma.auditLog.deleteMany();
+  // await prisma.notification.deleteMany();
+  // await prisma.review.deleteMany();
+  // await prisma.verificationDocument.deleteMany();
+  // await prisma.report.deleteMany();
+  // await prisma.agreement.deleteMany();
+  // await prisma.appointment.deleteMany();
+  // await prisma.property.deleteMany();
+  // await prisma.refreshToken.deleteMany();
+  // await prisma.session.deleteMany();
+  // await prisma.account.deleteMany();
+  // await prisma.verificationToken.deleteMany();
+  // await prisma.payment.deleteMany();
+  // await prisma.user.deleteMany();
 
   // 1) Users
   const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
@@ -426,28 +426,21 @@ async function main() {
         'A beautiful villa overlooking the city with modern amenities.',
         'ዘመናዊ አገልግሎቶች ያሉት ከተማን የሚመለከት ቪላ።'
       ),
-      location: 'POINT(38.7636 8.9806)',
-      address: 'Bole, Addis Ababa',
-      type: PropertyType.VILLA,
+      location: { lat: 8.9806, lng: 38.7636 },
+      address: textPair('Bole, Addis Ababa', 'ቦሌ, አዲስ አበባ'),
+      category: textPair('VILLA', 'ቪላ'),
       status: PropertyStatus.PENDING,
-      price: 45000,
+      price: { value: 45000, currency: 'ETB' },
       amenities: ['WiFi', 'Parking', 'CCTV', 'Balcony'],
       images: ['https://example.com/properties/horizon.jpg'],
       videos: ['https://example.com/properties/horizon-tour.mp4'],
       bedrooms: 4,
       bathrooms: 3,
-      area: 250,
-      furnishingType: 'furnished',
-      rentTerms: {
-        minDuration: '6',
-        minMonths: 6,
-        secureDeposit: 45000,
-        currency: 'ETB',
-        petsAllowed: false,
-        conditions: {
-          en: '6 months minimum, first and last month upfront',
-          am: 'ቢያንስ 6 ወር፣ የመጀመሪያ እና የመጨረሻ ወር ቅድሚያ ክፍያ',
-        },
+      area: { value: 250, unit: 'sqm' },
+      furnishingStatus: 'furnished',
+      leaseTerms: {
+        secureDeposit: { value: 45000, currency: 'ETB' },
+        conditions: textPair('6 months minimum, first and last month upfront', 'ቢያንስ 6 ወር፣ የመጀመሪያ እና የመጨረሻ ወር ቅድሚያ ክፍያ'),
       },
     },
   });
@@ -460,26 +453,20 @@ async function main() {
         'Modern loft in the heart of Addis with walkable services.',
         'በአዲስ አበባ መሀል የሚገኝ ዘመናዊ ሎፍት።'
       ),
-      location: 'POINT(38.7612 9.0167)',
-      address: 'Kazanchis, Addis Ababa',
-      type: PropertyType.APARTMENT,
+      location: { lat: 9.0167, lng: 38.7612 },
+      address: textPair('Kazanchis, Addis Ababa', 'ካዛንቺስ, አዲስ አበባ'),
+      category: textPair('APARTMENT', 'አፓርትመንት'),
       status: PropertyStatus.AVAILABLE,
-      price: 25000,
+      price: { value: 25000, currency: 'ETB' },
       amenities: ['WiFi', 'Elevator', 'Backup Power'],
       images: ['https://example.com/properties/loft.jpg'],
       bedrooms: 2,
       bathrooms: 1,
-      area: 90,
-      furnishingType: 'semi-furnished',
-      rentTerms: {
-        minDuration: '3',
-        minMonths: 3,
-        secureDeposit: 25000,
-        currency: 'ETB',
-        conditions: {
-          en: '3 months minimum, first month upfront',
-          am: 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ',
-        },
+      area: { value: 90, unit: 'sqm' },
+      furnishingStatus: 'semi-furnished',
+      leaseTerms: {
+        secureDeposit: { value: 25000, currency: 'ETB' },
+        conditions: textPair('3 months minimum, first month upfront', 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ'),
       },
     },
   });
@@ -492,25 +479,19 @@ async function main() {
         'Cheap house listing with inconsistent details.',
         'ዝርዝሮቹ የማይጣጣሙ ዝቅተኛ ዋጋ ቤት ማስታወቂያ።'
       ),
-      location: 'POINT(38.8470 9.0100)',
-      address: 'Megenagna, Addis Ababa',
-      type: PropertyType.HOUSE,
+      location: { lat: 9.0100, lng: 38.8470 },
+      address: textPair('Megenagna, Addis Ababa', 'መገናኛ, አዲስ አበባ'),
+      category: textPair('HOUSE', 'ቤት'),
       status: PropertyStatus.UNAVAILABLE,
-      price: 5000,
+      price: { value: 5000, currency: 'ETB' },
       amenities: [],
       images: [],
       bedrooms: 1,
       bathrooms: 1,
-      area: 50,
-      rentTerms: {
-        minDuration: '1',
-        minMonths: 1,
-        secureDeposit: 5000,
-        currency: 'ETB',
-        conditions: {
-          en: '1 month minimum',
-          am: 'ቢያንስ 1 ወር',
-        },
+      area: { value: 50, unit: 'sqm' },
+      leaseTerms: {
+        secureDeposit: { value: 5000, currency: 'ETB' },
+        conditions: textPair('1 month minimum', 'ቢያንስ 1 ወር'),
       },
     },
   });
@@ -523,25 +504,19 @@ async function main() {
         'Perfect family home close to the lake and parks.',
         'ከሐይቅና ፓርኮች አቅራቢያ የሚገኝ ለቤተሰብ ተስማሚ ቤት።'
       ),
-      location: 'POINT(38.4795 7.0570)',
-      address: 'Hawassa',
-      type: PropertyType.HOUSE,
+      location: { lat: 7.0570, lng: 38.4795 },
+      address: textPair('Hawassa', 'ሀዋሳ'),
+      category: textPair('HOUSE', 'ቤት'),
       status: PropertyStatus.RENTED,
-      price: 15000,
+      price: { value: 15000, currency: 'ETB' },
       amenities: ['Garden', 'Water Tank'],
       images: ['https://example.com/properties/cottage.jpg'],
       bedrooms: 3,
       bathrooms: 2,
-      area: 120,
-      rentTerms: {
-        minDuration: '12',
-        minMonths: 12,
-        secureDeposit: 15000,
-        currency: 'ETB',
-        conditions: {
-          en: '12 months minimum, negotiable for long-term leases',
-          am: 'ቢያንስ 12 ወር፣ ረጅም ጊዜ ኪራይ ከሆነ ይከናወናል',
-        },
+      area: { value: 120, unit: 'sqm' },
+      leaseTerms: {
+        secureDeposit: { value: 15000, currency: 'ETB' },
+        conditions: textPair('12 months minimum, negotiable for long-term leases', 'ቢያንስ 12 ወር፣ ረጅም ጊዜ ኪራይ ከሆነ ይከናወናል'),
       },
     },
   });
@@ -554,25 +529,19 @@ async function main() {
         'Affordable studio for single professionals.',
         'ለነጠላ ሰራተኞች ተመጣጣኝ ዋጋ ያለው ስቱዲዮ።'
       ),
-      location: 'POINT(38.7485 9.0302)',
-      address: 'CMC, Addis Ababa',
-      type: PropertyType.STUDIO,
+      location: { lat: 9.0302, lng: 38.7485 },
+      address: textPair('CMC, Addis Ababa', 'ሲኤምሲ, አዲስ አበባ'),
+      category: textPair('STUDIO', 'ስቱዲዮ'),
       status: PropertyStatus.AVAILABLE,
-      price: 12000,
+      price: { value: 12000, currency: 'ETB' },
       amenities: ['WiFi'],
       images: ['https://example.com/properties/studio.jpg'],
       bedrooms: 1,
       bathrooms: 1,
-      area: 45,
-      rentTerms: {
-        minDuration: '3',
-        minMonths: 3,
-        secureDeposit: 12000,
-        currency: 'ETB',
-        conditions: {
-          en: '3 months minimum, first month deposit',
-          am: 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ',
-        },
+      area: { value: 45, unit: 'sqm' },
+      leaseTerms: {
+        secureDeposit: { value: 12000, currency: 'ETB' },
+        conditions: textPair('3 months minimum, first month deposit', 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ'),
       },
     },
   });

@@ -185,30 +185,30 @@ model Property {
   ownerId String
   owner   User   @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  type   PropertyType
-  status PropertyStatus @default(AVAILABLE)
+  category Json
+  status   PropertyStatus @default(AVAILABLE)
 
   title       Json
   description Json
-  location    String
-  address     String?
-  reviews Review[]
+  location    Json
+  address     Json?
+  reviews     Review[]
   
 
-  price     Float
+  price     Json
   bedrooms  Int?
   bathrooms Int?
-  area      Float?
+  area      Json?
 
-  amenities      Json
-  furnishingType String?
+  amenities        String[] @default([])
+  furnishingStatus String?
 
   images String[] @default([])
   videos String[] @default([])
 
-  rentTerms Json?
+  leaseTerms Json?
 
-  viewsCount Int @default(0)
+  viewCount Int @default(0)
 
   isVerified Boolean @default(false)
 
@@ -224,9 +224,7 @@ model Property {
   interactions UserInteraction[]
   embedding   PropertyEmbedding?
   @@index([ownerId])
-  @@index([price])
   @@index([status])
-  @@index([type])
   @@index([isDeleted])
 }
 

@@ -56,25 +56,28 @@ const jsonPreprocess = <T extends z.ZodTypeAny>(schema: T) =>
  * CREATE
  */
 export const createPropertySchema = z.object({
-  type: PropertyTypeEnum,
+  category: jsonPreprocess(MultiLangTextSchema),
   title: jsonPreprocess(MultiLangTextSchema),
   description: jsonPreprocess(MultiLangTextSchema),
-  location: z.string().min(1),
-  address: z.string().optional(),
+  location: jsonPreprocess(z.object({ lat: z.coerce.number(), lng: z.coerce.number() })),
+  address: jsonPreprocess(MultiLangTextSchema).optional(),
 
-  price: z.coerce.number().positive(),
+  price: jsonPreprocess(z.object({ value: z.coerce.number().positive(), currency: z.string() })),
 
   bedrooms: z.coerce.number().int().min(0).optional(),
   bathrooms: z.coerce.number().int().min(0).optional(),
-  area: z.coerce.number().positive().optional(),
+  area: jsonPreprocess(z.object({ value: z.coerce.number().positive().nullable(), unit: z.string() }).optional()),
 
-  amenities: jsonPreprocess(z.any().optional()),
-  furnishingType: z.string().optional(),
+  amenities: jsonPreprocess(z.array(z.string()).optional()),
+  furnishingStatus: z.string().optional(),
 
-  images: jsonPreprocess(z.array(z.string()).optional()), // Files uploaded via multer, URLs added in controller
+  images: jsonPreprocess(z.array(z.string()).optional()),
   videos: jsonPreprocess(z.array(z.string()).optional()),
 
-  rentTerms: jsonPreprocess(z.any().optional()),
+  leaseTerms: jsonPreprocess(z.object({
+    secureDeposit: z.object({ value: z.coerce.number().positive(), currency: z.string() }).optional(),
+    conditions: MultiLangTextSchema.optional()
+  }).optional()),
 });
 
 /**
@@ -82,20 +85,23 @@ export const createPropertySchema = z.object({
  */
 export const updatePropertySchema = z
   .object({
-    type: PropertyTypeEnum.optional(),
+    category: jsonPreprocess(MultiLangTextSchema).optional(),
     title: jsonPreprocess(MultiLangTextSchema).optional(),
     description: jsonPreprocess(MultiLangTextSchema).optional(),
-    location: z.string().min(1).optional(),
-    address: z.string().optional(),
-    price: z.coerce.number().positive().optional(),
+    location: jsonPreprocess(z.object({ lat: z.coerce.number(), lng: z.coerce.number() })).optional(),
+    address: jsonPreprocess(MultiLangTextSchema).optional(),
+    price: jsonPreprocess(z.object({ value: z.coerce.number().positive(), currency: z.string() })).optional(),
     bedrooms: z.coerce.number().int().min(0).optional(),
     bathrooms: z.coerce.number().int().min(0).optional(),
-    area: z.coerce.number().positive().optional(),
-    amenities: jsonPreprocess(z.any().optional()),
-    furnishingType: z.string().optional(),
+    area: jsonPreprocess(z.object({ value: z.coerce.number().positive().nullable(), unit: z.string() })).optional(),
+    amenities: jsonPreprocess(z.array(z.string()).optional()),
+    furnishingStatus: z.string().optional(),
     images: jsonPreprocess(z.array(z.string().url()).optional()),
     videos: jsonPreprocess(z.array(z.string().url()).optional()),
-    rentTerms: jsonPreprocess(z.any().optional()),
+    leaseTerms: jsonPreprocess(z.object({
+      secureDeposit: z.object({ value: z.coerce.number().positive(), currency: z.string() }).optional(),
+      conditions: MultiLangTextSchema.optional()
+    }).optional()),
     status: PropertyStatusEnum.optional(),
   })
   .strict();
@@ -115,7 +121,7 @@ export const getPropertiesSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(12),
   lang: SupportedLanguageEnum.optional(),
   status: PropertyStatusEnum.optional(),
-  type: PropertyTypeEnum.optional(),
+  category: z.string().optional(),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
   bedrooms: z.coerce.number().int().min(0).optional(),

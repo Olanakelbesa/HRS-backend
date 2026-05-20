@@ -423,6 +423,10 @@ router.post(
 router.patch(
   '/:propertyId',
   requireAuth,
+  memoryUpload.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'videos', maxCount: 5 },
+  ]),
   validate(updatePropertySchema, 'body'),
   updatePropertyController
 );
