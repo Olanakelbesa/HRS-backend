@@ -74,7 +74,7 @@ export const env = {
     new Set(
       [
         rawEnv.FRONTEND_URL,
-        ...(rawEnv.NODE_ENV === 'production' ? [] : localOrigins),
+        ...localOrigins, // Always include local origins for development
         ...configuredOrigins,
       ].filter(Boolean) as string[]
     )
