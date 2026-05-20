@@ -78,7 +78,60 @@ function mapTopProperty(property: Awaited<ReturnType<typeof propertyService.getM
   };
 }
 
-export async function getOwnerOverview(ownerId: string, _query: GetOwnerOverviewQueryInput) {
+async function buildRevenueChart(ownerId: string, range: GetOwnerOverviewQueryInput['range']) {
+  const now = new Date();
+  const buckets: { label: string; start: Date; end: Date }[] = [];
+
+  if (range === 'weekly') {
+    for (let i = 6; i >= 0; i -= 1) {
+      const start = new Date(now);
+      start.setDate(start.getDate() - i);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+      buckets.push({
+        label: start.toLocaleDateString('en-US', { weekday: 'short' }),
+        start,
+        end,
+      });
+    }
+  } else {
+    for (let i = 5; i >= 0; i -= 1) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+      buckets.push({
+        label: start.toLocaleDateString('en-US', { month: 'short' }),
+        start,
+        end,
+      });
+    }
+  }
+
+  if (buckets.length === 0) {
+    return [];
+  }
+
+  const rangeStart = buckets[0].start;
+  const rangeEnd = buckets[buckets.length - 1].end;
+
+  const payments = await prisma.payment.findMany({
+    where: {
+      status: 'confirmed',
+      paidAt: { gte: rangeStart, lte: rangeEnd },
+      agreement: { ownerId },
+    },
+    select: { amount: true, paidAt: true },
+  });
+
+  return buckets.map((bucket) => ({
+    label: bucket.label,
+    revenue: payments
+      .filter((p) => p.paidAt >= bucket.start && p.paidAt <= bucket.end)
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0),
+  }));
+}
+
+export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQueryInput) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -93,6 +146,7 @@ export async function getOwnerOverview(ownerId: string, _query: GetOwnerOverview
     recentNotifications,
     revenueThisMonth,
     pendingPayments,
+    revenueChart,
   ] = await Promise.all([
     getProfile(ownerId),
     propertyService.getMyProperties(ownerId),
@@ -157,6 +211,7 @@ export async function getOwnerOverview(ownerId: string, _query: GetOwnerOverview
         agreement: { ownerId },
       },
     }),
+    buildRevenueChart(ownerId, query.range),
   ]);
 
   const activeListings = properties.filter((p) => p.status === 'AVAILABLE').length;
@@ -235,6 +290,8 @@ export async function getOwnerOverview(ownerId: string, _query: GetOwnerOverview
       pendingAmount: pendingPayments._sum.amount ?? 0,
       pendingCount: pendingPayments._count._all ?? 0,
       currency: 'ETB',
+      chart: revenueChart,
+      range: query.range,
     },
   };
 }

@@ -27,7 +27,7 @@ const router = Router();
 router.get(
   '/overview',
   requireAuth,
-  restrictTo('owner'),
+  restrictTo('owner', 'admin'),
   validate(getOwnerOverviewQuerySchema, 'query'),
   overview
 );

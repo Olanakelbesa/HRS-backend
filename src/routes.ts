@@ -86,10 +86,10 @@ router.use('/payments', paymentRoutes);
 // Verification Routes
 router.use('/verification', verificationRoutes);
 
-// Agreements
-router.use('/', agreementRoutes);
-
-// Owner dashboard
+// Owner dashboard (register before catch-all agreement mounts)
 router.use('/owner', ownerRoutes);
+
+// Agreements (also exposes GET /owner/overview for older deploys)
+router.use('/', agreementRoutes);
 
 export default router;
