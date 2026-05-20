@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
+import { validate } from '../../middlewares/validate';
 import { diskUpload } from '../../middlewares/multer.middleware';
 import * as agreementController from './controller';
+import { overview as ownerOverview } from '../owner/controller';
+import { getOwnerOverviewQuerySchema } from '../owner/schema';
 
 const router = Router();
 
@@ -65,6 +68,23 @@ router.get(
   requireAuth,
   restrictTo('owner', 'admin'),
   agreementController.exportOwnerAgreements
+);
+
+/**
+ * @openapi
+ * /api/v1/owner/overview:
+ *   get:
+ *     summary: Get owner dashboard overview (aggregated)
+ *     tags: [Owner]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  '/owner/overview',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(getOwnerOverviewQuerySchema, 'query'),
+  ownerOverview
 );
 
 // Public agreement detail (requires auth to identify requester)
