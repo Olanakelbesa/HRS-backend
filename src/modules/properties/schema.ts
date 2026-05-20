@@ -52,7 +52,39 @@ const leaseTermsSchema = z.object({
     })
     .optional(),
   conditions: MultiLangTextSchema.optional(),
+  minDuration: z.coerce.number().int().positive().optional(),
+  availableFrom: z.coerce.date().optional(),
 });
+
+/**
+ * Multipart may send duplicate `images`/`videos` fields (JSON array + plain URLs).
+ * Flatten into a single URL string array.
+ */
+const mediaUrlsSchema = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined;
+
+  const flatten = (input: unknown): string[] => {
+    if (Array.isArray(input)) {
+      return input.flatMap(flatten);
+    }
+    if (typeof input === 'string') {
+      const trimmed = input.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[')) {
+        try {
+          return flatten(JSON.parse(trimmed));
+        } catch {
+          return [trimmed];
+        }
+      }
+      return [trimmed];
+    }
+    return [];
+  };
+
+  const urls = flatten(val);
+  return urls.length > 0 ? urls : undefined;
+}, z.array(z.string().min(1)).optional());
 
 /**
  * CREATE — category, price { value, currency }, area { value, unit }
@@ -69,8 +101,8 @@ export const createPropertySchema = z.object({
   area: jsonPreprocess(areaSchema).optional(),
   amenities: jsonPreprocess(z.array(z.string()).optional()),
   furnishingStatus: z.string().optional(),
-  images: jsonPreprocess(z.array(z.string()).optional()),
-  videos: jsonPreprocess(z.array(z.string()).optional()),
+  images: mediaUrlsSchema,
+  videos: mediaUrlsSchema,
   leaseTerms: jsonPreprocess(leaseTermsSchema.optional()),
   availableFrom: z.coerce.date().optional(),
 });
@@ -90,8 +122,8 @@ export const updatePropertySchema = z.object({
   area: jsonPreprocess(areaSchema).optional(),
   amenities: jsonPreprocess(z.array(z.string()).optional()),
   furnishingStatus: z.string().optional(),
-  images: jsonPreprocess(z.array(z.string()).optional()),
-  videos: jsonPreprocess(z.array(z.string()).optional()),
+  images: mediaUrlsSchema,
+  videos: mediaUrlsSchema,
   leaseTerms: jsonPreprocess(leaseTermsSchema.optional()),
   availableFrom: z.coerce.date().optional(),
   status: PropertyStatusEnum.optional(),

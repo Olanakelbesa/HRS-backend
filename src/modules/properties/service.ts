@@ -69,6 +69,17 @@ const TYPE_LABELS: Record<string, { en: string; am: string }> = {
   PENTHOUSE: { en: 'Penthouse', am: 'ፔንትሃውስ' },
 };
 
+function buildLeaseTerms(
+  leaseTerms: CreatePropertyInput['leaseTerms'] | UpdatePropertyInput['leaseTerms'] | undefined,
+  availableFrom?: Date
+) {
+  const base = leaseTerms ? { ...leaseTerms } : {};
+  if (availableFrom) {
+    (base as Record<string, unknown>).availableFrom = availableFrom.toISOString();
+  }
+  return Object.keys(base).length > 0 ? base : null;
+}
+
 function formatPropertyResponse(property: any) {
   const category = (property.category as any) || { en: '', am: '' };
   const location = (property.location as any) || { lat: 0, lng: 0 };
@@ -79,8 +90,11 @@ function formatPropertyResponse(property: any) {
   const address = (property.address as any) || { en: '', am: '' };
   const leaseTerms = (property.leaseTerms as any) || {
     secureDeposit: { value: 0, currency: 'ETB' },
-    conditions: { en: '', am: '' }
+    conditions: { en: '', am: '' },
   };
+  const leaseAvailableFrom = leaseTerms.availableFrom
+    ? new Date(leaseTerms.availableFrom).toISOString()
+    : null;
   
   const ownerObj = property.owner ? {
     id: property.owner.id,
@@ -106,7 +120,9 @@ function formatPropertyResponse(property: any) {
     leaseTerms,
     images: Array.isArray(property.images) ? property.images : [],
     video: Array.isArray(property.videos) && property.videos.length > 0 ? property.videos[0] : '',
-    availableFrom: property.availableFrom ?? (property.createdAt ? property.createdAt.toISOString() : null),
+    availableFrom:
+      leaseAvailableFrom ??
+      (property.createdAt ? property.createdAt.toISOString() : null),
     status: property.status,
     isVerified: property.isVerified ?? false,
     owner: ownerObj,
@@ -145,7 +161,7 @@ export const propertyService = {
         furnishingStatus: data.furnishingStatus ?? null,
         images: data.images ?? [],
         videos: data.videos ?? [],
-        leaseTerms: data.leaseTerms as any ?? null,
+        leaseTerms: buildLeaseTerms(data.leaseTerms, data.availableFrom) as any,
         isVerified,
       },
       include: {
@@ -269,16 +285,16 @@ export const propertyService = {
     if (!existing) return null;
     if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
 
-    // Handle image deletion
-    if (data.images && existing.images) {
-      const removedImages = existing.images.filter(img => !data.images!.includes(img));
+    // Handle image deletion from Cloudinary when URLs are removed on edit
+    if (data.images !== undefined && existing.images?.length) {
+      const removedImages = existing.images.filter((img) => !data.images!.includes(img));
       for (const img of removedImages) {
         await deleteFromCloudinary(img, 'image').catch(console.error);
       }
     }
-    // Handle video deletion
-    if (data.videos && existing.videos) {
-      const removedVideos = existing.videos.filter(vid => !data.videos!.includes(vid));
+    // Handle video deletion from Cloudinary when URLs are removed on edit
+    if (data.videos !== undefined && existing.videos?.length) {
+      const removedVideos = existing.videos.filter((vid) => !data.videos!.includes(vid));
       for (const vid of removedVideos) {
         await deleteFromCloudinary(vid, 'video').catch(console.error);
       }
@@ -300,7 +316,14 @@ export const propertyService = {
         ...(data.furnishingStatus !== undefined && { furnishingStatus: data.furnishingStatus }),
         ...(data.images !== undefined && { images: data.images }),
         ...(data.videos !== undefined && { videos: data.videos }),
-        ...(data.leaseTerms !== undefined && { leaseTerms: data.leaseTerms as any }),
+        ...(data.leaseTerms !== undefined || data.availableFrom !== undefined
+          ? {
+              leaseTerms: buildLeaseTerms(
+                data.leaseTerms ?? (existing.leaseTerms as any),
+                data.availableFrom
+              ) as any,
+            }
+          : {}),
         ...(data.status !== undefined && { status: data.status }),
       },
       include: {

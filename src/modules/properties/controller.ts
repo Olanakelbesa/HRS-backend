@@ -215,10 +215,17 @@ export const updatePropertyController = async (req: Request, res: Response) => {
       })
     ).then(results => results.filter((url): url is string => url !== null));
 
+    const keptImageUrls = Array.isArray(body.images) ? body.images : [];
+    const keptVideoUrls = Array.isArray(body.videos) ? body.videos : [];
+
     const finalBody = {
       ...body,
-      images: imageUrls.length > 0 ? [...(body.images || []), ...imageUrls] : body.images,
-      videos: videoUrls.length > 0 ? [...(body.videos || []), ...videoUrls] : body.videos,
+      ...(body.images !== undefined || imageUrls.length > 0
+        ? { images: [...keptImageUrls, ...imageUrls] }
+        : {}),
+      ...(body.videos !== undefined || videoUrls.length > 0
+        ? { videos: [...keptVideoUrls, ...videoUrls] }
+        : {}),
     };
 
     const result = await propertyService.updateProperty(ownerId, propertyId, finalBody);
