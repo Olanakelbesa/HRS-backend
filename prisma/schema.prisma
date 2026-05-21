@@ -257,6 +257,7 @@ model Appointment {
   endsAt     DateTime
   status     AppointmentStatus @default(PENDING)
   note       String?
+  agreements Agreement[]
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 
@@ -388,19 +389,36 @@ enum NotificationType {
 // =======================
 
 model Agreement {
-  id            String   @id @default(cuid())
+  id            String          @id @default(cuid())
   propertyId    String
-  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property      Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   renterId      String
-  renter        User     @relation("RenterAgreements", fields: [renterId], references: [id])
+  renter        User            @relation("RenterAgreements", fields: [renterId], references: [id])
   ownerId       String
-  owner         User     @relation("OwnerAgreements", fields: [ownerId], references: [id])
+  owner         User            @relation("OwnerAgreements", fields: [ownerId], references: [id])
+  appointmentId String?
+  appointment   Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
   monthlyRent   Float
-  currency      String   @default("ETB")
+  currency      String          @default("ETB")
   startDate     DateTime
   endDate       DateTime
-  status        AgreementStatus @default(draft)
-  paymentStatus PaymentStatus @default(pending)
+
+  termsSnapshot   Json?
+  depositOriginal Json?
+  depositAmountEtb Float?
+  fxRate          Float?
+  fxRateAt        DateTime?
+
+  status          AgreementStatus @default(draft)
+  ownerMessage    String?
+  sentAt          DateTime?
+  renterRespondedAt DateTime?
+  offerExpiresAt  DateTime?
+  activatedAt     DateTime?
+  cancelledBy     String?
+  cancellationReason String?
+
   payments      Payment[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -408,40 +426,68 @@ model Agreement {
   @@index([propertyId])
   @@index([renterId])
   @@index([ownerId])
+  @@index([status])
+  @@index([offerExpiresAt])
 }
 
 enum AgreementStatus {
-  active
-  pending_renter
-  pending_owner
   draft
+  sent
+  payment_pending
+  completed
+  rejected
+  cancelled
   terminated
   expired
 }
 
-enum PaymentStatus {
-  confirmed
-  proof_uploaded
+enum PaymentPurpose {
+  security_deposit
+  monthly_rent
+}
+
+enum PaymentProvider {
+  chapa
+  manual
+}
+
+enum GatewayPaymentStatus {
   pending
+  processing
+  success
+  failed
+  expired
 }
 
 model Payment {
-  id          String        @id @default(cuid())
+  id          String               @id @default(cuid())
   agreementId String
-  agreement   Agreement     @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-  amount      Float
-  currency    String        @default("ETB")
-  proofUrl    String?
-  status      PaymentStatus @default(pending)
-  paidAt      DateTime      @default(now())
-  confirmedAt DateTime?
-  stripeId    String?       @unique // Added for Stripe integration
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  agreement   Agreement            @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  purpose           PaymentPurpose       @default(security_deposit)
+  provider          PaymentProvider      @default(chapa)
+  amount            Float
+  currency          String               @default("ETB")
+  amountEtb         Float?
+  originalAmount    Float?
+  originalCurrency  String?
+
+  status            GatewayPaymentStatus @default(pending)
+  chapaTxRef        String?              @unique
+  chapaRefId        String?
+  idempotencyKey    String?              @unique
+  failureReason     String?
+  expiresAt         DateTime?
+
+  proofUrl          String?
+  paidAt            DateTime?
+  confirmedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   @@index([agreementId])
   @@index([status])
-  @@index([paidAt])
+  @@index([purpose])
 }
 
 model Report {

@@ -3,7 +3,7 @@ import { propertyService } from '../properties/service';
 import { getProfile } from '../profile/service';
 import type { GetOwnerOverviewQueryInput } from './schema';
 
-const PENDING_AGREEMENT_STATUSES = ['pending_owner', 'pending_renter'] as const;
+const PENDING_AGREEMENT_STATUSES = ['sent', 'payment_pending'] as const;
 
 function getLocalized(value: unknown, lang = 'en'): string {
   if (typeof value === 'string') return value;
@@ -116,7 +116,7 @@ async function buildRevenueChart(ownerId: string, range: GetOwnerOverviewQueryIn
 
   const payments = await prisma.payment.findMany({
     where: {
-      status: 'confirmed',
+      status: 'success',
       paidAt: { gte: rangeStart, lte: rangeEnd },
       agreement: { ownerId },
     },
@@ -126,7 +126,7 @@ async function buildRevenueChart(ownerId: string, range: GetOwnerOverviewQueryIn
   return buckets.map((bucket) => ({
     label: bucket.label,
     revenue: payments
-      .filter((p) => p.paidAt >= bucket.start && p.paidAt <= bucket.end)
+      .filter((p) => p.paidAt && p.paidAt >= bucket.start && p.paidAt <= bucket.end)
       .reduce((sum, p) => sum + (p.amount ?? 0), 0),
   }));
 }
@@ -198,7 +198,7 @@ export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQ
     prisma.payment.aggregate({
       _sum: { amount: true },
       where: {
-        status: 'confirmed',
+        status: 'success',
         paidAt: { gte: monthStart },
         agreement: { ownerId },
       },
@@ -216,7 +216,7 @@ export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQ
 
   const activeListings = properties.filter((p) => p.status === 'AVAILABLE').length;
   const totalViews = properties.reduce((sum, p) => sum + (p.viewCount || 0), 0);
-  const revenueTotal = revenueThisMonth._sum.amount ?? 0;
+  const revenueTotal = revenueThisMonth._sum?.amount ?? 0;
 
   const topPerformingProperties = [...properties]
     .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))

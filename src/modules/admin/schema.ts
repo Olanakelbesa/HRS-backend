@@ -100,12 +100,30 @@ export const createAgreementSchema = z.object({
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   status: z
-    .enum(['active', 'pending_renter', 'pending_owner', 'draft', 'terminated', 'expired'])
+    .enum([
+      'draft',
+      'sent',
+      'payment_pending',
+      'completed',
+      'rejected',
+      'cancelled',
+      'terminated',
+      'expired',
+    ])
     .default('draft'),
 });
 
 export const updateAgreementStatusSchema = z.object({
-  status: z.enum(['active', 'pending_renter', 'pending_owner', 'draft', 'terminated', 'expired']),
+  status: z.enum([
+    'draft',
+    'sent',
+    'payment_pending',
+    'completed',
+    'rejected',
+    'cancelled',
+    'terminated',
+    'expired',
+  ]),
 });
 
 export const updateReportStatusSchema = z.object({

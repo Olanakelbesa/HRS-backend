@@ -4,21 +4,19 @@ import * as agreementService from './service';
 
 export const listOwnerAgreements = async (req: Request, res: Response) => {
   const userId = (req as AuthenticatedRequest).userId as string;
-  const { page = '1', limit = '20', search = '', status } = req.query as any;
+  const result = await agreementService.listOwnerAgreements(userId, req.query as any);
+  return res.status(200).json({ message: 'Agreements retrieved', data: result });
+};
 
-  const result = await agreementService.listOwnerAgreements(userId, {
-    page: Number(page),
-    limit: Number(limit),
-    search: String(search || ''),
-    status: status ? String(status) : undefined,
-  });
-
-  return res.status(200).json({ status: 'success', data: result });
+export const listRenterAgreements = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const result = await agreementService.listRenterAgreements(userId, req.query as any);
+  return res.status(200).json({ message: 'Agreements retrieved', data: result });
 };
 
 export const exportOwnerAgreements = async (req: Request, res: Response) => {
   const userId = (req as AuthenticatedRequest).userId as string;
-  const csv = await agreementService.exportOwnerAgreements(userId, req.query as any);
+  const csv = await agreementService.exportOwnerAgreements(userId, req.query);
 
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=agreements-${Date.now()}.csv`);
@@ -26,56 +24,77 @@ export const exportOwnerAgreements = async (req: Request, res: Response) => {
 };
 
 export const getAgreementDetail = async (req: Request, res: Response) => {
-  const userId = (req as AuthenticatedRequest).userId as string | undefined;
+  const userId = (req as AuthenticatedRequest).userId;
   const id = String(req.params.id);
-  if (!id) return res.status(400).json({ status: 'error', message: 'Agreement id is required' });
-
   const agreement = await agreementService.getAgreementDetail(id, userId);
-  return res.status(200).json({ status: 'success', data: { agreement } });
+  return res.status(200).json({ message: 'Agreement retrieved', data: { agreement } });
+};
+
+export const createOwnerAgreement = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const agreement = await agreementService.createOwnerAgreement(userId, req.body);
+  return res.status(201).json({ message: 'Agreement created', data: { agreement } });
+};
+
+export const updateDraftAgreement = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const agreement = await agreementService.updateDraftAgreement(id, userId, req.body);
+  return res.status(200).json({ message: 'Agreement updated', data: { agreement } });
+};
+
+export const sendAgreement = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const agreement = await agreementService.sendAgreement(id, userId, req.body?.offerExpiresAt);
+  return res.status(200).json({ message: 'Agreement sent', data: { agreement } });
+};
+
+export const cancelAgreement = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const agreement = await agreementService.cancelAgreement(id, userId, req.body?.reason);
+  return res.status(200).json({ message: 'Agreement cancelled', data: { agreement } });
+};
+
+export const acceptAgreement = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const agreement = await agreementService.acceptAgreement(id, userId);
+  return res.status(200).json({ message: 'Agreement accepted', data: { agreement } });
+};
+
+export const rejectAgreement = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const agreement = await agreementService.rejectAgreement(id, userId, req.body?.reason);
+  return res.status(200).json({ message: 'Agreement rejected', data: { agreement } });
+};
+
+export const initiateDeposit = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const result = await agreementService.initiateDeposit(id, userId);
+  return res.status(200).json({ message: 'Deposit checkout ready', data: result });
+};
+
+export const getDepositStatus = async (req: Request, res: Response) => {
+  const userId = (req as AuthenticatedRequest).userId as string;
+  const id = String(req.params.id);
+  const result = await agreementService.getDepositStatus(id, userId);
+  return res.status(200).json({ message: 'Deposit status retrieved', data: result });
 };
 
 export const listAgreementPayments = async (req: Request, res: Response) => {
-  const id = String(req.params.id);
-  if (!id) return res.status(400).json({ status: 'error', message: 'Agreement id is required' });
-
-  const payments = await agreementService.listAgreementPayments(id);
-  return res.status(200).json({ status: 'success', data: payments });
-};
-
-export const createAgreementPayment = async (req: Request, res: Response) => {
   const userId = (req as AuthenticatedRequest).userId as string;
   const id = String(req.params.id);
-  if (!id) return res.status(400).json({ status: 'error', message: 'Agreement id is required' });
-  const amount = req.body.amount ? Number(req.body.amount) : undefined;
-  const currency = req.body.currency || 'ETB';
-
-  const file = (req as any).file;
-
-  const payment = await agreementService.createAgreementPayment(id, userId, {
-    amount,
-    currency,
-    filePath: file ? `/uploads/${file.filename}` : undefined,
-  });
-
-  return res.status(201).json({ status: 'success', data: { payment } });
-};
-
-export const updateAgreement = async (req: Request, res: Response) => {
-  const userId = (req as AuthenticatedRequest).userId as string;
-  const id = String(req.params.id);
-  if (!id) return res.status(400).json({ status: 'error', message: 'Agreement id is required' });
-  const { status, paymentStatus } = req.body;
-
-  const agreement = await agreementService.updateAgreement(id, userId, { status, paymentStatus });
-  return res.status(200).json({ status: 'success', data: { agreement } });
+  const payments = await agreementService.listAgreementPayments(id, userId);
+  return res.status(200).json({ message: 'Payments retrieved', data: payments });
 };
 
 export const terminateAgreement = async (req: Request, res: Response) => {
   const userId = (req as AuthenticatedRequest).userId as string;
   const id = String(req.params.id);
-  if (!id) return res.status(400).json({ status: 'error', message: 'Agreement id is required' });
-  const { reason } = req.body;
-
-  const agreement = await agreementService.terminateAgreement(id, userId, reason);
-  return res.status(200).json({ status: 'success', data: { agreement } });
+  const agreement = await agreementService.terminateAgreement(id, userId, req.body?.reason);
+  return res.status(200).json({ message: 'Agreement terminated', data: { agreement } });
 };

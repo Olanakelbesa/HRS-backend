@@ -30,6 +30,9 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
   CLOUDINARY_URL: z.string().optional(),
+  CHAPA_SECRET_KEY: z.string().optional(),
+  CHAPA_PUBLICK_KEY: z.string().optional(),
+  EXCHANGE_API_KEY: z.string().optional(),
 });
 
 const rawEnv = envSchema.parse(process.env);

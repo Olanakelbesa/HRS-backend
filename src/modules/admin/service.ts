@@ -249,7 +249,7 @@ export async function getAdminOverview(query: GetOverviewQueryInput) {
     prisma.user.count(),
     prisma.property.count({ where: { isDeleted: false, status: 'AVAILABLE' } }),
     prisma.verificationDocument.count({ where: { status: 'pending' } }),
-    prisma.agreement.count({ where: { status: 'active' } }),
+    prisma.agreement.count({ where: { status: 'completed' } }),
     prisma.report.count(),
     prisma.user.count({ where: { createdAt: { gte: currentStart } } }),
     prisma.user.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
@@ -287,10 +287,10 @@ export async function getAdminOverview(query: GetOverviewQueryInput) {
       },
     }),
     prisma.payment.count(),
-    prisma.payment.count({ where: { status: 'confirmed' } }),
+    prisma.payment.count({ where: { status: 'success' } }),
     prisma.payment.aggregate({
       _sum: { amount: true },
-      where: { status: 'confirmed' },
+      where: { status: 'success' },
     }),
     prisma.property.groupBy({
       by: ['address'],
@@ -473,7 +473,7 @@ export async function getAdminOverview(query: GetOverviewQueryInput) {
     listingsByArea,
     paymentPerformance: {
       successRate,
-      totalCollectionAmount: confirmedCollection._sum.amount ?? 0,
+      totalCollectionAmount: confirmedCollection._sum?.amount ?? 0,
       currency: 'ETB',
       label: successRate >= 90 ? 'On Time Collection' : 'Needs Attention',
     },

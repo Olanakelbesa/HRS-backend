@@ -1,70 +1,30 @@
 import { Router } from 'express';
 import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate';
-import { diskUpload } from '../../middlewares/multer.middleware';
 import * as agreementController from './controller';
 import { overview as ownerOverview } from '../owner/controller';
 import { getOwnerOverviewQuerySchema } from '../owner/schema';
 import * as appointmentController from '../appointments/controller';
 import { listAppointmentsQuerySchema } from '../appointments/schema';
+import {
+  listAgreementsQuerySchema,
+  createOwnerAgreementSchema,
+  updateDraftAgreementSchema,
+  sendAgreementSchema,
+  cancelAgreementSchema,
+  rejectAgreementSchema,
+} from './schema';
 
 const router = Router();
 
-// Owner-specific listing
-/**
- * @swagger
- * /api/v1/owner/agreements:
- *   get:
- *     summary: List agreements for the authenticated owner
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Paged list of agreements
- */
 router.get(
   '/owner/agreements',
   requireAuth,
   restrictTo('owner', 'admin'),
+  validate(listAgreementsQuerySchema, 'query'),
   agreementController.listOwnerAgreements
 );
 
-/**
- * @swagger
- * /api/v1/owner/agreements/export:
- *   get:
- *     summary: Export owner agreements as CSV
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: format
- *         schema:
- *           type: string
- *           enum: [csv]
- *     responses:
- *       200:
- *         description: CSV attachment
- */
 router.get(
   '/owner/agreements/export',
   requireAuth,
@@ -72,15 +32,38 @@ router.get(
   agreementController.exportOwnerAgreements
 );
 
-/**
- * @openapi
- * /api/v1/owner/overview:
- *   get:
- *     summary: Get owner dashboard overview (aggregated)
- *     tags: [Owner]
- *     security:
- *       - bearerAuth: []
- */
+router.post(
+  '/owner/agreements',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(createOwnerAgreementSchema),
+  agreementController.createOwnerAgreement
+);
+
+router.patch(
+  '/owner/agreements/:id',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(updateDraftAgreementSchema),
+  agreementController.updateDraftAgreement
+);
+
+router.post(
+  '/owner/agreements/:id/send',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(sendAgreementSchema),
+  agreementController.sendAgreement
+);
+
+router.post(
+  '/owner/agreements/:id/cancel',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(cancelAgreementSchema),
+  agreementController.cancelAgreement
+);
+
 router.get(
   '/owner/overview',
   requireAuth,
@@ -89,13 +72,6 @@ router.get(
   ownerOverview
 );
 
-/**
- * @openapi
- * /api/v1/owner/appointments:
- *   get:
- *     summary: List appointments for the authenticated owner
- *     tags: [Owner]
- */
 router.get(
   '/owner/appointments',
   requireAuth,
@@ -104,150 +80,59 @@ router.get(
   appointmentController.list
 );
 
-// Public agreement detail (requires auth to identify requester)
-/**
- * @swagger
- * /api/v1/agreements/{id}:
- *   get:
- *     summary: Get agreement detail
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Agreement detail object
- *       404:
- *         description: Agreement not found
- */
+router.get(
+  '/agreements/me',
+  requireAuth,
+  restrictTo('renter', 'admin'),
+  validate(listAgreementsQuerySchema, 'query'),
+  agreementController.listRenterAgreements
+);
+
 router.get('/agreements/:id', requireAuth, agreementController.getAgreementDetail);
 
-// Agreement payments
-/**
- * @swagger
- * /api/v1/agreements/{id}/payments:
- *   get:
- *     summary: List payments for an agreement
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: List of payments
- */
-router.get('/agreements/:id/payments', requireAuth, agreementController.listAgreementPayments);
-
-/**
- * @swagger
- * /api/v1/agreements/{id}/payments:
- *   post:
- *     summary: Create a payment record (upload proof)
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     consumes:
- *       - multipart/form-data
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *       - in: formData
- *         name: amount
- *         schema:
- *           type: number
- *       - in: formData
- *         name: currency
- *         schema:
- *           type: string
- *       - in: formData
- *         name: proof
- *         type: file
- *     responses:
- *       201:
- *         description: Payment created
- */
-router.post(
+router.get(
   '/agreements/:id/payments',
   requireAuth,
-  diskUpload.single('proof'),
-  agreementController.createAgreementPayment
+  agreementController.listAgreementPayments
 );
 
-// Update / terminate
-/**
- * @swagger
- * /api/v1/agreements/{id}:
- *   patch:
- *     summary: Update agreement (status/paymentStatus)
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               status:
- *                 type: string
- *               paymentStatus:
- *                 type: string
- *     responses:
- *       200:
- *         description: Updated agreement
- */
-router.patch(
-  '/agreements/:id',
+router.post(
+  '/agreements/:id/accept',
   requireAuth,
-  restrictTo('owner', 'admin'),
-  agreementController.updateAgreement
+  restrictTo('renter', 'admin'),
+  agreementController.acceptAgreement
 );
 
-/**
- * @swagger
- * /api/v1/agreements/{id}/terminate:
- *   post:
- *     summary: Terminate an agreement
- *     tags: [Agreements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               reason:
- *                 type: string
- *     responses:
- *       200:
- *         description: Agreement terminated
- */
+router.post(
+  '/agreements/:id/reject',
+  requireAuth,
+  restrictTo('renter', 'admin'),
+  validate(rejectAgreementSchema),
+  agreementController.rejectAgreement
+);
+
+router.post(
+  '/agreements/:id/cancel',
+  requireAuth,
+  restrictTo('renter', 'owner', 'admin'),
+  validate(cancelAgreementSchema),
+  agreementController.cancelAgreement
+);
+
+router.post(
+  '/agreements/:id/deposit/initiate',
+  requireAuth,
+  restrictTo('renter', 'admin'),
+  agreementController.initiateDeposit
+);
+
+router.get(
+  '/agreements/:id/deposit/status',
+  requireAuth,
+  restrictTo('renter', 'admin'),
+  agreementController.getDepositStatus
+);
+
 router.post(
   '/agreements/:id/terminate',
   requireAuth,

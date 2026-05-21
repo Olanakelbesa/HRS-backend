@@ -1,8 +1,13 @@
 import { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../../types/request';
 import * as paymentService from './service';
-import { listPaymentsQuerySchema, exportPaymentsQuerySchema } from './schema';
-import * as stripeUtils from './stripe';
+import * as chapaService from './chapaService';
+import {
+  listPaymentsQuerySchema,
+  exportPaymentsQuerySchema,
+  chapaVerifySchema,
+} from './schema';
+import { env } from '../../config/env';
 
 export const listPayments = async (req: Request, res: Response) => {
   const userId = (req as AuthenticatedRequest).userId;
@@ -32,14 +37,6 @@ export const confirmPayment = async (req: Request, res: Response) => {
 
   const payment = await paymentService.confirmPayment(id as string, userId);
   return res.status(200).json({ status: 'success', data: { payment } });
-};
-
-export const createCheckoutSession = async (req: Request, res: Response) => {
-  const userId = (req as AuthenticatedRequest).userId;
-  const { id } = req.params;
-
-  const checkoutUrl = await paymentService.createStripeSession(id as string, userId);
-  return res.status(200).json({ status: 'success', data: { checkoutUrl } });
 };
 
 export const uploadPaymentProof = async (req: Request, res: Response) => {
@@ -72,11 +69,12 @@ export const exportPayments = async (req: Request, res: Response) => {
 
   const payments = await paymentService.exportPayments(userId, parsed.data);
 
-  // Simple CSV generation
   const headers = ['Payment ID', 'Property', 'Renter', 'Amount', 'Currency', 'Status', 'Date'];
   const rows = payments.map((p: any) => [
     p.id,
-    typeof p.agreement.property.title === 'string' ? p.agreement.property.title : (p.agreement.property.title as any).en,
+    typeof p.agreement.property.title === 'string'
+      ? p.agreement.property.title
+      : (p.agreement.property.title as { en?: string })?.en,
     `${p.agreement.renter.first_name} ${p.agreement.renter.last_name}`,
     p.amount,
     p.currency,
@@ -84,22 +82,40 @@ export const exportPayments = async (req: Request, res: Response) => {
     p.createdAt.toISOString(),
   ]);
 
-  const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
+  const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=payments-export-${Date.now()}.csv`);
   return res.status(200).send(csvContent);
 };
 
-export const stripeWebhook = async (req: Request, res: Response) => {
-  const sig = req.headers['stripe-signature'] as string;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
-
+export const chapaWebhook = async (req: Request, res: Response) => {
   try {
-    const event = stripeUtils.verifyWebhookSignature((req as any).rawBody, sig, webhookSecret);
-    await paymentService.handleStripeWebhook(event);
-    return res.status(200).json({ received: true });
+    const result = await chapaService.handleChapaWebhook(req.body as Record<string, unknown>);
+    return res.status(200).json({ message: 'Webhook processed', data: result });
   } catch (err: any) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).json({ message: err.message || 'Webhook error' });
   }
+};
+
+export const chapaCallback = async (req: Request, res: Response) => {
+  const txRef = String(req.query.tx_ref || req.query.txRef || '');
+  try {
+    await chapaService.processChapaTxRef(txRef);
+    const redirect = `${env.FRONTEND_URL}/agreements/payment/return?tx_ref=${encodeURIComponent(txRef)}&status=success`;
+    return res.redirect(302, redirect);
+  } catch {
+    const redirect = `${env.FRONTEND_URL}/agreements/payment/return?tx_ref=${encodeURIComponent(txRef)}&status=failed`;
+    return res.redirect(302, redirect);
+  }
+};
+
+export const chapaVerify = async (req: Request, res: Response) => {
+  const parsed = chapaVerifySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: 'tx_ref is required' });
+  }
+
+  const result = await chapaService.processChapaTxRef(parsed.data.tx_ref);
+  return res.status(200).json({ message: 'Verification complete', data: result });
 };
