@@ -14,7 +14,7 @@ import { updatePropertySchema } from './schema';
 import { updatePropertyController } from './controller';
 import { deletePropertySchema } from './schema';
 import { deletePropertyController } from './controller';
-import { getMyPropertiesController } from './controller';
+import { getMyPropertiesController, getSavedPropertiesController, savePropertyController, removeSavedPropertyController } from './controller';
 import { updatePropertyStatusSchema } from './schema';
 import { updatePropertyStatusController } from './controller';
 import { addPropertyTranslationSchema } from './schema';
@@ -149,6 +149,108 @@ router.get('/', validate(getPropertiesSchema, 'query'), getPropertiesController)
  *         description: Unauthorized
  */
 router.get('/my', requireAuth, getMyPropertiesController);
+
+/**
+ * @openapi
+ * /api/v1/properties/saved:
+ *   get:
+ *     summary: Get saved/favorite properties for the logged-in user
+ *     tags: [Property]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Saved properties fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Saved properties fetched successfully"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Property'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/saved', requireAuth, getSavedPropertiesController);
+
+/**
+ * @openapi
+ * /api/v1/properties/{propertyId}/save:
+ *   post:
+ *     summary: Save a property to the logged-in user's favorites
+ *     tags: [Property]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: propertyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "ckv1n1xyz"
+ *     responses:
+ *       200:
+ *         description: Property saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property saved successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     property:
+ *                       $ref: '#/components/schemas/Property'
+ *                     savedAt:
+ *                       type: string
+ *                       format: date-time
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Property not found
+ */
+router.post('/:propertyId/save', requireAuth, validate(getPropertyByIdSchema, 'params'), savePropertyController);
+
+/**
+ * @openapi
+ * /api/v1/properties/{propertyId}/save:
+ *   delete:
+ *     summary: Remove a saved property from the logged-in user's favorites
+ *     tags: [Property]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: propertyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "ckv1n1xyz"
+ *     responses:
+ *       200:
+ *         description: Saved property removed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Property removed from saved list successfully"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Saved property not found
+ */
+router.delete('/:propertyId/save', requireAuth, validate(getPropertyByIdSchema, 'params'), removeSavedPropertyController);
 
 /**
  * @openapi
