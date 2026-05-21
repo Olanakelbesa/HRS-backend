@@ -5,6 +5,7 @@ import {
   getOwnerReportsQuerySchema,
   reportIdParamSchema,
   submitOwnerResponseSchema,
+  submitReportSchema,
 } from './schema';
 
 /**
@@ -39,6 +40,23 @@ export async function getOwnerReport(req: Request, res: Response) {
     }
 
     return res.status(200).json({ status: 'success', data: report });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return res.status(500).json({ status: 'error', message });
+  }
+}
+
+/**
+ * POST /api/v1/reports
+ * Submit a new report as a renter.
+ */
+export async function submitReport(req: Request, res: Response) {
+  try {
+    const auth = req as AuthenticatedRequest;
+    const body = submitReportSchema.parse(req.body);
+    const report = await service.createReport(auth.userId, body);
+
+    return res.status(201).json({ status: 'success', data: report });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return res.status(500).json({ status: 'error', message });

@@ -1,8 +1,13 @@
 import { Router } from 'express';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate';
-import { getOwnerReportsQuerySchema, reportIdParamSchema, submitOwnerResponseSchema } from './schema';
-import { listOwnerReports, getOwnerReport, submitResponse } from './controller';
+import {
+  getOwnerReportsQuerySchema,
+  reportIdParamSchema,
+  submitOwnerResponseSchema,
+  submitReportSchema,
+} from './schema';
+import { listOwnerReports, getOwnerReport, submitResponse, submitReport } from './controller';
 
 const router = Router();
 
@@ -10,7 +15,7 @@ const router = Router();
  * @openapi
  * tags:
  *   - name: Reports
- *     description: Owner-facing reports endpoints (Reports Against Me)
+ *     description: Reports endpoints for renters, owners, and admins
  */
 
 /**
@@ -61,6 +66,51 @@ const router = Router();
  *                   type: array
  *                 meta:
  *                   type: object
+ *       401:
+ *         description: Unauthorized
+ */
+router.post(
+  '/',
+  requireAuth,
+  restrictTo('renter'),
+  validate(submitReportSchema, 'body'),
+  submitReport
+);
+
+/**
+ * @openapi
+ * /api/v1/reports:
+ *   post:
+ *     summary: Submit a new report as a renter
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [targetType, targetId, category, description]
+ *             properties:
+ *               targetType:
+ *                 type: string
+ *                 enum: [property, user]
+ *                 example: property
+ *               targetId:
+ *                 type: string
+ *                 example: "cku123abc"
+ *               category:
+ *                 type: string
+ *                 example: "Noise complaint"
+ *               description:
+ *                 type: string
+ *                 example: "The tenant is creating loud noise every evening and the owner has not responded."
+ *     responses:
+ *       201:
+ *         description: Report submitted successfully
+ *       400:
+ *         description: Validation failed
  *       401:
  *         description: Unauthorized
  */
