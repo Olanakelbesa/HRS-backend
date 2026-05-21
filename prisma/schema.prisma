@@ -431,13 +431,6 @@ enum PropertyType {
   PENTHOUSE
 }
 
-enum AppointmentStatus {
-  PENDING
-  CONFIRMED
-  DECLINED
-  CANCELLED
-}
-
 enum MessageType {
   TEXT
   IMAGE
@@ -485,23 +478,6 @@ enum ReportStatus {
   in_review
   resolved
   dismissed
-}
-
-model VerificationDocument {
-  id             String   @id @default(cuid())
-  userId         String   @unique                            // one record per user
-  user           User     @relation("VerificationDocuments", fields: [userId], references: [id])
-  frontUrl       String?                                     // NATIONAL_ID_FRONT
-  backUrl        String?                                     // NATIONAL_ID_BACK
-  livePhotoUrl   String?                                     // OWNER_PHOTO
-  status         VerificationStatus @default(pending)        // admin reviews once
-  note           String?                                     // admin note when changing status
-  submittedAt    DateTime @default(now())
-  reviewedAt     DateTime?
-  reviewedById   String?
-  reviewedBy     User?    @relation("ReviewedDocuments", fields: [reviewedById], references: [id])
-
-  @@index([userId])
 }
 
 // enum VerificationDocumentType {
