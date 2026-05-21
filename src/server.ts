@@ -1,4 +1,3 @@
-import './config/prismaBoot'; // Regenerate client before any Prisma import (production)
 import './config/redis'; // Connect Redis at startup
 import http from 'http';
 import { Server } from 'socket.io';
