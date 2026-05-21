@@ -23,12 +23,15 @@ export const listAppointmentsQuerySchema = z.object({
   to: z.coerce.date().optional(),
 });
 
-export const updateAppointmentStatusSchema = z.object({
-  status: z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED']),
-});
+/** Renter "my appointments" list — same filters as owner list */
+export const listMyAppointmentsQuerySchema = listAppointmentsQuerySchema;
 
 export const appointmentIdParamSchema = z.object({
   id: z.string().min(1),
+});
+
+export const updateAppointmentStatusSchema = z.object({
+  status: z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED']),
 });
 
 export const updateAppointmentNoteSchema = z.object({
@@ -37,5 +40,6 @@ export const updateAppointmentNoteSchema = z.object({
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>;
+export type ListMyAppointmentsQuery = z.infer<typeof listMyAppointmentsQuerySchema>;
 export type UpdateAppointmentStatusInput = z.infer<typeof updateAppointmentStatusSchema>;
 export type UpdateAppointmentNoteInput = z.infer<typeof updateAppointmentNoteSchema>;

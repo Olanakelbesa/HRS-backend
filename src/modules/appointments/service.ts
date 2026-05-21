@@ -46,9 +46,14 @@ const appointmentSelect = {
       email: true,
       first_name: true,
       last_name: true,
+      phone: true,
+      image: true,
     },
   },
 } as const;
+
+/** Statuses that block a property time slot */
+const RENTER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED'] as const;
 
 const ACTIVE_SLOT_STATUSES = ['PENDING', 'ACCEPTED'] as const;
 
@@ -168,10 +173,14 @@ export async function bookAppointment(
 
   const property = await prisma.property.findUnique({
     where: { id: input.propertyId },
-    select: { id: true, ownerId: true },
+    select: { id: true, ownerId: true, status: true },
   });
 
   if (!property) throw new AppError('Property not found', 404);
+
+  if (property.status !== 'AVAILABLE') {
+    throw new AppError('This property is not available for visits', 400);
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -206,6 +215,17 @@ export async function bookAppointment(
 
   if (propertyOverlap) {
     throw new AppError('This time slot is already booked for this property', 409);
+  }
+
+  const duplicateForRenterOnProperty = await findOverlappingAppointment({
+    propertyId: property.id,
+    renterId: userId,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+  });
+
+  if (duplicateForRenterOnProperty) {
+    throw new AppError('You already have a booking for this property at this time', 409);
   }
 
   const appointment = await prisma.appointment.create({
@@ -250,6 +270,96 @@ export async function bookAppointment(
   });
 
   return appointment;
+}
+
+export async function listMyAppointmentsForRenter(
+  userId: string,
+  userRole: string,
+  query: ListAppointmentsQuery
+) {
+  if (userRole !== 'renter') {
+    throw new AppError('Only renters can access their appointments', 403);
+  }
+
+  return listAppointments(userId, 'renter', query);
+}
+
+export async function getRenterAppointmentById(userId: string, userRole: string, appointmentId: string) {
+  if (userRole !== 'renter') {
+    throw new AppError('Only renters can access this appointment', 403);
+  }
+
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: appointmentSelect,
+  });
+
+  if (!appointment) throw new AppError('Appointment not found', 404);
+
+  if (appointment.renterId !== userId) {
+    throw new AppError('You do not have permission to view this appointment', 403);
+  }
+
+  return appointment;
+}
+
+export async function cancelRenterAppointment(
+  userId: string,
+  userRole: string,
+  appointmentId: string
+) {
+  if (userRole !== 'renter') {
+    throw new AppError('Only renters can cancel their appointments', 403);
+  }
+
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: {
+      id: true,
+      renterId: true,
+      ownerId: true,
+      status: true,
+      propertyId: true,
+    },
+  });
+
+  if (!appointment) throw new AppError('Appointment not found', 404);
+
+  if (appointment.renterId !== userId) {
+    throw new AppError('You can only cancel your own appointments', 403);
+  }
+
+  if (!RENTER_CANCELLABLE_STATUSES.includes(appointment.status as (typeof RENTER_CANCELLABLE_STATUSES)[number])) {
+    throw new AppError('Only pending or confirmed appointments can be cancelled', 400);
+  }
+
+  const updated = await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { status: 'CANCELLED' },
+    select: appointmentSelect,
+  });
+
+  await createNotification({
+    userId: updated.ownerId,
+    type: 'APPOINTMENT_UPDATED',
+    title: 'Appointment cancelled',
+    body: 'A renter cancelled their visit request',
+    payload: {
+      appointmentId: updated.id,
+      status: updated.status,
+      propertyId: updated.propertyId,
+    },
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'APPOINTMENT_CANCELLED',
+    entityType: 'Appointment',
+    entityId: updated.id,
+    metadata: { previousStatus: appointment.status, status: 'CANCELLED' },
+  });
+
+  return updated;
 }
 
 export async function listAppointments(
