@@ -21,6 +21,39 @@ class ReviewService {
       throw new Error("You have already reviewed this property");
     }
 
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      select: { ownerId: true },
+    });
+
+    if (!property) {
+      throw new Error("Property not found");
+    }
+
+    const hasAppointment = await prisma.appointment.findFirst({
+      where: {
+        propertyId,
+        renterId: reviewerId,
+        ownerId: property.ownerId,
+        status: { in: ["PENDING", "ACCEPTED", "REJECTED", "CANCELLED"] },
+      },
+    });
+
+    const hasConversation = await prisma.conversation.findFirst({
+      where: {
+        propertyId,
+        renterId: reviewerId,
+        ownerId: property.ownerId,
+        messages: { some: {} },
+      },
+    });
+
+    if (!hasAppointment && !hasConversation) {
+      throw new Error(
+        "You can only review properties you have either booked an appointment for or started a conversation about"
+      );
+    }
+
     return prisma.review.create({
       data: {
         reviewerId,

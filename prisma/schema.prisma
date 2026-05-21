@@ -1,6 +1,3 @@
-// Prisma schema for Smart House Rental Platform
-// Add your ER diagram models here
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,78 +6,44 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-// =======================
-// AUTH MODELS
-// =======================
 
-// User model (core authentication + roles)
 model User {
-  id            String  @id @default(cuid())
-  first_name    String?
-  last_name     String?
-  email         String? @unique
-  password      String? // Add this for credentials login
-  emailVerified Boolean @default(false) // Changed from DateTime? to Boolean based on snippet, check logic
-  // actually standard next-auth uses DateTime? for emailVerified. But snippet says Boolean @default(false). I will stick to snippet.
-  // Wait, NextAuth usually uses DateTime for emailVerified. If I use Boolean, it might conflict if I use NextAuth adapter later.
-  // User snippet explicitly says: "emailVerified Boolean @default(false)". I will follow snippet.
-  image         String?
-  phone         String? @unique
-  location      String?
-  bio           String?
-
-  role              Role    @default(renter)
-  preferredLanguage String?
-  isVerified        Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-
-  // Relations
-  accounts      Account[]
-  sessions      Session[]
-  refreshTokens RefreshToken[]
-  
-  // Messaging relations
-  messagesSent     Message[]         @relation("UserMessages")
-  messageReactions MessageReaction[]
-  properties       Property[]        @relation("OwnerProperties")
-
-  // properties        Property[] @relation("OwnerProperties")
-  // appointmentsRenter Appointment[] @relation("RenterAppointments")
-  // appointmentsOwner  Appointment[] @relation("OwnerAppointments")
-
-  // inside User model
-
-  renterConversations Conversation[] @relation("RenterConversations")
-  ownerConversations  Conversation[] @relation("OwnerConversations")
-  renterAppointments  Appointment[]  @relation("RenterAppointments")
-  ownerAppointments   Appointment[]  @relation("OwnerAppointments")
-  notifications       Notification[]
+  id                  String                 @id @default(cuid())
+  email               String?                @unique
+  password            String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  emailVerified       Boolean                @default(false)
+  image               String?
+  isVerified          Boolean                @default(false)
+  phone               String?                @unique
+  preferredLanguage   String?
+  role                Role                   @default(renter)
+  first_name          String?
+  last_name           String?
+  status              UserStatus             @default(active)
+  verificationState   VerificationState      @default(pending_otp)
+  accounts            Account[]
+  ownerAgreements     Agreement[]            @relation("OwnerAgreements")
+  renterAgreements    Agreement[]            @relation("RenterAgreements")
+  ownerAppointments   Appointment[]          @relation("OwnerAppointments")
+  renterAppointments  Appointment[]          @relation("RenterAppointments")
   auditLogs           AuditLog[]
-
-  status            UserStatus @default(active)
-  verificationState VerificationState @default(pending)
-
-  renterAgreements  Agreement[] @relation("RenterAgreements")
-  ownerAgreements   Agreement[] @relation("OwnerAgreements")
-  reportsSubmitted  Report[] @relation("SubmittedReports")
-  verificationDocs  VerificationDocument[] @relation("VerificationDocuments")
-  reviewedDocs      VerificationDocument[] @relation("ReviewedDocuments")
-
-  reviews           Review[]
-  // notifications     Notification[]
-
-  preferences      UserPreference?
-  searchHistories  SearchHistory[]
-  interactions     UserInteraction[]
-  
-  bankDetail            BankDetail?
-  notificationPreference NotificationPreference?
-
-  // reportsSubmitted  Report[] @relation("SubmittedReports")
-  // reportsAgainst    Report[] @relation("ReportsAgainst")
+  ownerConversations  Conversation[]         @relation("OwnerConversations")
+  renterConversations Conversation[]         @relation("RenterConversations")
+  messagesSent        Message[]              @relation("UserMessages")
+  messageReactions    MessageReaction[]
+  notifications       Notification[]
+  properties          Property[]             @relation("OwnerProperties")
+  refreshTokens       RefreshToken[]
+  reportsSubmitted    Report[]               @relation("SubmittedReports")
+  reviews             Review[]
+  searchHistories     SearchHistory[]
+  sessions            Session[]
+  interactions        UserInteraction[]
+  preferences         UserPreference?
+  reviewedDocs        VerificationDocument[] @relation("ReviewedDocuments")
+  verificationDocs    VerificationDocument[] @relation("VerificationDocuments")
 }
 
 model Account {
@@ -96,8 +59,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -108,8 +70,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -121,58 +82,30 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
 model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
 }
 
-enum Role {
-  renter
-  owner
-  admin
-}
-
-enum UserStatus {
-  active
-  suspended
-  pending
-}
-
-enum VerificationState {
-  verified
-  pending
-  rejected
-  resubmit
-}
-
-// =======================
-// MESSAGING MODELS
-// =======================
-
 model Conversation {
-  id String @id @default(cuid())
-
+  id         String    @id @default(cuid())
   propertyId String?
-  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-
-  renterId String
-  renter   User   @relation("RenterConversations", fields: [renterId], references: [id])
-
-  ownerId String
-  owner   User   @relation("OwnerConversations", fields: [ownerId], references: [id])
-
-  messages Message[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  renterId   String
+  ownerId    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  owner      User      @relation("OwnerConversations", fields: [ownerId], references: [id])
+  property   Property? @relation(fields: [propertyId], references: [id])
+  renter     User      @relation("RenterConversations", fields: [renterId], references: [id])
+  messages   Message[]
 
   @@index([renterId])
   @@index([ownerId])
@@ -228,6 +161,259 @@ model Property {
   @@index([isDeleted])
 }
 
+model Appointment {
+  id         String            @id @default(cuid())
+  propertyId String
+  renterId   String
+  ownerId    String
+  startsAt   DateTime
+  endsAt     DateTime
+  status     AppointmentStatus @default(PENDING)
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  owner      User              @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renter     User              @relation("RenterAppointments", fields: [renterId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([startsAt])
+  @@index([status])
+}
+
+enum AppointmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model Message {
+  id             String              @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  status         MessageStatus       @default(SENT)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  replyToId      String?
+  type           MessageType         @default(TEXT)
+  conversation   Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo        Message?            @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]           @relation("MessageReplies")
+  sender         User                @relation("UserMessages", fields: [senderId], references: [id])
+  attachments    MessageAttachment[]
+  reactions      MessageReaction[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([replyToId])
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  url       String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  eventType  String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([eventType])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model Agreement {
+  id            String          @id @default(cuid())
+  propertyId    String
+  renterId      String
+  ownerId       String
+  monthlyRent   Float
+  currency      String          @default("ETB")
+  startDate     DateTime
+  endDate       DateTime
+  status        AgreementStatus @default(draft)
+  paymentStatus PaymentStatus   @default(pending)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  owner         User            @relation("OwnerAgreements", fields: [ownerId], references: [id])
+  property      Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  renter        User            @relation("RenterAgreements", fields: [renterId], references: [id])
+
+  @@index([propertyId])
+  @@index([renterId])
+  @@index([ownerId])
+}
+
+model Report {
+  id            String           @id @default(cuid())
+  reportedById  String
+  targetId      String
+  targetType    ReportTargetType
+  category      String
+  description   String
+  status        ReportStatus     @default(open)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  ownerResponse String?
+  respondedAt   DateTime?
+  reportedBy    User             @relation("SubmittedReports", fields: [reportedById], references: [id])
+
+  @@index([reportedById])
+  @@index([targetId])
+}
+
+model VerificationDocument {
+  id           String                   @id @default(cuid())
+  userId       String
+  documentType VerificationDocumentType
+  documentUrl  String
+  frontUrl     String?
+  backUrl      String?
+  livePhotoUrl String?
+  status       VerificationStatus       @default(pending)
+  submittedAt  DateTime                 @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?                    @relation("ReviewedDocuments", fields: [reviewedById], references: [id])
+  user         User                     @relation("VerificationDocuments", fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  reviewerId String
+  rating     Int
+  comment    String
+  status     ReviewStatus @default(published)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  propertyId String
+  repliedAt  DateTime?
+  reply      String?
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reviewer   User         @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, propertyId])
+  @@index([reviewerId])
+  @@index([propertyId])
+}
+
+model UserPreference {
+  id                 String        @id @default(cuid())
+  userId             String        @unique
+  preferredPriceMin  Float?
+  preferredPriceMax  Float?
+  preferredBedrooms  Int?
+  preferredLocations String[]
+  preferredAmenities String[]
+  preferredType      PropertyType?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  filters   Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model UserInteraction {
+  id         String          @id @default(cuid())
+  userId     String
+  propertyId String
+  type       InteractionType
+  createdAt  DateTime        @default(now())
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, propertyId])
+  @@index([type])
+}
+
+model PropertyEmbedding {
+  id         String   @id @default(cuid())
+  propertyId String   @unique
+  embedding  Float[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  renter
+  owner
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  banned
+}
+
+enum VerificationState {
+  verified
+  pending_otp
+  pending_documents
+  rejected
+}
+
 enum PropertyStatus {
   AVAILABLE
   PENDING
@@ -245,89 +431,11 @@ enum PropertyType {
   PENTHOUSE
 }
 
-model Appointment {
-  id         String            @id @default(cuid())
-  propertyId String
-  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  renterId   String
-  renter     User              @relation("RenterAppointments", fields: [renterId], references: [id], onDelete: Cascade)
-  ownerId    String
-  owner      User              @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
-  startsAt   DateTime
-  endsAt     DateTime
-  status     AppointmentStatus @default(PENDING)
-  note       String?
-  agreements Agreement[]
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-
-  @@index([propertyId])
-  @@index([renterId])
-  @@index([ownerId])
-  @@index([startsAt])
-  @@index([status])
-}
-
 enum AppointmentStatus {
   PENDING
-  ACCEPTED
-  REJECTED
+  CONFIRMED
+  DECLINED
   CANCELLED
-}
-
-model Message {
-  id String @id @default(cuid())
-
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  replyToId String?
-  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies   Message[] @relation("MessageReplies")
-
-  senderId String
-  sender   User   @relation("UserMessages", fields: [senderId], references: [id])
-
-  type    MessageType   @default(TEXT)
-  content String
-  status  MessageStatus @default(SENT)
-
-  attachments MessageAttachment[]
-  reactions   MessageReaction[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([conversationId])
-  @@index([senderId])
-  @@index([replyToId])
-}
-
-model MessageAttachment {
-  id        String   @id @default(cuid())
-  messageId String
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  url       String
-  fileName  String
-  mimeType  String
-  fileSize  Int
-  createdAt DateTime @default(now())
-
-  @@index([messageId])
-}
-
-model MessageReaction {
-  id        String   @id @default(cuid())
-  messageId String
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emoji     String
-  createdAt DateTime @default(now())
-
-  @@unique([messageId, userId, emoji])
-  @@index([messageId])
-  @@index([userId])
 }
 
 enum MessageType {
@@ -344,168 +452,25 @@ enum MessageStatus {
   READ
 }
 
-model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      NotificationType
-  title     String
-  body      String
-  payload   Json?
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
-
-  @@index([userId])
-  @@index([type])
-  @@index([createdAt])
-}
-
-model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String?
-  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  eventType  String
-  entityType String
-  entityId   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
-
-  @@index([actorId])
-  @@index([eventType])
-  @@index([entityType])
-  @@index([createdAt])
-}
-
 enum NotificationType {
   MESSAGE_NEW
   APPOINTMENT_BOOKED
   APPOINTMENT_UPDATED
-  PAYMENT_RECEIVED
-  PAYMENT_CONFIRMED
-}
-
-// =======================
-// ADMIN & PLATFORM MODELS
-// =======================
-
-model Agreement {
-  id            String          @id @default(cuid())
-  propertyId    String
-  property      Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  renterId      String
-  renter        User            @relation("RenterAgreements", fields: [renterId], references: [id])
-  ownerId       String
-  owner         User            @relation("OwnerAgreements", fields: [ownerId], references: [id])
-  appointmentId String?
-  appointment   Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-
-  monthlyRent   Float
-  currency      String          @default("ETB")
-  startDate     DateTime
-  endDate       DateTime
-
-  termsSnapshot   Json?
-  depositOriginal Json?
-  depositAmountEtb Float?
-  fxRate          Float?
-  fxRateAt        DateTime?
-
-  status          AgreementStatus @default(draft)
-  ownerMessage    String?
-  sentAt          DateTime?
-  renterRespondedAt DateTime?
-  offerExpiresAt  DateTime?
-  activatedAt     DateTime?
-  cancelledBy     String?
-  cancellationReason String?
-
-  payments      Payment[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([propertyId])
-  @@index([renterId])
-  @@index([ownerId])
-  @@index([status])
-  @@index([offerExpiresAt])
 }
 
 enum AgreementStatus {
+  active
+  pending_renter
+  pending_owner
   draft
-  sent
-  payment_pending
-  completed
-  rejected
-  cancelled
   terminated
   expired
 }
 
-enum PaymentPurpose {
-  security_deposit
-  monthly_rent
-}
-
-enum PaymentProvider {
-  chapa
-  manual
-}
-
-enum GatewayPaymentStatus {
+enum PaymentStatus {
+  confirmed
+  proof_uploaded
   pending
-  processing
-  success
-  failed
-  expired
-}
-
-model Payment {
-  id          String               @id @default(cuid())
-  agreementId String
-  agreement   Agreement            @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-
-  purpose           PaymentPurpose       @default(security_deposit)
-  provider          PaymentProvider      @default(chapa)
-  amount            Float
-  currency          String               @default("ETB")
-  amountEtb         Float?
-  originalAmount    Float?
-  originalCurrency  String?
-
-  status            GatewayPaymentStatus @default(pending)
-  chapaTxRef        String?              @unique
-  chapaRefId        String?
-  idempotencyKey    String?              @unique
-  failureReason     String?
-  expiresAt         DateTime?
-
-  proofUrl          String?
-  paidAt            DateTime?
-  confirmedAt       DateTime?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-
-  @@index([agreementId])
-  @@index([status])
-  @@index([purpose])
-}
-
-model Report {
-  id             String    @id @default(cuid())
-  reportedById   String
-  reportedBy     User      @relation("SubmittedReports", fields: [reportedById], references: [id])
-  targetId       String
-  targetType     ReportTargetType
-  category       String
-  description    String
-  status         ReportStatus @default(open)
-  ownerResponse  String?
-  respondedAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@index([reportedById])
-  @@index([targetId])
 }
 
 enum ReportTargetType {
@@ -550,31 +515,6 @@ enum VerificationStatus {
   under_review
   approved
   rejected
-  resubmit
-}
-
-model Review {
-  id String @id @default(cuid())
-
-  reviewerId String
-  reviewer   User @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
-
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  rating  Int
-  comment String
-  reply   String?
-  repliedAt DateTime?
-
-  status ReviewStatus @default(published)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([reviewerId])
-  @@index([propertyId])
-  @@unique([reviewerId, propertyId])
 }
 
 enum ReviewTargetType {
@@ -588,98 +528,14 @@ enum ReviewStatus {
   removed
 }
 
-
-model UserPreference {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  preferredPriceMin  Float?
-  preferredPriceMax  Float?
-  preferredCurrency  String?  @default("ETB")
-  preferredBedrooms  Int?
-  preferredLocations Json?    // Array of { address: string, lat: number, lng: number }
-  preferredAmenities String[]
-  preferredType      PropertyType?
-  furnishStatus      String?  // furnished, semi-furnished, unfurnished
-
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model SearchHistory {
-  id        String   @id @default(cuid())
-  userId    String
-  query     String
-  filters   Json?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-}
-
-model UserInteraction {
-  id         String   @id @default(cuid())
-  userId     String   
-  propertyId String
-
-  type       InteractionType
-  
-
-  createdAt  DateTime @default(now())
-
-  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([userId, propertyId])
-  @@index([type])
-}
 enum InteractionType {
   VIEW
   LIKE
   SAVE
 }
 
-model PropertyEmbedding {
-  id         String   @id @default(cuid())
-  propertyId String   @unique
-  embedding  Float[]
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-}
-
-// =======================
-// PROFILE & BANKING MODELS
-// =======================
-
-model BankDetail {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bankName        String
-  accountNumber   String   // Stored encrypted in production
-  holderName      String
-  branch          String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model NotificationPreference {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  appointments    Boolean  @default(true)
-  agreements      Boolean  @default(true)
-  payments        Boolean  @default(true)
-  reviews         Boolean  @default(false)
-  reports         Boolean  @default(true)
-  system          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([userId])
+enum VerificationDocumentType {
+  national_id
+  passport
+  ownership_deed
 }
