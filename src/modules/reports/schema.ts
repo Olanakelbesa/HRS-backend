@@ -27,3 +27,12 @@ export const submitOwnerResponseSchema = z.object({
 });
 
 export type SubmitOwnerResponseInput = z.infer<typeof submitOwnerResponseSchema>;
+
+export const submitReportSchema = z.object({
+  targetType: z.enum(['property', 'user']),
+  targetId: z.string().min(1, 'targetId is required'),
+  category: z.string().min(3, 'Category must be at least 3 characters').max(100),
+  description: z.string().min(10, 'Description must be at least 10 characters').max(2000),
+});
+
+export type SubmitReportInput = z.infer<typeof submitReportSchema>;

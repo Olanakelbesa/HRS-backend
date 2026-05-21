@@ -86,6 +86,49 @@ export async function getOwnerReportById(ownerId: string, reportId: string) {
   return report;
 }
 
+export async function createReport(
+  reporterId: string,
+  input: {
+    targetType: 'property' | 'user';
+    targetId: string;
+    category: string;
+    description: string;
+  }
+) {
+  if (input.targetType === 'property') {
+    const property = await prisma.property.findUnique({
+      where: { id: input.targetId },
+      select: { id: true },
+    });
+
+    if (!property) {
+      throw new Error('Property not found');
+    }
+  } else {
+    const user = await prisma.user.findUnique({
+      where: { id: input.targetId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+  }
+
+  const report = await prisma.report.create({
+    data: {
+      reportedById: reporterId,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      category: input.category,
+      description: input.description,
+      status: 'open',
+    },
+  });
+
+  return report;
+}
+
 /**
  * Submit (or update) the owner's response to a specific report.
  * Only allowed when the report status is 'open' or 'in_review'.
