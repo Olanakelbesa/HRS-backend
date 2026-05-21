@@ -524,6 +524,99 @@ export const propertyService = {
     });
   },
 
+  async saveProperty(userId: string, propertyId: string) {
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+      include: {
+        owner: {
+          select: { id: true, first_name: true, last_name: true, email: true },
+        },
+      },
+    });
+
+    if (!property) {
+      throw new AppError('Property not found', 404);
+    }
+
+    const existing = await prisma.userInteraction.findFirst({
+      where: {
+        userId,
+        propertyId,
+        type: 'SAVE',
+      },
+    });
+
+    if (existing) {
+      return {
+        property: formatPropertyResponse(property),
+        savedAt: existing.createdAt,
+      };
+    }
+
+    const saved = await prisma.userInteraction.create({
+      data: {
+        userId,
+        propertyId,
+        type: 'SAVE',
+      },
+      include: {
+        property: {
+          include: {
+            owner: {
+              select: { id: true, first_name: true, last_name: true, email: true },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      property: formatPropertyResponse(saved.property),
+      savedAt: saved.createdAt,
+    };
+  },
+
+  async removeSavedProperty(userId: string, propertyId: string) {
+    const result = await prisma.userInteraction.deleteMany({
+      where: {
+        userId,
+        propertyId,
+        type: 'SAVE',
+      },
+    });
+
+    return result.count > 0;
+  },
+
+  async getSavedProperties(userId: string) {
+    const savedInteractions = await prisma.userInteraction.findMany({
+      where: {
+        userId,
+        type: 'SAVE',
+        property: {
+          isDeleted: false,
+        },
+      },
+      include: {
+        property: {
+          include: {
+            owner: {
+              select: { id: true, first_name: true, last_name: true, email: true },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return savedInteractions.map((interaction) => ({
+      ...formatPropertyResponse(interaction.property),
+      savedAt: interaction.createdAt,
+    }));
+  },
+
   /**
    * Get analytics for a specific owner's properties
    * Returns: Total Properties, Available, Rented, Total Views

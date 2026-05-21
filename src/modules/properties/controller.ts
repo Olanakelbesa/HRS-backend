@@ -321,6 +321,91 @@ export const getMyPropertiesController = async (req: Request, res: Response) => 
   }
 };
 
+export const getSavedPropertiesController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const savedProperties = await propertyService.getSavedProperties(userId);
+
+    return res.status(200).json({
+      message: 'Saved properties fetched successfully',
+      data: savedProperties,
+    });
+  } catch (error: any) {
+    console.error('Get saved properties error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const savePropertyController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const propertyId = req.params.propertyId as string;
+    const savedProperty = await propertyService.saveProperty(userId, propertyId);
+
+    return res.status(200).json({
+      message: 'Property saved successfully',
+      data: savedProperty,
+    });
+  } catch (error: any) {
+    console.error('Save property error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const removeSavedPropertyController = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: 'Unauthorized. Please login.',
+      });
+    }
+
+    const propertyId = req.params.propertyId as string;
+    const removed = await propertyService.removeSavedProperty(userId, propertyId);
+
+    if (!removed) {
+      return res.status(404).json({
+        message: 'Saved property not found',
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Property removed from saved list successfully',
+    });
+  } catch (error: any) {
+    console.error('Remove saved property error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
 export const updatePropertyStatusController = async (req: Request, res: Response) => {
   try {
     const ownerId = (req as any).userId
