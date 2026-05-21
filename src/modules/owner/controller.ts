@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../../types/request';
+import { formatPrismaError } from '../../lib/prismaErrors';
 import { getOwnerOverview } from './service';
 import { getOwnerOverviewQuerySchema } from './schema';
 import type { GetOwnerOverviewQueryInput } from './schema';
@@ -23,7 +24,7 @@ export async function overview(req: Request, res: Response) {
     });
   } catch (error: unknown) {
     console.error('Get owner overview error:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return res.status(500).json({ status: 'error', message });
+    const { statusCode, message } = formatPrismaError(error);
+    return res.status(statusCode).json({ status: 'error', message });
   }
 }

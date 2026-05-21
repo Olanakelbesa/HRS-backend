@@ -6,6 +6,7 @@ import { convertDepositToEtb } from '../../lib/exchangeRate';
 import { enrichAgreement, BLOCKING_AGREEMENT_STATUSES } from '../../lib/agreementStatus';
 import { buildChapaUrls, initializeTransaction } from '../../integrations/chapa/client';
 import { finalizeSecurityDeposit } from './deposit';
+import { agreementListSelect, agreementDetailSelect } from '../../lib/prismaSelects';
 import type { CreateOwnerAgreementInput, ListAgreementsQuery } from './schema';
 
 type ListQuery = ListAgreementsQuery;
@@ -111,13 +112,6 @@ async function expireAgreementIfNeeded(agreementId: string) {
   });
 }
 
-const agreementInclude = {
-  property: { select: { id: true, title: true, address: true, status: true } },
-  renter: { select: { id: true, first_name: true, last_name: true, email: true, phone: true } },
-  owner: { select: { id: true, first_name: true, last_name: true, email: true, phone: true } },
-  payments: { orderBy: { createdAt: 'desc' as const } },
-} satisfies Prisma.AgreementInclude;
-
 function mapAgreementResponse<T extends { status: AgreementStatus }>(row: T) {
   return enrichAgreement(row);
 }
@@ -138,10 +132,7 @@ export async function listOwnerAgreements(ownerId: string, query: ListQuery) {
   const [items, total] = await Promise.all([
     prisma.agreement.findMany({
       where,
-      include: {
-        property: { select: { id: true, title: true, address: true } },
-        renter: { select: { id: true, first_name: true, last_name: true, email: true } },
-      },
+      select: agreementListSelect,
       orderBy: { createdAt: 'desc' },
       skip: (query.page - 1) * query.limit,
       take: query.limit,
@@ -162,8 +153,8 @@ export async function listRenterAgreements(renterId: string, query: ListQuery) {
   const [items, total] = await Promise.all([
     prisma.agreement.findMany({
       where,
-      include: {
-        property: { select: { id: true, title: true, address: true } },
+      select: {
+        ...agreementListSelect,
         owner: { select: { id: true, first_name: true, last_name: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -184,7 +175,7 @@ export async function exportOwnerAgreements(ownerId: string, _query: unknown) {
 
   const agreements = await prisma.agreement.findMany({
     where: { ownerId },
-    include: { property: true, renter: true },
+    select: agreementListSelect,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -208,7 +199,7 @@ export async function getAgreementDetail(agreementId: string, requesterId?: stri
 
   const agreement = await prisma.agreement.findUnique({
     where: { id: agreementId },
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   if (!agreement) throw new AppError('Agreement not found', 404);
@@ -289,7 +280,7 @@ export async function createOwnerAgreement(ownerId: string, input: CreateOwnerAg
       status,
       sentAt: now,
     },
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   if (input.send) {
@@ -334,7 +325,7 @@ export async function updateDraftAgreement(
   const updated = await prisma.agreement.update({
     where: { id: agreementId },
     data,
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   return mapAgreementResponse(updated);
@@ -368,7 +359,7 @@ export async function sendAgreement(
       sentAt: new Date(),
       offerExpiresAt: expiresAt,
     },
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   await prisma.notification.create({
@@ -411,7 +402,7 @@ export async function cancelAgreement(
       cancelledBy: actorId,
       cancellationReason: reason,
     },
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   return mapAgreementResponse(updated);
@@ -441,7 +432,7 @@ export async function acceptAgreement(agreementId: string, renterId: string) {
         fxRate: conversion.fxRate,
         fxRateAt: conversion.fxRateAt,
       },
-      include: agreementInclude,
+      select: agreementDetailSelect,
     });
 
     await prisma.notification.create({
@@ -474,7 +465,7 @@ export async function rejectAgreement(agreementId: string, renterId: string, rea
       renterRespondedAt: new Date(),
       cancellationReason: reason,
     },
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   await prisma.notification.create({
@@ -633,7 +624,7 @@ export async function terminateAgreement(
   const updated = await prisma.agreement.update({
     where: { id: agreementId },
     data: { status: 'terminated' },
-    include: agreementInclude,
+    select: agreementDetailSelect,
   });
 
   await prisma.auditLog.create({

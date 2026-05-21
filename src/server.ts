@@ -1,3 +1,4 @@
+import './config/prismaBoot'; // Regenerate client before any Prisma import (production)
 import './config/redis'; // Connect Redis at startup
 import http from 'http';
 import { Server } from 'socket.io';
@@ -5,6 +6,7 @@ import type { AddressInfo } from 'net';
 import app from './app';
 import { env } from './config/env';
 import prisma from './config/database';
+import { assertDatabaseSchemaReady } from './lib/prismaHealth';
 import { initMessagingSocket } from './modules/messaging/socket';
 
 const PORT = env.PORT || 3000;
@@ -24,6 +26,11 @@ async function bootstrap() {
   try {
     await prisma.$connect();
     console.log('🐘 PostgreSQL connected');
+
+    if (env.NODE_ENV === 'production') {
+      await assertDatabaseSchemaReady();
+      console.log('✅ Database schema compatible with Prisma client');
+    }
   } catch (err) {
     console.error('PostgreSQL connection failed:', (err as Error).message);
     process.exit(1);

@@ -1,11 +1,17 @@
 import { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../../types/request';
+import { formatPrismaError } from '../../lib/prismaErrors';
 import * as agreementService from './service';
 
 export const listOwnerAgreements = async (req: Request, res: Response) => {
-  const userId = (req as AuthenticatedRequest).userId as string;
-  const result = await agreementService.listOwnerAgreements(userId, req.query as any);
-  return res.status(200).json({ message: 'Agreements retrieved', data: result });
+  try {
+    const userId = (req as AuthenticatedRequest).userId as string;
+    const result = await agreementService.listOwnerAgreements(userId, req.query as any);
+    return res.status(200).json({ message: 'Agreements retrieved', data: result });
+  } catch (error: unknown) {
+    const { statusCode, message } = formatPrismaError(error);
+    return res.status(statusCode).json({ status: 'error', message });
+  }
 };
 
 export const listRenterAgreements = async (req: Request, res: Response) => {

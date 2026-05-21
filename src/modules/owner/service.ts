@@ -1,6 +1,8 @@
 import prisma from '../../config/database';
 import { propertyService } from '../properties/service';
 import { getProfile } from '../profile/service';
+import { safePrisma } from '../../lib/safePrisma';
+import { agreementListSelect } from '../../lib/prismaSelects';
 import type { GetOwnerOverviewQueryInput } from './schema';
 
 const PENDING_AGREEMENT_STATUSES = ['sent', 'payment_pending'] as const;
@@ -114,14 +116,19 @@ async function buildRevenueChart(ownerId: string, range: GetOwnerOverviewQueryIn
   const rangeStart = buckets[0].start;
   const rangeEnd = buckets[buckets.length - 1].end;
 
-  const payments = await prisma.payment.findMany({
-    where: {
-      status: 'success',
-      paidAt: { gte: rangeStart, lte: rangeEnd },
-      agreement: { ownerId },
-    },
-    select: { amount: true, paidAt: true },
-  });
+  const { value: payments } = await safePrisma(
+    'revenue.chart.payments',
+    () =>
+      prisma.payment.findMany({
+        where: {
+          status: 'success',
+          paidAt: { gte: rangeStart, lte: rangeEnd },
+          agreement: { ownerId },
+        },
+        select: { amount: true, paidAt: true },
+      }),
+    []
+  );
 
   return buckets.map((bucket) => ({
     label: bucket.label,
@@ -134,85 +141,116 @@ async function buildRevenueChart(ownerId: string, range: GetOwnerOverviewQueryIn
 export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQueryInput) {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const warnings: string[] = [];
 
-  const [
-    profile,
-    properties,
-    pendingAppointmentsCount,
-    pendingAppointments,
-    pendingAgreementsCount,
-    pendingAgreements,
-    unreadNotificationsCount,
-    recentNotifications,
-    revenueThisMonth,
-    pendingPayments,
-    revenueChart,
-  ] = await Promise.all([
-    getProfile(ownerId),
-    propertyService.getMyProperties(ownerId),
-    prisma.appointment.count({
-      where: { ownerId, status: 'PENDING' },
-    }),
-    prisma.appointment.findMany({
-      where: { ownerId, status: 'PENDING' },
-      orderBy: { startsAt: 'asc' },
-      take: 5,
-      select: {
-        id: true,
-        propertyId: true,
-        startsAt: true,
-        endsAt: true,
-        status: true,
-        note: true,
-        property: { select: { id: true, title: true, address: true, images: true } },
-        renter: { select: { id: true, first_name: true, last_name: true, email: true } },
-      },
-    }),
-    prisma.agreement.count({
-      where: {
-        ownerId,
-        status: { in: [...PENDING_AGREEMENT_STATUSES] },
-      },
-    }),
-    prisma.agreement.findMany({
-      where: {
-        ownerId,
-        status: { in: [...PENDING_AGREEMENT_STATUSES] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: {
-        property: { select: { id: true, title: true, address: true } },
-        renter: { select: { id: true, first_name: true, last_name: true, email: true } },
-      },
-    }),
-    prisma.notification.count({
-      where: { userId: ownerId, readAt: null },
-    }),
-    prisma.notification.findMany({
-      where: { userId: ownerId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: { id: true, type: true, title: true, body: true, createdAt: true, readAt: true },
-    }),
-    prisma.payment.aggregate({
-      _sum: { amount: true },
-      where: {
-        status: 'success',
-        paidAt: { gte: monthStart },
-        agreement: { ownerId },
-      },
-    }),
-    prisma.payment.aggregate({
-      _sum: { amount: true },
-      _count: { _all: true },
-      where: {
-        status: 'pending',
-        agreement: { ownerId },
-      },
-    }),
-    buildRevenueChart(ownerId, query.range),
-  ]);
+  const profile = await getProfile(ownerId);
+  const properties = await propertyService.getMyProperties(ownerId);
+
+  const { value: pendingAppointmentsCount, warning: apptCountWarn } = await safePrisma(
+    'appointments.count',
+    () => prisma.appointment.count({ where: { ownerId, status: 'PENDING' } }),
+    0
+  );
+  if (apptCountWarn) warnings.push(apptCountWarn);
+
+  const { value: pendingAppointments, warning: apptListWarn } = await safePrisma(
+    'appointments.list',
+    () =>
+      prisma.appointment.findMany({
+        where: { ownerId, status: 'PENDING' },
+        orderBy: { startsAt: 'asc' },
+        take: 5,
+        select: {
+          id: true,
+          propertyId: true,
+          startsAt: true,
+          endsAt: true,
+          status: true,
+          note: true,
+          property: { select: { id: true, title: true, address: true, images: true } },
+          renter: { select: { id: true, first_name: true, last_name: true, email: true } },
+        },
+      }),
+    []
+  );
+  if (apptListWarn) warnings.push(apptListWarn);
+
+  const agreementWhere = {
+    ownerId,
+    status: { in: [...PENDING_AGREEMENT_STATUSES] },
+  };
+
+  const { value: pendingAgreementsCount, warning: agCountWarn } = await safePrisma(
+    'agreements.count',
+    () => prisma.agreement.count({ where: agreementWhere }),
+    0
+  );
+  if (agCountWarn) warnings.push(agCountWarn);
+
+  const { value: pendingAgreements, warning: agListWarn } = await safePrisma(
+    'agreements.list',
+    () =>
+      prisma.agreement.findMany({
+        where: agreementWhere,
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: agreementListSelect,
+      }),
+    []
+  );
+  if (agListWarn) warnings.push(agListWarn);
+
+  const { value: unreadNotificationsCount, warning: notifCountWarn } = await safePrisma(
+    'notifications.count',
+    () => prisma.notification.count({ where: { userId: ownerId, readAt: null } }),
+    0
+  );
+  if (notifCountWarn) warnings.push(notifCountWarn);
+
+  const { value: recentNotifications, warning: notifListWarn } = await safePrisma(
+    'notifications.list',
+    () =>
+      prisma.notification.findMany({
+        where: { userId: ownerId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, type: true, title: true, body: true, createdAt: true, readAt: true },
+      }),
+    []
+  );
+  if (notifListWarn) warnings.push(notifListWarn);
+
+  const { value: revenueThisMonth, warning: revenueWarn } = await safePrisma(
+    'payments.revenueMonth',
+    () =>
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'success',
+          paidAt: { gte: monthStart },
+          agreement: { ownerId },
+        },
+      }),
+    { _sum: { amount: null } }
+  );
+  if (revenueWarn) warnings.push(revenueWarn);
+
+  const { value: pendingPayments, warning: pendingPayWarn } = await safePrisma(
+    'payments.pending',
+    () =>
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        _count: { _all: true },
+        where: {
+          status: { in: ['pending', 'processing'] },
+          agreement: { ownerId },
+        },
+      }),
+    { _sum: { amount: null }, _count: { _all: 0 } }
+  );
+  if (pendingPayWarn) warnings.push(pendingPayWarn);
+
+  const revenueChart = await buildRevenueChart(ownerId, query.range);
 
   const activeListings = properties.filter((p) => p.status === 'AVAILABLE').length;
   const totalViews = properties.reduce((sum, p) => sum + (p.viewCount || 0), 0);
@@ -287,11 +325,17 @@ export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQ
     revenue: {
       totalThisMonth: revenueTotal,
       avgPerProperty: properties.length > 0 ? Math.round(revenueTotal / properties.length) : 0,
-      pendingAmount: pendingPayments._sum.amount ?? 0,
-      pendingCount: pendingPayments._count._all ?? 0,
+      pendingAmount: pendingPayments._sum?.amount ?? 0,
+      pendingCount: pendingPayments._count?._all ?? 0,
       currency: 'ETB',
       chart: revenueChart,
       range: query.range,
     },
+    ...(warnings.length > 0
+      ? {
+          warnings: Array.from(new Set(warnings)),
+          partial: true,
+        }
+      : {}),
   };
 }
