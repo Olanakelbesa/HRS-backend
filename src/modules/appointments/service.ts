@@ -26,6 +26,8 @@ const appointmentSelect = {
       id: true,
       title: true,
       address: true,
+      images: true,
+      status: true,
     },
   },
   renter: {
@@ -34,6 +36,8 @@ const appointmentSelect = {
       email: true,
       first_name: true,
       last_name: true,
+      phone: true,
+      image: true,
     },
   },
   owner: {
@@ -45,6 +49,40 @@ const appointmentSelect = {
     },
   },
 } as const;
+
+const ACTIVE_SLOT_STATUSES = ['PENDING', 'ACCEPTED'] as const;
+
+async function findOverlappingAppointment(where: {
+  propertyId?: string;
+  renterId?: string;
+  ownerId?: string;
+  startsAt: Date;
+  endsAt: Date;
+  excludeId?: string;
+}) {
+  return prisma.appointment.findFirst({
+    where: {
+      ...(where.propertyId ? { propertyId: where.propertyId } : {}),
+      ...(where.renterId ? { renterId: where.renterId } : {}),
+      ...(where.ownerId ? { ownerId: where.ownerId } : {}),
+      ...(where.excludeId ? { id: { not: where.excludeId } } : {}),
+      status: { in: [...ACTIVE_SLOT_STATUSES] },
+      startsAt: { lt: where.endsAt },
+      endsAt: { gt: where.startsAt },
+    },
+    select: { id: true },
+  });
+}
+
+function assertCanAccessAppointment(
+  userId: string,
+  userRole: string,
+  appointment: { renterId: string; ownerId: string }
+) {
+  if (userRole === 'admin') return;
+  if (appointment.renterId === userId || appointment.ownerId === userId) return;
+  throw new AppError('You do not have permission to view this appointment', 403);
+}
 
 /**
  * Check if a user is verified (helper function)
@@ -146,17 +184,28 @@ export async function bookAppointment(
     throw new AppError('You cannot book an appointment for your own property', 400);
   }
 
-  const overlapping = await prisma.appointment.findFirst({
-    where: {
-      renterId: userId,
-      status: { in: ['PENDING', 'ACCEPTED'] },
-      startsAt: { lt: input.endsAt },
-      endsAt: { gt: input.startsAt },
-    },
+  if (input.startsAt < new Date()) {
+    throw new AppError('Cannot book appointments in the past', 400);
+  }
+
+  const renterOverlap = await findOverlappingAppointment({
+    renterId: userId,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
   });
 
-  if (overlapping) {
+  if (renterOverlap) {
     throw new AppError('You already have an overlapping appointment', 409);
+  }
+
+  const propertyOverlap = await findOverlappingAppointment({
+    propertyId: property.id,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+  });
+
+  if (propertyOverlap) {
+    throw new AppError('This time slot is already booked for this property', 409);
   }
 
   const appointment = await prisma.appointment.create({
@@ -234,6 +283,35 @@ export async function listAppointments(
   });
 }
 
+export async function listOwnerAppointments(
+  userId: string,
+  userRole: string,
+  query: ListAppointmentsQuery
+) {
+  if (userRole !== 'owner' && userRole !== 'admin') {
+    throw new AppError('Only owners can access this endpoint', 403);
+  }
+
+  return listAppointments(userId, userRole === 'admin' ? 'admin' : 'owner', query);
+}
+
+export async function getAppointmentById(
+  userId: string,
+  userRole: string,
+  appointmentId: string
+) {
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: appointmentSelect,
+  });
+
+  if (!appointment) throw new AppError('Appointment not found', 404);
+
+  assertCanAccessAppointment(userId, userRole, appointment);
+
+  return appointment;
+}
+
 export async function updateAppointmentStatus(
   userId: string,
   userRole: string,
@@ -244,6 +322,8 @@ export async function updateAppointmentStatus(
     where: { id: appointmentId },
     select: {
       id: true,
+      propertyId: true,
+      renterId: true,
       ownerId: true,
       startsAt: true,
       endsAt: true,
@@ -253,28 +333,57 @@ export async function updateAppointmentStatus(
 
   if (!appointment) throw new AppError('Appointment not found', 404);
 
-  const canManage = userRole === 'admin' || appointment.ownerId === userId;
-  if (!canManage) throw new AppError('Only owner/agent can update appointment status', 403);
+  if (input.status === 'CANCELLED') {
+    const canCancel =
+      userRole === 'admin' ||
+      appointment.renterId === userId ||
+      appointment.ownerId === userId;
 
-  // Check if owner is verified (only applies to owners, not admins)
-  if (userRole === 'owner' && appointment.ownerId === userId) {
-    await checkOwnerVerification(userId);
-  }
+    if (!canCancel) {
+      throw new AppError('You do not have permission to cancel this appointment', 403);
+    }
 
-  if (input.status === 'ACCEPTED') {
-    const overlap = await prisma.appointment.findFirst({
-      where: {
+    if (appointment.status !== 'PENDING' && appointment.status !== 'ACCEPTED') {
+      throw new AppError('Only pending or confirmed appointments can be cancelled', 400);
+    }
+
+    if (userRole === 'owner' && appointment.ownerId === userId) {
+      await checkOwnerVerification(userId);
+    }
+  } else {
+    const canManage = userRole === 'admin' || appointment.ownerId === userId;
+    if (!canManage) throw new AppError('Only the property owner can approve or reject', 403);
+
+    if (appointment.status !== 'PENDING') {
+      throw new AppError('Only pending appointments can be approved or rejected', 400);
+    }
+
+    if (userRole === 'owner' && appointment.ownerId === userId) {
+      await checkOwnerVerification(userId);
+    }
+
+    if (input.status === 'ACCEPTED') {
+      const ownerOverlap = await findOverlappingAppointment({
         ownerId: appointment.ownerId,
-        id: { not: appointment.id },
-        status: 'ACCEPTED',
-        startsAt: { lt: appointment.endsAt },
-        endsAt: { gt: appointment.startsAt },
-      },
-      select: { id: true },
-    });
+        startsAt: appointment.startsAt,
+        endsAt: appointment.endsAt,
+        excludeId: appointment.id,
+      });
 
-    if (overlap) {
-      throw new AppError('Time slot is no longer available for owner', 409);
+      if (ownerOverlap) {
+        throw new AppError('You already have a confirmed appointment at this time', 409);
+      }
+
+      const propertyOverlap = await findOverlappingAppointment({
+        propertyId: appointment.propertyId,
+        startsAt: appointment.startsAt,
+        endsAt: appointment.endsAt,
+        excludeId: appointment.id,
+      });
+
+      if (propertyOverlap) {
+        throw new AppError('This property time slot is no longer available', 409);
+      }
     }
   }
 

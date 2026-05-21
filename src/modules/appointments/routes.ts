@@ -79,6 +79,28 @@ router.get('/', appointmentController.list);
 
 /**
  * @swagger
+ * /api/v1/appointments/{id}:
+ *   get:
+ *     summary: Get a single appointment
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/:id', appointmentController.getById);
+
+/**
+ * @swagger
+ * /api/v1/appointments/{id}:
+ *   patch:
+ *     summary: Update appointment status (approve / reject / cancel)
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch('/:id', appointmentController.patchById);
+
+/**
+ * @swagger
  * /api/v1/appointments/{id}/status:
  *   patch:
  *     summary: Update appointment status (owner/agent)

@@ -3,6 +3,8 @@ import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate';
 import { getOwnerOverviewQuerySchema } from './schema';
 import { overview } from './controller';
+import * as appointmentController from '../appointments/controller';
+import { listAppointmentsQuerySchema } from '../appointments/schema';
 
 const router = Router();
 
@@ -30,6 +32,21 @@ router.get(
   restrictTo('owner', 'admin'),
   validate(getOwnerOverviewQuerySchema, 'query'),
   overview
+);
+
+/**
+ * @openapi
+ * /api/v1/owner/appointments:
+ *   get:
+ *     summary: List appointments for the authenticated owner
+ *     tags: [Owner]
+ */
+router.get(
+  '/appointments',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(listAppointmentsQuerySchema, 'query'),
+  appointmentController.list
 );
 
 export default router;

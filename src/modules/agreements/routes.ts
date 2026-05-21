@@ -5,6 +5,8 @@ import { diskUpload } from '../../middlewares/multer.middleware';
 import * as agreementController from './controller';
 import { overview as ownerOverview } from '../owner/controller';
 import { getOwnerOverviewQuerySchema } from '../owner/schema';
+import * as appointmentController from '../appointments/controller';
+import { listAppointmentsQuerySchema } from '../appointments/schema';
 
 const router = Router();
 
@@ -85,6 +87,21 @@ router.get(
   restrictTo('owner', 'admin'),
   validate(getOwnerOverviewQuerySchema, 'query'),
   ownerOverview
+);
+
+/**
+ * @openapi
+ * /api/v1/owner/appointments:
+ *   get:
+ *     summary: List appointments for the authenticated owner
+ *     tags: [Owner]
+ */
+router.get(
+  '/owner/appointments',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(listAppointmentsQuerySchema, 'query'),
+  appointmentController.list
 );
 
 // Public agreement detail (requires auth to identify requester)

@@ -12,12 +12,14 @@ import paymentRoutes from './modules/payments/routes';
 import agreementRoutes from './modules/agreements/routes';
 import recommendationRoutes from './modules/recommendation/routes';
 import recommendationController from './modules/recommendation/controller';
-import { requireAuth } from './middlewares/auth.middleware';
+import { requireAuth, restrictTo } from './middlewares/auth.middleware';
 import { validate } from './middlewares/validate';
 import { searchSchema, interactionSchema } from './modules/recommendation/schema';
 import reportRoutes from './modules/reports/routes';
 import verificationRoutes from './modules/verification/routes';
 import ownerRoutes from './modules/owner/routes';
+import * as appointmentController from './modules/appointments/controller';
+import { listAppointmentsQuerySchema } from './modules/appointments/schema';
 const router = Router();
 
 // Auth Routes
@@ -87,6 +89,13 @@ router.use('/payments', paymentRoutes);
 router.use('/verification', verificationRoutes);
 
 // Owner dashboard (register before catch-all agreement mounts)
+router.get(
+  '/owner/appointments',
+  requireAuth,
+  restrictTo('owner', 'admin'),
+  validate(listAppointmentsQuerySchema, 'query'),
+  appointmentController.list
+);
 router.use('/owner', ownerRoutes);
 
 // Agreements (also exposes GET /owner/overview for older deploys)

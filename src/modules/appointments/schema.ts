@@ -10,17 +10,25 @@ export const createAppointmentSchema = z
   .refine((value) => value.endsAt > value.startsAt, {
     message: 'endsAt must be after startsAt',
     path: ['endsAt'],
+  })
+  .refine((value) => value.startsAt >= new Date(), {
+    message: 'startsAt must be in the future',
+    path: ['startsAt'],
   });
 
 export const listAppointmentsQuerySchema = z.object({
-  status: z.enum(['PENDING', 'ACCEPTED', 'REJECTED']).optional(),
+  status: z.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED']).optional(),
   propertyId: z.string().optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
 });
 
 export const updateAppointmentStatusSchema = z.object({
-  status: z.enum(['ACCEPTED', 'REJECTED']),
+  status: z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED']),
+});
+
+export const appointmentIdParamSchema = z.object({
+  id: z.string().min(1),
 });
 
 export const updateAppointmentNoteSchema = z.object({

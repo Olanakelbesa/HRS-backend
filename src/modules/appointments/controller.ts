@@ -28,6 +28,19 @@ export async function book(req: Request, res: Response) {
   return res.status(201).json({ status: 'success', data: { appointment } });
 }
 
+export async function getById(req: Request, res: Response) {
+  const auth = req as AuthenticatedRequest;
+  const appointmentId = String(req.params.id);
+
+  const appointment = await appointmentService.getAppointmentById(
+    auth.userId,
+    auth.userRole,
+    appointmentId
+  );
+
+  return res.status(200).json({ status: 'success', data: { appointment } });
+}
+
 export async function list(req: Request, res: Response) {
   const auth = req as AuthenticatedRequest;
   const parsed = listAppointmentsQuerySchema.safeParse(req.query);
@@ -46,6 +59,11 @@ export async function list(req: Request, res: Response) {
     parsed.data
   );
   return res.status(200).json({ status: 'success', data: { appointments } });
+}
+
+/** PATCH /appointments/:id — update status (approve / reject / cancel) */
+export async function patchById(req: Request, res: Response) {
+  return updateStatus(req, res);
 }
 
 export async function updateStatus(req: Request, res: Response) {
