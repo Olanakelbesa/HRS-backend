@@ -78,6 +78,7 @@ function ensureParticipant(conversationId: string, userId: string) {
   return prisma.conversation.findFirst({
     where: {
       id: conversationId,
+      deletedAt: null,
       OR: [{ renterId: userId }, { ownerId: userId }],
     },
   });
@@ -103,6 +104,7 @@ async function validateReplyTarget(replyToId: string | undefined, conversationId
 export async function listConversations(userId: string) {
   const conversations = await prisma.conversation.findMany({
     where: {
+      deletedAt: null,
       OR: [{ renterId: userId }, { ownerId: userId }],
     },
     orderBy: { updatedAt: 'desc' },
@@ -180,6 +182,7 @@ export async function createConversation(userId: string, input: CreateConversati
       ownerId,
       renterId,
       propertyId: propertyId ?? null,
+      deletedAt: null,
     },
   });
 
@@ -286,8 +289,8 @@ export async function markConversationAsRead(conversationId: string, userId: str
 }
 
 export async function getConversationMetadata(conversationId: string, userId: string) {
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: conversationId, deletedAt: null },
     include: {
       property: {
         select: {
@@ -313,6 +316,30 @@ export async function getConversationMetadata(conversationId: string, userId: st
     ...conversation,
     participant,
   };
+}
+
+export async function deleteConversation(conversationId: string, userId: string) {
+  const conversation = await ensureParticipant(conversationId, userId);
+  if (!conversation) throw new AppError('Conversation not found', 404);
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { deletedAt: new Date() },
+  });
+
+  await createAuditLog({
+    actorId: userId,
+    eventType: 'CONVERSATION_DELETED',
+    entityType: 'Conversation',
+    entityId: conversationId,
+    metadata: {
+      renterId: conversation.renterId,
+      ownerId: conversation.ownerId,
+      propertyId: conversation.propertyId,
+    },
+  });
+
+  return { conversationId };
 }
 
 export async function updateMessageStatus(

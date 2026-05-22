@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
-import { updateProfileSchema, updateUserRoleSchema, updateUserStatusSchema } from './schema';
+import {
+  updateProfileSchema,
+  updateUserRoleSchema,
+  updateUserStatusSchema,
+  getUserByIdSchema,
+} from './schema';
 import * as userService from './service';
 import { changePasswordSchema } from './schema';
 
@@ -8,6 +13,27 @@ export async function getProfile(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
   const user = await userService.getProfile(userId);
   return res.status(200).json({ status: 'success', data: { user } });
+}
+
+export async function getOwnerProfile(req: Request, res: Response) {
+  const parsed = getUserByIdSchema.safeParse({ params: req.params });
+  if (!parsed.success) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Validation failed',
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  try {
+    const result = await userService.getOwnerProfile(parsed.data.params.id);
+    return res.status(200).json({ status: 'success', data: result });
+  } catch (error: any) {
+    return res.status(error.statusCode ?? 500).json({
+      status: 'error',
+      message: error.message,
+    });
+  }
 }
 
 export async function updateProfile(req: Request, res: Response) {

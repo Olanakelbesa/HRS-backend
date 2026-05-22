@@ -240,3 +240,34 @@ export async function updateNote(req: Request, res: Response, next: NextFunction
     return handleError(error, res, next);
   }
 }
+
+/**
+ * GET /appointments/availability?propertyId=&ownerId=&from=&to=
+ */
+export async function getAvailability(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { propertyId, ownerId } = req.query as Record<string, string | undefined>;
+    const fromRaw = req.query.from as string | undefined;
+    const toRaw = req.query.to as string | undefined;
+
+    if (!propertyId && !ownerId) {
+      return res.status(400).json({ message: 'propertyId or ownerId is required', data: null });
+    }
+
+    const from = fromRaw ? new Date(fromRaw) : undefined;
+    const to = toRaw ? new Date(toRaw) : undefined;
+
+    if (from && Number.isNaN(from.getTime())) {
+      return res.status(400).json({ message: 'Invalid `from` datetime', data: null });
+    }
+    if (to && Number.isNaN(to.getTime())) {
+      return res.status(400).json({ message: 'Invalid `to` datetime', data: null });
+    }
+
+    const busy = await appointmentService.getAvailability({ propertyId, ownerId, from, to });
+
+    return res.status(200).json({ message: 'Availability fetched', data: { busy } });
+  } catch (error) {
+    return handleError(error, res, next);
+  }
+}

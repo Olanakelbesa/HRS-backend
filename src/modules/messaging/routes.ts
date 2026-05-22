@@ -101,6 +101,31 @@ router.post('/conversations', messagingController.createConversation);
  */
 router.get('/conversations/:id', messagingController.getMetadata);
 
+/**
+ * @swagger
+ * /api/v1/messaging/conversations/{id}:
+ *   delete:
+ *     summary: Soft delete a conversation
+ *     tags: [Messaging]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Conversation ID
+ *     responses:
+ *       200:
+ *         description: Conversation soft deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Conversation not found
+ */
+router.delete('/conversations/:id', messagingController.deleteConversation);
+
 
 /**
  * @swagger

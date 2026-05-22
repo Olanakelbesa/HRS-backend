@@ -4,8 +4,6 @@ import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 
 const router = Router();
 
-router.use(requireAuth);
-
 /**
  * @swagger
  * /api/v1/users/profile:
@@ -43,8 +41,104 @@ router.use(requireAuth);
  *       401:
  *         description: Unauthorized
  */
-router.get('/profile', userController.getProfile);
-router.patch('/profile', userController.updateProfile);
+router.get('/profile', requireAuth, userController.getProfile);
+router.patch('/profile', requireAuth, userController.updateProfile);
+router.patch('/change-password', requireAuth, userController.changePassword);
+router.get('/:id', userController.getOwnerProfile);
+/**
+ * @swagger
+ * /api/v1/users/{id}:
+ *   get:
+ *     summary: Get public owner profile with listings and reviews
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Owner user id
+ *     responses:
+ *       200:
+ *         description: Owner profile loaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     owner:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                         avatar:
+ *                           type: string
+ *                         role:
+ *                           type: string
+ *                         location:
+ *                           type: string
+ *                         joinedDate:
+ *                           type: string
+ *                         verification:
+ *                           type: object
+ *                           properties:
+ *                             idVerified:
+ *                               type: boolean
+ *                             phoneVerified:
+ *                               type: boolean
+ *                         propertiesManaged:
+ *                           type: integer
+ *                         rating:
+ *                           type: object
+ *                           properties:
+ *                             average:
+ *                               type: number
+ *                             reviewCount:
+ *                               type: integer
+ *                     listings:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           title:
+ *                             type: string
+ *                           location:
+ *                             type: string
+ *                           price:
+ *                             type: number
+ *                           image:
+ *                             type: string
+ *                     reviews:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           reviewerName:
+ *                             type: string
+ *                           date:
+ *                             type: string
+ *                           rating:
+ *                             type: integer
+ *                           comment:
+ *                             type: string
+ *       400:
+ *         description: Validation failed
+ *       404:
+ *         description: Owner not found
+ *       500:
+ *         description: Server error
+ */
 /**
  * @swagger
  * /api/v1/users/change-password:
