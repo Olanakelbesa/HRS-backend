@@ -19,6 +19,37 @@ router.post('/', restrictTo('renter'), appointmentController.book);
 
 /**
  * @swagger
+ * /api/v1/appointments/availability:
+ *   get:
+ *     summary: Get busy time slots for a property or owner
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: query
+ *         name: propertyId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: ownerId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Busy slots returned
+ */
+router.get('/availability', appointmentController.getAvailability);
+
+/**
+ * @swagger
  * /api/v1/appointments/me:
  *   get:
  *     summary: List logged-in renter's appointments
