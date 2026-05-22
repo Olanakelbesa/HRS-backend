@@ -23,14 +23,7 @@ export function schemaDriftUserMessage(): string {
   return 'The server database schema is out of sync. Please redeploy the latest backend or contact support.';
 }
 
-import * as fs from 'fs';
-
 export function formatPrismaError(error: unknown): { statusCode: number; message: string } {
-  console.error('[formatPrismaError] Original Error:', error);
-  try {
-    fs.writeFileSync('prisma_error_log.txt', String(error) + '\n' + (error instanceof Error ? error.stack : '') + '\n' + JSON.stringify(error));
-  } catch (e) { }
-
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (isSchemaDriftError(error)) {
       return { statusCode: 503, message: schemaDriftUserMessage() };
