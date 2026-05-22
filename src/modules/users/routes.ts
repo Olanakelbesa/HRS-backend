@@ -4,8 +4,6 @@ import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 
 const router = Router();
 
-router.use(requireAuth);
-
 /**
  * @swagger
  * /api/v1/users/profile:
@@ -43,17 +41,16 @@ router.use(requireAuth);
  *       401:
  *         description: Unauthorized
  */
-router.get('/profile', userController.getProfile);
+router.get('/profile', requireAuth, userController.getProfile);
+router.patch('/profile', requireAuth, userController.updateProfile);
+router.patch('/change-password', requireAuth, userController.changePassword);
 router.get('/:id', userController.getOwnerProfile);
-router.patch('/profile', userController.updateProfile);
 /**
  * @swagger
  * /api/v1/users/{id}:
  *   get:
  *     summary: Get public owner profile with listings and reviews
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -137,8 +134,6 @@ router.patch('/profile', userController.updateProfile);
  *                             type: string
  *       400:
  *         description: Validation failed
- *       401:
- *         description: Unauthorized
  *       404:
  *         description: Owner not found
  *       500:
