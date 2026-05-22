@@ -79,6 +79,46 @@ async function findOverlappingAppointment(where: {
   });
 }
 
+/**
+ * Get busy appointment slots for a property or owner within an optional window.
+ * Returns appointments with status in ACTIVE_SLOT_STATUSES (PENDING, ACCEPTED).
+ */
+export async function getAvailability(options: {
+  propertyId?: string;
+  ownerId?: string;
+  from?: Date;
+  to?: Date;
+}) {
+  const { propertyId, ownerId, from, to } = options;
+
+  const windowFrom = from ?? new Date();
+  const windowTo = to ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // default 30 days
+
+  const where: any = {
+    status: { in: [...ACTIVE_SLOT_STATUSES] },
+    startsAt: { lt: windowTo },
+    endsAt: { gt: windowFrom },
+  };
+
+  if (propertyId) where.propertyId = propertyId;
+  if (ownerId) where.ownerId = ownerId;
+
+  const appointments = await prisma.appointment.findMany({
+    where,
+    select: { id: true, propertyId: true, ownerId: true, startsAt: true, endsAt: true, status: true },
+    orderBy: { startsAt: 'asc' },
+  });
+
+  return appointments.map((a) => ({
+    id: a.id,
+    propertyId: a.propertyId,
+    ownerId: a.ownerId,
+    startsAt: a.startsAt.toISOString(),
+    endsAt: a.endsAt.toISOString(),
+    status: a.status,
+  }));
+}
+
 function assertCanAccessAppointment(
   userId: string,
   userRole: string,
