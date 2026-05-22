@@ -6,18 +6,73 @@ import bcrypt from 'bcryptjs';
 export async function getProfile(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, first_name: true, last_name: true, createdAt: true },
+    select: {
+      id: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      phone: true,
+      image: true,
+      location: true,
+      bio: true,
+      role: true,
+      preferredLanguage: true,
+      emailVerified: true,
+      isVerified: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
   if (!user) throw new AppError('User not found', 404);
   return user;
 }
 
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
+  const data: Record<string, unknown> = {};
+
+  if (input.first_name !== undefined) data.first_name = input.first_name;
+  if (input.last_name !== undefined) data.last_name = input.last_name;
+
+  if ((input.first_name === undefined || input.last_name === undefined) && input.name !== undefined) {
+    const parts = input.name.trim().split(/\s+/);
+    if (parts.length > 0) {
+      data.first_name = parts[0];
+      if (parts.length > 1) {
+        data.last_name = parts.slice(1).join(' ');
+      }
+    }
+  }
+
+  if (input.phone !== undefined) data.phone = input.phone;
+  if (input.location !== undefined) data.location = input.location;
+  if (input.bio !== undefined) data.bio = input.bio;
+  if (input.image !== undefined) data.image = input.image;
+
+  if (Object.keys(data).length === 0) {
+    return getProfile(userId);
+  }
+
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { first_name: input.name },
-    select: { id: true, email: true, first_name: true, last_name: true, createdAt: true },
+    data,
+    select: {
+      id: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      phone: true,
+      image: true,
+      location: true,
+      bio: true,
+      role: true,
+      preferredLanguage: true,
+      emailVerified: true,
+      isVerified: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
+
   return user;
 }
 

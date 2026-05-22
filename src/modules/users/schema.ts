@@ -3,7 +3,12 @@ import { z } from 'zod';
 export const updateProfileSchema = z.object({
   body: z.object({
     name: z.string().min(1).optional(),
-    // role: z.enum(['USER', 'ADMIN']).optional(), // when you add roles
+    first_name: z.string().min(1).optional(),
+    last_name: z.string().min(1).optional(),
+    phone: z.string().min(6).optional(),
+    location: z.string().optional(),
+    bio: z.string().optional(),
+    image: z.string().url().optional(),
   }),
 });
 
