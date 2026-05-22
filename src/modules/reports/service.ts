@@ -146,6 +146,7 @@ export async function createReport(
     targetId: string;
     category: string;
     description: string;
+    images?: string[];
   }
 ) {
   if (input.targetType === 'property') {
@@ -199,6 +200,7 @@ export async function createReport(
       category: input.category,
       description: input.description,
       status: 'open',
+      images: input.images ?? [],
     },
   });
 
