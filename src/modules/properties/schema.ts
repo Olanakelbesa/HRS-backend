@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const PROPERTY_STATUS_VALUES = ['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE'] as const;
+const PROPERTY_STATUS_VALUES = ['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE', 'RESTRICTED'] as const;
 
 export const PropertyStatusEnum = z
   .string()
