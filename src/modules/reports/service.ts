@@ -86,6 +86,59 @@ export async function getOwnerReportById(ownerId: string, reportId: string) {
   return report;
 }
 
+async function hasAppointmentOrConversationWithProperty(
+  reporterId: string,
+  propertyId: string,
+  ownerId: string
+) {
+  const hasAppointment = await prisma.appointment.findFirst({
+    where: {
+      propertyId,
+      renterId: reporterId,
+      ownerId,
+      status: { in: ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED'] },
+    },
+  });
+
+  const hasConversation = await prisma.conversation.findFirst({
+    where: {
+      propertyId,
+      renterId: reporterId,
+      ownerId,
+      messages: { some: {} },
+    },
+  });
+
+  return Boolean(hasAppointment || hasConversation);
+}
+
+async function hasAppointmentOrConversationWithUser(
+  reporterId: string,
+  userId: string
+) {
+  if (reporterId === userId) {
+    return false;
+  }
+
+  const hasAppointment = await prisma.appointment.findFirst({
+    where: {
+      renterId: reporterId,
+      ownerId: userId,
+      status: { in: ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED'] },
+    },
+  });
+
+  const hasConversation = await prisma.conversation.findFirst({
+    where: {
+      renterId: reporterId,
+      ownerId: userId,
+      messages: { some: {} },
+    },
+  });
+
+  return Boolean(hasAppointment || hasConversation);
+}
+
 export async function createReport(
   reporterId: string,
   input: {
@@ -98,11 +151,23 @@ export async function createReport(
   if (input.targetType === 'property') {
     const property = await prisma.property.findUnique({
       where: { id: input.targetId },
-      select: { id: true },
+      select: { id: true, ownerId: true },
     });
 
     if (!property) {
       throw new Error('Property not found');
+    }
+
+    const authorized = await hasAppointmentOrConversationWithProperty(
+      reporterId,
+      input.targetId,
+      property.ownerId
+    );
+
+    if (!authorized) {
+      throw new Error(
+        'You can only report properties that you have booked an appointment for or started a conversation about.'
+      );
     }
   } else {
     const user = await prisma.user.findUnique({
@@ -112,6 +177,17 @@ export async function createReport(
 
     if (!user) {
       throw new Error('User not found');
+    }
+
+    const authorized = await hasAppointmentOrConversationWithUser(
+      reporterId,
+      input.targetId
+    );
+
+    if (!authorized) {
+      throw new Error(
+        'You can only report users that you have booked an appointment with or started a conversation with.'
+      );
     }
   }
 
