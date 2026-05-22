@@ -18,6 +18,11 @@ export const listAgreementsQuerySchema = z.object({
   status: agreementStatusFilter.optional(),
 });
 
+export const listOwnerAgreementsQuerySchema = z.object({
+  search: z.string().optional(),
+  status: agreementStatusFilter.optional(),
+});
+
 export const createOwnerAgreementSchema = z
   .object({
     propertyId: z.string().min(1),
@@ -67,3 +72,4 @@ export const rejectAgreementSchema = z.object({
 
 export type CreateOwnerAgreementInput = z.infer<typeof createOwnerAgreementSchema>;
 export type ListAgreementsQuery = z.infer<typeof listAgreementsQuerySchema>;
+export type ListOwnerAgreementsQuery = z.infer<typeof listOwnerAgreementsQuerySchema>;

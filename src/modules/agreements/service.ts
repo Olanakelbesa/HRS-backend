@@ -7,7 +7,7 @@ import { enrichAgreement, BLOCKING_AGREEMENT_STATUSES } from '../../lib/agreemen
 import { buildChapaUrls, initializeTransaction } from '../../integrations/chapa/client';
 import { finalizeSecurityDeposit } from './deposit';
 import { agreementListSelect, agreementDetailSelect } from '../../lib/prismaSelects';
-import type { CreateOwnerAgreementInput, ListAgreementsQuery } from './schema';
+import type { CreateOwnerAgreementInput, ListAgreementsQuery, ListOwnerAgreementsQuery } from './schema';
 
 type ListQuery = ListAgreementsQuery;
 
@@ -116,7 +116,7 @@ function mapAgreementResponse<T extends { status: AgreementStatus }>(row: T) {
   return enrichAgreement(row);
 }
 
-export async function listOwnerAgreements(ownerId: string, query: ListQuery) {
+export async function listOwnerAgreements(ownerId: string, query: ListOwnerAgreementsQuery) {
   await checkOwnerVerification(ownerId);
 
   const where: Prisma.AgreementWhereInput = { ownerId };
@@ -134,15 +134,13 @@ export async function listOwnerAgreements(ownerId: string, query: ListQuery) {
       where,
       select: agreementListSelect,
       orderBy: { createdAt: 'desc' },
-      skip: (query.page - 1) * query.limit,
-      take: query.limit,
     }),
     prisma.agreement.count({ where }),
   ]);
 
   return {
     items: items.map(mapAgreementResponse),
-    meta: { page: query.page, limit: query.limit, total },
+    meta: { total },
   };
 }
 
@@ -584,12 +582,12 @@ export async function getDepositStatus(agreementId: string, renterId: string) {
     ...mapAgreementResponse(agreement),
     payment: payment
       ? {
-          id: payment.id,
-          status: payment.status,
-          chapaTxRef: payment.chapaTxRef,
-          amountEtb: payment.amountEtb,
-          paidAt: payment.paidAt,
-        }
+        id: payment.id,
+        status: payment.status,
+        chapaTxRef: payment.chapaTxRef,
+        amountEtb: payment.amountEtb,
+        paidAt: payment.paidAt,
+      }
       : null,
   };
 }

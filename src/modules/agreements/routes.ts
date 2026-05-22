@@ -8,6 +8,7 @@ import * as appointmentController from '../appointments/controller';
 import { listAppointmentsQuerySchema } from '../appointments/schema';
 import {
   listAgreementsQuerySchema,
+  listOwnerAgreementsQuerySchema,
   createOwnerAgreementSchema,
   updateDraftAgreementSchema,
   sendAgreementSchema,
@@ -21,7 +22,7 @@ router.get(
   '/owner/agreements',
   requireAuth,
   restrictTo('owner', 'admin'),
-  validate(listAgreementsQuerySchema, 'query'),
+  validate(listOwnerAgreementsQuerySchema, 'query'),
   agreementController.listOwnerAgreements
 );
 

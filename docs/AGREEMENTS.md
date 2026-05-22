@@ -48,4 +48,3 @@ APP_BASE_URL=http://localhost:5000
 FRONTEND_URL=http://localhost:5173
 ```
 
-Stripe checkout for deposits has been removed.
