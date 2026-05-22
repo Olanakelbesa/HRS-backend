@@ -2,6 +2,13 @@ import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 import type { UpdateProfileInput } from './schema';
 import bcrypt from 'bcryptjs';
+import reviewService from '../review-rate/service';
+import { propertyService } from '../properties/service';
+
+function formatDateToIsoDate(value: Date) {
+  return value.toISOString().substring(0, 10);
+}
+
 
 export async function getProfile(userId: string) {
   const user = await prisma.user.findUnique({
@@ -25,6 +32,74 @@ export async function getProfile(userId: string) {
   });
   if (!user) throw new AppError('User not found', 404);
   return user;
+}
+
+export async function getOwnerProfile(ownerId: string) {
+  const owner = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: {
+      id: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      phone: true,
+      image: true,
+      location: true,
+      bio: true,
+      role: true,
+      isVerified: true,
+      verificationState: true,
+      preferredLanguage: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!owner || owner.role !== 'owner') {
+    throw new AppError('Owner not found', 404);
+  }
+
+  const listingsRaw = await propertyService.getMyProperties(ownerId);
+  const listings = listingsRaw.map((property: any) => ({
+    id: property.id,
+    title: property.title?.en || property.title?.am || '',
+    location: property.address?.en || property.address?.am || '',
+    price: property.price?.value ?? 0,
+    image: Array.isArray(property.images) && property.images.length > 0 ? property.images[0] : '',
+  }));
+
+  const reviewStats = await reviewService.getOwnerReviewStats(ownerId);
+  const ownerReviews = await reviewService.getOwnerReviews(ownerId, { limit: 10, sort: 'newest' });
+
+  const reviews = ownerReviews.reviews.map((review: any) => ({
+    id: review.reviewId,
+    reviewerName: review.reviewerName,
+    date: formatDateToIsoDate(new Date(review.createdAt)),
+    rating: review.rating,
+    comment: review.comment,
+  }));
+
+  return {
+    owner: {
+      id: owner.id,
+      name: `${owner.first_name ?? ''} ${owner.last_name ?? ''}`.trim(),
+      avatar: owner.image || '',
+      role: owner.role?.toUpperCase() || 'OWNER',
+      location: owner.location || '',
+      joinedDate: formatDateToIsoDate(owner.createdAt),
+      verification: {
+        idVerified: owner.verificationState === 'verified',
+        phoneVerified: Boolean(owner.phone),
+      },
+      propertiesManaged: listings.length,
+      rating: {
+        average: reviewStats.averageRating,
+        reviewCount: reviewStats.totalReviews,
+      },
+    },
+    listings,
+    reviews,
+  };
 }
 
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
