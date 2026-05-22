@@ -28,11 +28,30 @@ export const submitOwnerResponseSchema = z.object({
 
 export type SubmitOwnerResponseInput = z.infer<typeof submitOwnerResponseSchema>;
 
+const parseStringArray = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined;
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith('[')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return [trimmed];
+      }
+    }
+    return [trimmed];
+  }
+  return undefined;
+}, z.array(z.string().min(1)).optional());
+
 export const submitReportSchema = z.object({
   targetType: z.enum(['property', 'user']),
   targetId: z.string().min(1, 'targetId is required'),
   category: z.string().min(3, 'Category must be at least 3 characters').max(100),
   description: z.string().min(10, 'Description must be at least 10 characters').max(2000),
+  images: parseStringArray,
 });
 
 export type SubmitReportInput = z.infer<typeof submitReportSchema>;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, restrictTo } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate';
+import { memoryUpload } from '../../middlewares/multer.middleware';
 import {
   getOwnerReportsQuerySchema,
   reportIdParamSchema,
@@ -73,6 +74,7 @@ router.post(
   '/',
   requireAuth,
   restrictTo('renter'),
+  memoryUpload.array('images', 10),
   validate(submitReportSchema, 'body'),
   submitReport
 );
@@ -88,6 +90,30 @@ router.post(
  *     requestBody:
  *       required: true
  *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [targetType, targetId, category, description]
+ *             properties:
+ *               targetType:
+ *                 type: string
+ *                 enum: [property, user]
+ *                 example: property
+ *               targetId:
+ *                 type: string
+ *                 example: "cku123abc"
+ *               category:
+ *                 type: string
+ *                 example: "Noise complaint"
+ *               description:
+ *                 type: string
+ *                 example: "The tenant is creating loud noise every evening and the owner has not responded."
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Optional image files to upload.
  *         application/json:
  *           schema:
  *             type: object
@@ -106,9 +132,55 @@ router.post(
  *               description:
  *                 type: string
  *                 example: "The tenant is creating loud noise every evening and the owner has not responded."
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["https://example.com/image.jpg"]
+ *                 description: Optional list of pre-uploaded image URLs.
  *     responses:
  *       201:
  *         description: Report submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     report:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         reportedById:
+ *                           type: string
+ *                         targetType:
+ *                           type: string
+ *                         targetId:
+ *                           type: string
+ *                         category:
+ *                           type: string
+ *                         description:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         images:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                         ownerResponse:
+ *                           type: string
+ *                         respondedAt:
+ *                           type: string
+ *                         createdAt:
+ *                           type: string
+ *                         updatedAt:
+ *                           type: string
  *       400:
  *         description: Validation failed
  *       401:
@@ -138,6 +210,46 @@ router.get(
  *     responses:
  *       200:
  *         description: Report fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     report:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         reportedById:
+ *                           type: string
+ *                         targetType:
+ *                           type: string
+ *                         targetId:
+ *                           type: string
+ *                         category:
+ *                           type: string
+ *                         description:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         images:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                         ownerResponse:
+ *                           type: string
+ *                         respondedAt:
+ *                           type: string
+ *                         createdAt:
+ *                           type: string
+ *                         updatedAt:
+ *                           type: string
  *       404:
  *         description: Report not found
  *       401:

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../../types/request';
+import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
 import * as service from './service';
 import {
   getOwnerReportsQuerySchema,
@@ -54,7 +55,27 @@ export async function submitReport(req: Request, res: Response) {
   try {
     const auth = req as AuthenticatedRequest;
     const body = submitReportSchema.parse(req.body);
-    const report = await service.createReport(auth.userId, body);
+    const files = req.files as Express.Multer.File[] | undefined;
+    const images = Array.isArray(files)
+      ? files
+      : (req.files as {
+          images?: Express.Multer.File[];
+        })?.images;
+
+    const uploadedImageUrls = await Promise.all(
+      (images || []).map(async (file, index) => {
+        if (!file?.buffer) {
+          console.error(`[submitReport] Image ${index} missing buffer`);
+          return null;
+        }
+        return uploadToCloudinary(file.buffer, 'reports/images', 'image');
+      })
+    ).then((results) => results.filter((url): url is string => url !== null));
+
+    const report = await service.createReport(auth.userId, {
+      ...body,
+      images: uploadedImageUrls.length > 0 ? uploadedImageUrls : body.images || [],
+    });
 
     return res.status(201).json({ status: 'success', data: report });
   } catch (err) {
