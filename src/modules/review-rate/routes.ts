@@ -16,7 +16,7 @@ const router = Router();
 
 /**
  * @swagger
- * /reviews:
+ * /api/v1/reviews:
  *   post:
  *     summary: Create a new review
  *     tags: [Reviews]
@@ -59,7 +59,7 @@ router.post(
 
 /**
  * @swagger
- * /reviews/property/{propertyId}:
+ * /api/v1/reviews/property/{propertyId}:
  *   get:
  *     summary: Get all reviews for a property
  *     tags: [Reviews]
@@ -77,7 +77,7 @@ router.get("/property/:propertyId", reviewController.getPropertyReviews);
 
 /**
  * @swagger
- * /reviews/me:
+ * /api/v1/reviews/me:
  *   get:
  *     summary: Get logged-in user's reviews
  *     tags: [Reviews]
@@ -93,7 +93,7 @@ router.get("/me", requireAuth, reviewController.getMyReviews);
 
 /**
  * @swagger
- * /reviews/{reviewId}:
+ * /api/v1/reviews/{reviewId}:
  *   patch:
  *     summary: Update a review
  *     tags: [Reviews]
@@ -133,7 +133,7 @@ router.patch(
 );
 /**
  * @swagger
- * /reviews/{reviewId}:
+ * /api/v1/reviews/{reviewId}:
  *   delete:
  *     summary: Delete a review
  *     tags: [Reviews]
@@ -155,7 +155,7 @@ router.delete("/:reviewId", requireAuth, reviewController.remove);
 
 /**
  * @swagger
- * /reviews/property/{propertyId}/stats:
+ * /api/v1/reviews/property/{propertyId}/stats:
  *   get:
  *     summary: Get review statistics for a property
  *     tags: [Reviews]
@@ -176,7 +176,7 @@ router.get(
 
 /**
  * @swagger
- * /reviews/owner:
+ * /api/v1/reviews/owner:
  *   get:
  *     summary: Get all reviews for properties owned by the logged-in user
  *     tags: [Reviews]
@@ -214,7 +214,7 @@ router.get("/owner", requireAuth, reviewController.getOwnerReviews);
 
 /**
  * @swagger
- * /reviews/owner/stats:
+ * /api/v1/reviews/owner/stats:
  *   get:
  *     summary: Get aggregated review stats for all properties owned by the logged-in user
  *     tags: [Reviews]
@@ -230,7 +230,7 @@ router.get("/owner/stats", requireAuth, reviewController.getOwnerStats);
 
 /**
  * @swagger
- * /reviews/{reviewId}/reply:
+ * /api/v1/reviews/{reviewId}/reply:
  *   patch:
  *     summary: Reply to a review (property owner only)
  *     tags: [Reviews]
