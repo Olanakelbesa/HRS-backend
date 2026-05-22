@@ -143,6 +143,14 @@ export async function deleteMessage(req: Request, res: Response) {
   return res.status(200).json({ status: 'success', data: result });
 }
 
+export async function deleteConversation(req: Request, res: Response) {
+  const userId = (req as AuthenticatedRequest).userId;
+  const conversationId = String(req.params.id);
+
+  const result = await messagingService.deleteConversation(conversationId, userId);
+  return res.status(200).json({ status: 'success', data: result });
+}
+
 export async function markRead(req: Request, res: Response) {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = String(req.params.id);

@@ -173,6 +173,7 @@ model Conversation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   @@index([renterId])
   @@index([ownerId])
