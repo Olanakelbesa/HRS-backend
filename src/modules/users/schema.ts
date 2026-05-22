@@ -33,6 +33,15 @@ export const updateUserRoleSchema = z.object({
 });
 
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
+
+export const getUserByIdSchema = z.object({
+  params: z.object({
+    id: z.string().cuid(),
+  }),
+});
+
+export type GetUserByIdInput = z.infer<typeof getUserByIdSchema>;
+
 export const updateUserStatusSchema = z.object({
   params: z.object({
     id: z.string().cuid(),
