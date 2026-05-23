@@ -1,5 +1,5 @@
 import prisma from '../../config/database';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, Report, ReportTargetType } from '@prisma/client';
 import type {
   AdminUpdatePropertyBodyInput,
   ApprovePropertyInput,
@@ -975,6 +975,400 @@ export async function getReportById(id: string) {
   return await prisma.report.findUnique({
     where: { id },
     include: { reportedBy: { select: { id: true, first_name: true, last_name: true } } },
+  });
+}
+
+// --- Risk assessment (admin investigations) ---
+
+export const RISK_ASSESSMENT_VERSION = 1 as const;
+
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+export interface RiskFactor {
+  code: string;
+  label: string;
+  weight: number;
+}
+
+export interface ReportsAgainstSubjectBreakdown {
+  open: number;
+  in_review: number;
+  resolved: number;
+  dismissed: number;
+}
+
+export interface RiskAssessmentSubject {
+  type: 'user' | 'property' | 'agreement';
+  userIds: string[];
+  propertyId?: string;
+  agreementId?: string;
+}
+
+export interface RiskAssessment {
+  version: typeof RISK_ASSESSMENT_VERSION;
+  computedAt: string;
+  level: RiskLevel;
+  score: number;
+  factors: RiskFactor[];
+  previousReportsCount: number;
+  reportsAgainstSubject: ReportsAgainstSubjectBreakdown;
+  subject: RiskAssessmentSubject;
+}
+
+const RISK_LEVEL_THRESHOLDS = { medium: 34, high: 67 } as const;
+
+async function riskGetOwnerPropertyIds(ownerId: string): Promise<string[]> {
+  const rows = await prisma.property.findMany({
+    where: { ownerId, isDeleted: false },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
+function riskBuildReportsWhereAgainstUser(userId: string, propertyIds: string[]) {
+  return {
+    OR: [
+      { targetType: 'user' as const, targetId: userId },
+      ...(propertyIds.length > 0
+        ? [{ targetType: 'property' as const, targetId: { in: propertyIds } }]
+        : []),
+    ],
+  };
+}
+
+function riskScoreToLevel(score: number): RiskLevel {
+  if (score >= RISK_LEVEL_THRESHOLDS.high) return 'high';
+  if (score >= RISK_LEVEL_THRESHOLDS.medium) return 'medium';
+  return 'low';
+}
+
+function riskMergeFactors(factorLists: RiskFactor[][]): RiskFactor[] {
+  const byCode = new Map<string, RiskFactor>();
+  for (const factors of factorLists) {
+    for (const factor of factors) {
+      const existing = byCode.get(factor.code);
+      if (!existing || factor.weight > existing.weight) {
+        byCode.set(factor.code, factor);
+      }
+    }
+  }
+  return Array.from(byCode.values()).sort((a, b) => b.weight - a.weight);
+}
+
+function riskSumFactorWeights(factors: RiskFactor[]): number {
+  return Math.min(100, factors.reduce((sum, f) => sum + f.weight, 0));
+}
+
+async function riskCountReportsByStatus(
+  where: Record<string, unknown>,
+  excludeReportId?: string
+): Promise<ReportsAgainstSubjectBreakdown> {
+  const baseWhere = excludeReportId ? { ...where, NOT: { id: excludeReportId } } : where;
+
+  const [open, in_review, resolved, dismissed] = await Promise.all([
+    prisma.report.count({ where: { ...baseWhere, status: 'open' } }),
+    prisma.report.count({ where: { ...baseWhere, status: 'in_review' } }),
+    prisma.report.count({ where: { ...baseWhere, status: 'resolved' } }),
+    prisma.report.count({ where: { ...baseWhere, status: 'dismissed' } }),
+  ]);
+
+  return { open, in_review, resolved, dismissed };
+}
+
+interface RiskAssessUserContext {
+  excludeReportId?: string;
+  propertyVerified?: boolean;
+  agreementId?: string;
+  reporterId?: string;
+  includeAgreementReports?: boolean;
+}
+
+async function riskAssessUser(
+  userId: string,
+  ctx: RiskAssessUserContext = {}
+): Promise<{ factors: RiskFactor[]; breakdown: ReportsAgainstSubjectBreakdown }> {
+  const propertyIds = await riskGetOwnerPropertyIds(userId);
+  const userWhere = riskBuildReportsWhereAgainstUser(userId, propertyIds);
+
+  const reportWhere =
+    ctx.includeAgreementReports && ctx.agreementId
+      ? {
+          OR: [
+            userWhere,
+            { targetType: 'agreement' as const, targetId: ctx.agreementId },
+          ],
+        }
+      : userWhere;
+
+  const breakdown = await riskCountReportsByStatus(reportWhere, ctx.excludeReportId);
+  const unresolved = breakdown.open + breakdown.in_review;
+
+  const factors: RiskFactor[] = [];
+
+  if (unresolved > 0) {
+    const weight = Math.min(40, 10 + unresolved * 6);
+    factors.push({
+      code: 'UNRESOLVED_REPORTS',
+      label:
+        unresolved === 1
+          ? '1 unresolved report against this account'
+          : `${unresolved} unresolved reports against this account`,
+      weight,
+    });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { status: true, verificationState: true, isVerified: true },
+  });
+
+  if (user) {
+    if (user.status === 'suspended') {
+      factors.push({
+        code: 'SUBJECT_SUSPENDED',
+        label: 'Account is suspended',
+        weight: 30,
+      });
+    }
+
+    if (user.verificationState === 'rejected') {
+      factors.push({
+        code: 'VERIFICATION_REJECTED',
+        label: 'ID verification was rejected',
+        weight: 25,
+      });
+    } else if (user.verificationState !== 'verified' || !user.isVerified) {
+      factors.push({
+        code: 'SUBJECT_UNVERIFIED',
+        label: 'Account is not ID verified',
+        weight: 20,
+      });
+    }
+  }
+
+  const fraudWhere = {
+    ...reportWhere,
+    category: { contains: 'fraud', mode: 'insensitive' as const },
+    ...(ctx.excludeReportId ? { NOT: { id: ctx.excludeReportId } } : {}),
+  };
+
+  const fraudReportCount = await prisma.report.count({ where: fraudWhere });
+  if (fraudReportCount >= 2) {
+    factors.push({
+      code: 'MULTIPLE_FRAUD_REPORTS',
+      label: `${fraudReportCount} fraud-related reports on record`,
+      weight: 20,
+    });
+  }
+
+  if (ctx.propertyVerified === false) {
+    factors.push({
+      code: 'PROPERTY_UNVERIFIED',
+      label: 'Linked property listing is not verified',
+      weight: 15,
+    });
+  }
+
+  if (ctx.agreementId) {
+    const failedPayments = await prisma.payment.count({
+      where: { agreementId: ctx.agreementId, status: 'failed' },
+    });
+    if (failedPayments > 0) {
+      factors.push({
+        code: 'FAILED_AGREEMENT_PAYMENTS',
+        label:
+          failedPayments === 1
+            ? '1 failed payment on this agreement'
+            : `${failedPayments} failed payments on this agreement`,
+        weight: 20,
+      });
+    }
+  }
+
+  if (ctx.reporterId) {
+    const since = new Date();
+    since.setDate(since.getDate() - 90);
+
+    const reporterReportCount = await prisma.report.count({
+      where: {
+        reportedById: ctx.reporterId,
+        createdAt: { gte: since },
+        ...(ctx.excludeReportId ? { NOT: { id: ctx.excludeReportId } } : {}),
+      },
+    });
+
+    if (reporterReportCount >= 3) {
+      factors.push({
+        code: 'REPEAT_REPORTER',
+        label: 'Reporter has filed multiple reports recently',
+        weight: 15,
+      });
+    }
+  }
+
+  return { factors, breakdown };
+}
+
+function riskMergeBreakdowns(
+  breakdowns: ReportsAgainstSubjectBreakdown[]
+): ReportsAgainstSubjectBreakdown {
+  return breakdowns.reduce(
+    (acc, b) => ({
+      open: acc.open + b.open,
+      in_review: acc.in_review + b.in_review,
+      resolved: acc.resolved + b.resolved,
+      dismissed: acc.dismissed + b.dismissed,
+    }),
+    { open: 0, in_review: 0, resolved: 0, dismissed: 0 }
+  );
+}
+
+async function riskBuildAssessment(
+  subject: RiskAssessmentSubject,
+  userIds: string[],
+  ctx: RiskAssessUserContext & { propertyVerified?: boolean }
+): Promise<RiskAssessment> {
+  const perUser = await Promise.all(
+    userIds.map((userId, index) =>
+      riskAssessUser(userId, {
+        ...ctx,
+        propertyVerified:
+          ctx.propertyVerified === false && (userIds.length === 1 || index === 0)
+            ? false
+            : undefined,
+        includeAgreementReports: Boolean(ctx.agreementId),
+      })
+    )
+  );
+
+  const factors = riskMergeFactors(perUser.map((r) => r.factors));
+  const score = riskSumFactorWeights(factors);
+  const breakdown = riskMergeBreakdowns(perUser.map((r) => r.breakdown));
+  const unresolved = breakdown.open + breakdown.in_review;
+
+  return {
+    version: RISK_ASSESSMENT_VERSION,
+    computedAt: new Date().toISOString(),
+    level: riskScoreToLevel(score),
+    score,
+    factors,
+    previousReportsCount: unresolved,
+    reportsAgainstSubject: breakdown,
+    subject,
+  };
+}
+
+async function riskResolveReportSubject(report: Report): Promise<{
+  subject: RiskAssessmentSubject;
+  userIds: string[];
+  propertyVerified?: boolean;
+} | null> {
+  const targetType = report.targetType as ReportTargetType;
+
+  switch (targetType) {
+    case 'user':
+      return {
+        subject: { type: 'user', userIds: [report.targetId] },
+        userIds: [report.targetId],
+      };
+
+    case 'property': {
+      const property = await prisma.property.findUnique({
+        where: { id: report.targetId },
+        select: { id: true, ownerId: true, isVerified: true },
+      });
+      if (!property) return null;
+      return {
+        subject: {
+          type: 'property',
+          userIds: [property.ownerId],
+          propertyId: property.id,
+        },
+        userIds: [property.ownerId],
+        propertyVerified: property.isVerified,
+      };
+    }
+
+    case 'agreement': {
+      const agreement = await prisma.agreement.findUnique({
+        where: { id: report.targetId },
+        select: { id: true, ownerId: true, renterId: true, propertyId: true },
+      });
+      if (!agreement) return null;
+
+      const property = await prisma.property.findUnique({
+        where: { id: agreement.propertyId },
+        select: { isVerified: true },
+      });
+
+      return {
+        subject: {
+          type: 'agreement',
+          userIds: [agreement.ownerId, agreement.renterId],
+          propertyId: agreement.propertyId,
+          agreementId: agreement.id,
+        },
+        userIds: [agreement.ownerId, agreement.renterId],
+        propertyVerified: property?.isVerified,
+      };
+    }
+
+    default: {
+      const user = await prisma.user.findUnique({
+        where: { id: report.targetId },
+        select: { id: true },
+      });
+      if (!user) return null;
+      return {
+        subject: { type: 'user', userIds: [user.id] },
+        userIds: [user.id],
+      };
+    }
+  }
+}
+
+export async function getReportRiskAssessment(
+  reportId: string
+): Promise<RiskAssessment | null> {
+  const report = await prisma.report.findUnique({ where: { id: reportId } });
+  if (!report) return null;
+
+  const resolved = await riskResolveReportSubject(report);
+  if (!resolved) return null;
+
+  return riskBuildAssessment(resolved.subject, resolved.userIds, {
+    excludeReportId: report.id,
+    propertyVerified: resolved.propertyVerified,
+    agreementId: resolved.subject.agreementId,
+    reporterId: report.reportedById,
+  });
+}
+
+export async function getAgreementRiskAssessment(
+  agreementId: string
+): Promise<RiskAssessment | null> {
+  const agreement = await prisma.agreement.findUnique({
+    where: { id: agreementId },
+    select: { id: true, ownerId: true, renterId: true, propertyId: true },
+  });
+
+  if (!agreement) return null;
+
+  const property = await prisma.property.findUnique({
+    where: { id: agreement.propertyId },
+    select: { isVerified: true },
+  });
+
+  const subject: RiskAssessmentSubject = {
+    type: 'agreement',
+    userIds: [agreement.ownerId, agreement.renterId],
+    propertyId: agreement.propertyId,
+    agreementId: agreement.id,
+  };
+
+  return riskBuildAssessment(subject, [agreement.ownerId, agreement.renterId], {
+    propertyVerified: property?.isVerified,
+    agreementId: agreement.id,
   });
 }
 

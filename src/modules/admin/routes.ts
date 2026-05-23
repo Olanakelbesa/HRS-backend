@@ -701,6 +701,28 @@ router.get('/agreements/:id', controller.agreementGet);
 
 /**
  * @swagger
+ * /api/v1/admin/agreements/{id}/risk-assessment:
+ *   get:
+ *     summary: Risk assessment for an agreement investigation
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Risk assessment computed for agreement parties
+ *       404:
+ *         description: Agreement not found
+ */
+router.get('/agreements/:id/risk-assessment', controller.agreementRiskAssessment);
+
+/**
+ * @swagger
  * /api/v1/admin/agreements/{id}/status:
  *   patch:
  *     summary: Update lifecycle status of an agreement
@@ -862,6 +884,28 @@ router.patch('/properties/:id/reject', controller.propertyReject);
  *         description: Report details
  */
 router.get('/reports/:id', controller.reportGet);
+
+/**
+ * @swagger
+ * /api/v1/admin/reports/{id}/risk-assessment:
+ *   get:
+ *     summary: Risk assessment for a report investigation
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Risk assessment for the report subject
+ *       404:
+ *         description: Report not found
+ */
+router.get('/reports/:id/risk-assessment', controller.reportRiskAssessment);
 
 // Notifications & Broadcasts
 /**
