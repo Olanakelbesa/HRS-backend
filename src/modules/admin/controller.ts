@@ -229,6 +229,24 @@ export async function reportGet(req: Request, res: Response) {
   return res.status(200).json({ status: 'success', data });
 }
 
+export async function reportRiskAssessment(req: Request, res: Response) {
+  const params = paramIdSchema.parse(req.params);
+  const data = await adminService.getReportRiskAssessment(params.id);
+  if (!data) {
+    return res.status(404).json({ status: 'error', message: 'Report not found' });
+  }
+  return res.status(200).json({ status: 'success', data });
+}
+
+export async function agreementRiskAssessment(req: Request, res: Response) {
+  const params = paramIdSchema.parse(req.params);
+  const data = await adminService.getAgreementRiskAssessment(params.id);
+  if (!data) {
+    return res.status(404).json({ status: 'error', message: 'Agreement not found' });
+  }
+  return res.status(200).json({ status: 'success', data });
+}
+
 export async function notificationsList(req: Request, res: Response) {
   const query = paginationQuerySchema.parse(req.query);
   const data = await adminService.getNotifications(query);
