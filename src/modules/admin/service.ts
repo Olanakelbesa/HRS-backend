@@ -868,6 +868,129 @@ export async function getAgreementById(id: string) {
   return prisma.agreement.findUnique({ where: { id } });
 }
 
+export interface AgreementPaymentSummary {
+  agreementId: string;
+  currency: string;
+  monthlyRent: number;
+  depositAmountEtb: number | null;
+  agreementStatus: string;
+  paymentCount: number;
+  byStatus: Record<string, { count: number; amount: number }>;
+  totalPaid: number;
+  totalOutstanding: number;
+  hasFailedPayments: boolean;
+  lastPayment: {
+    id: string;
+    status: string;
+    amount: number;
+    purpose: string;
+    provider: string;
+    createdAt: Date;
+    paidAt: Date | null;
+  } | null;
+}
+
+export async function getAgreementPaymentSummary(
+  agreementId: string
+): Promise<AgreementPaymentSummary | null> {
+  const agreement = await prisma.agreement.findUnique({
+    where: { id: agreementId },
+    select: {
+      id: true,
+      currency: true,
+      monthlyRent: true,
+      depositAmountEtb: true,
+      status: true,
+    },
+  });
+  if (!agreement) return null;
+
+  const [statusGroups, paymentCount, lastPayment] = await Promise.all([
+    prisma.payment.groupBy({
+      by: ['status'],
+      where: { agreementId },
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+    prisma.payment.count({ where: { agreementId } }),
+    prisma.payment.findFirst({
+      where: { agreementId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        amount: true,
+        purpose: true,
+        provider: true,
+        createdAt: true,
+        paidAt: true,
+      },
+    }),
+  ]);
+
+  const byStatus: AgreementPaymentSummary['byStatus'] = {};
+  let totalPaid = 0;
+  let totalOutstanding = 0;
+  let hasFailedPayments = false;
+
+  for (const row of statusGroups) {
+    const amount = row._sum.amount ?? 0;
+    byStatus[row.status] = { count: row._count._all, amount };
+    if (row.status === 'success') totalPaid += amount;
+    if (row.status === 'pending' || row.status === 'processing') totalOutstanding += amount;
+    if (row.status === 'failed') hasFailedPayments = row._count._all > 0;
+  }
+
+  return {
+    agreementId: agreement.id,
+    currency: agreement.currency,
+    monthlyRent: agreement.monthlyRent,
+    depositAmountEtb: agreement.depositAmountEtb,
+    agreementStatus: agreement.status,
+    paymentCount,
+    byStatus,
+    totalPaid,
+    totalOutstanding,
+    hasFailedPayments,
+    lastPayment,
+  };
+}
+
+export async function listAgreementPaymentsAdmin(agreementId: string) {
+  const agreement = await prisma.agreement.findUnique({
+    where: { id: agreementId },
+    select: { id: true },
+  });
+  if (!agreement) return null;
+
+  return prisma.payment.findMany({
+    where: { agreementId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function getPaymentProofAdmin(paymentId: string) {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: {
+      id: true,
+      proofUrl: true,
+      agreementId: true,
+      provider: true,
+      status: true,
+    },
+  });
+  if (!payment) return null;
+
+  return {
+    paymentId: payment.id,
+    agreementId: payment.agreementId,
+    provider: payment.provider,
+    status: payment.status,
+    proofUrl: payment.proofUrl,
+  };
+}
+
 export async function createAgreement(adminId: string, data: any) {
   const agreement = await prisma.agreement.create({ data });
   await prisma.auditLog.create({
