@@ -1,14 +1,10 @@
+import { PropertyStatus } from '@prisma/client';
 import { z } from 'zod';
 
-const PROPERTY_STATUS_VALUES = ['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE'] as const;
-
-export const PropertyStatusEnum = z
-  .string()
-  .transform((val) => val.toUpperCase())
-  .refine((val): val is (typeof PROPERTY_STATUS_VALUES)[number] =>
-    PROPERTY_STATUS_VALUES.includes(val as (typeof PROPERTY_STATUS_VALUES)[number]),
-    { message: 'Invalid status' }
-  );
+export const PropertyStatusEnum = z.preprocess(
+  (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+  z.nativeEnum(PropertyStatus)
+);
 
 export const SupportedLanguageEnum = z.enum(['en', 'am']);
 export const SortByEnum = z.enum(['createdAt', 'price', 'viewsCount']);

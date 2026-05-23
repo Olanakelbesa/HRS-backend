@@ -34,7 +34,7 @@ export const getAuditLogsQuerySchema = paginationQuerySchema.extend({
 });
 
 const PropertyTypeEnum = z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE']);
-const PropertyStatusEnum = z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE']);
+const PropertyStatusEnum = z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE', 'RESTRICTED']);
 
 const MultiLangTextSchema = z.object({
   en: z.string().min(1),
@@ -76,7 +76,7 @@ export const getUsersQuerySchema = paginationQuerySchema.extend({
 });
 
 export const getAdminPropertiesQuerySchema = paginationQuerySchema.extend({
-  status: z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE', 'MAINTENANCE']).optional(),
+  status: z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE', 'MAINTENANCE', 'RESTRICTED']).optional(),
 });
 
 export const paramIdSchema = z.object({
