@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { propertyService } from './service';
 import { CreatePropertyInput } from './schema';
-import { GetPropertiesQueryInput } from './schema';
+import { GetPropertiesQueryInput, GetNearbyPropertiesQueryInput, GetSimilarPropertiesQueryInput } from './schema';
 import { UpdatePropertyInput } from './schema';
 import { UpdatePropertyStatusInput } from './schema';
 import { AddPropertyTranslationInput } from './schema';
@@ -129,6 +129,67 @@ export const getPropertiesController = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Get properties error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const getNearbyPropertiesController = async (req: Request, res: Response) => {
+  try {
+    const query = req.query as unknown as GetNearbyPropertiesQueryInput;
+    const language = resolveLanguage(req);
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 12;
+    const radius = Number(query.radius) || 10;
+    const status = query.status;
+    const category = query.category;
+
+    const result = await propertyService.getNearbyProperties(
+      query.lat,
+      query.lng,
+      radius,
+      page,
+      limit,
+      status,
+      category
+    );
+
+    return res.status(200).json({
+      message: 'Nearby properties fetched successfully',
+      data: result.properties,
+      meta: result.meta,
+    });
+  } catch (error: any) {
+    console.error('Get nearby properties error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+};
+
+export const getSimilarPropertiesController = async (req: Request, res: Response) => {
+  try {
+    const query = req.query as unknown as GetSimilarPropertiesQueryInput;
+    const propertyId = req.params.propertyId as string;
+    const limit = Number(query.limit) || 12;
+
+    const similarProperties = await propertyService.getSimilarProperties(propertyId, limit);
+
+    if (similarProperties === null) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Similar properties fetched successfully',
+      data: similarProperties,
+    });
+  } catch (error: any) {
+    console.error('Get similar properties error:', error);
 
     return res.status(500).json({
       message: 'Internal server error',

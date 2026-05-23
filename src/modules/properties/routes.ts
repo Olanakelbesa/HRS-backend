@@ -6,8 +6,8 @@ import { createPropertySchema } from './schema';
 import { validate } from '../../middlewares/validate';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { memoryUpload } from '../../middlewares/multer.middleware';
-import { getPropertiesSchema } from './schema';
-import { getPropertiesController } from './controller';
+import { getPropertiesSchema, getNearbyPropertiesSchema, getSimilarPropertiesSchema } from './schema';
+import { getPropertiesController, getNearbyPropertiesController, getSimilarPropertiesController } from './controller';
 import { getPropertyByIdSchema } from './schema';
 import { getPropertyByIdController } from './controller';
 import { updatePropertySchema } from './schema';
@@ -177,6 +177,127 @@ router.get('/my', requireAuth, getMyPropertiesController);
  *         description: Unauthorized
  */
 router.get('/saved', requireAuth, getSavedPropertiesController);
+
+/**
+ * @openapi
+ * /api/v1/properties/nearby:
+ *   get:
+ *     summary: Get properties near a geographic location
+ *     tags: [Property]
+ *     parameters:
+ *       - in: query
+ *         name: lat
+ *         required: true
+ *         schema:
+ *           type: number
+ *         example: 9.03
+ *       - in: query
+ *         name: lng
+ *         required: true
+ *         schema:
+ *           type: number
+ *         example: 38.74
+ *       - in: query
+ *         name: radius
+ *         schema:
+ *           type: number
+ *           description: Radius in kilometers
+ *         example: 10
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         example: 12
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE]
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: lang
+ *         schema:
+ *           type: string
+ *           enum: [en, am]
+ *     responses:
+ *       200:
+ *         description: Nearby properties fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Nearby properties fetched successfully"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Property'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ */
+router.get('/nearby', validate(getNearbyPropertiesSchema, 'query'), getNearbyPropertiesController);
+
+/**
+ * @openapi
+ * /api/v1/properties/{propertyId}/similar:
+ *   get:
+ *     summary: Get similar properties to an existing property
+ *     tags: [Property]
+ *     parameters:
+ *       - in: path
+ *         name: propertyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "ckv1n1xyz"
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         example: 12
+ *       - in: query
+ *         name: lang
+ *         schema:
+ *           type: string
+ *           enum: [en, am]
+ *     responses:
+ *       200:
+ *         description: Similar properties fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Similar properties fetched successfully"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Property'
+ *       404:
+ *         description: Property not found
+ */
+router.get('/:propertyId/similar', validate(getPropertyByIdSchema, 'params'), validate(getSimilarPropertiesSchema, 'query'), getSimilarPropertiesController);
 
 /**
  * @openapi

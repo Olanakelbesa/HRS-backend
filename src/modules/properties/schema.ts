@@ -1,14 +1,10 @@
+import { PropertyStatus } from '@prisma/client';
 import { z } from 'zod';
 
-const PROPERTY_STATUS_VALUES = ['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE', 'RESTRICTED'] as const;
-
-export const PropertyStatusEnum = z
-  .string()
-  .transform((val) => val.toUpperCase())
-  .refine((val): val is (typeof PROPERTY_STATUS_VALUES)[number] =>
-    PROPERTY_STATUS_VALUES.includes(val as (typeof PROPERTY_STATUS_VALUES)[number]),
-    { message: 'Invalid status' }
-  );
+export const PropertyStatusEnum = z.preprocess(
+  (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+  z.nativeEnum(PropertyStatus)
+);
 
 export const SupportedLanguageEnum = z.enum(['en', 'am']);
 export const SortByEnum = z.enum(['createdAt', 'price', 'viewsCount']);
@@ -147,6 +143,22 @@ export const getPropertiesSchema = z.object({
   order: OrderEnum.default('desc'),
 });
 
+export const getNearbyPropertiesSchema = z.object({
+  lat: z.coerce.number(),
+  lng: z.coerce.number(),
+  radius: z.coerce.number().min(0).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  lang: SupportedLanguageEnum.optional(),
+  status: PropertyStatusEnum.optional(),
+  category: z.string().optional(),
+});
+
+export const getSimilarPropertiesSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  lang: SupportedLanguageEnum.optional(),
+});
+
 export const getPropertyByIdSchema = z.object({
   propertyId: z.string().min(1, 'propertyId is required'),
 });
@@ -180,6 +192,8 @@ export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
 export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
 export type UpdatePropertyStatusInput = z.infer<typeof updatePropertyStatusSchema>;
 export type GetPropertiesQueryInput = z.infer<typeof getPropertiesSchema>;
+export type GetNearbyPropertiesQueryInput = z.infer<typeof getNearbyPropertiesSchema>;
+export type GetSimilarPropertiesQueryInput = z.infer<typeof getSimilarPropertiesSchema>;
 export type GetPropertyByIdParams = z.infer<typeof getPropertyByIdSchema>;
 export type SupportedLanguage = z.infer<typeof SupportedLanguageEnum>;
 export type AddPropertyTranslationInput = z.infer<typeof addPropertyTranslationSchema>;

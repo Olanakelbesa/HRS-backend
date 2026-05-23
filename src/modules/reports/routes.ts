@@ -65,6 +65,29 @@ const router = Router();
  *                       type: integer
  *                 items:
  *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       targetType:
+ *                         type: string
+ *                       targetId:
+ *                         type: string
+ *                       category:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       images:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       createdAt:
+ *                         type: string
+ *                       updatedAt:
+ *                         type: string
  *                 meta:
  *                   type: object
  *       401:

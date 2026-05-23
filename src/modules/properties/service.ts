@@ -127,8 +127,33 @@ function formatPropertyResponse(property: any) {
     isVerified: property.isVerified ?? false,
     owner: ownerObj,
     createdAt: property.createdAt,
-    updateAt: property.updatedAt
+    updateAt: property.updatedAt,
   };
+}
+
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const earthRadiusKm = 6371;
+  return earthRadiusKm * c;
+}
+
+function normalizeNumeric(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+function normalizeCategory(category: unknown): string {
+  if (!category || typeof category !== 'object') return '';
+  const cat = category as Record<string, unknown>;
+  return String(cat.en || cat.am || '').toLowerCase();
 }
 
 export const propertyService = {
@@ -249,6 +274,158 @@ export const propertyService = {
         totalPages: Math.ceil(total / limit),
       },
     };
+  },
+
+  async getNearbyProperties(
+    lat: number,
+    lng: number,
+    radiusKm: number = 10,
+    page: number = 1,
+    limit: number = 12,
+    status?: string,
+    category?: string
+  ) {
+    const where: any = {
+      isDeleted: false,
+    };
+
+    if (status) where.status = status;
+    if (category) where.category = { string_contains: category };
+
+    const candidates = await prisma.property.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+      },
+      take: 300,
+    });
+
+    const nearby = candidates
+      .map((property) => {
+        const location = property.location as any;
+        if (
+          !location ||
+          typeof location.lat !== 'number' ||
+          typeof location.lng !== 'number'
+        ) {
+          return null;
+        }
+
+        const distance = getDistanceKm(lat, lng, location.lat, location.lng);
+        return { property, distance };
+      })
+      .filter((item): item is { property: any; distance: number } => item !== null)
+      .filter((item) => item.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    const total = nearby.length;
+    const start = (page - 1) * limit;
+    const selected = nearby.slice(start, start + limit);
+
+    return {
+      properties: selected.map((item) => ({
+        ...formatPropertyResponse(item.property),
+        distance: Number(item.distance.toFixed(2)),
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  async getSimilarProperties(propertyId: string, limit: number = 12) {
+    const targetProperty = await prisma.property.findFirst({
+      where: { id: propertyId, isDeleted: false },
+    });
+
+    if (!targetProperty) return null;
+
+    const targetLocation = targetProperty.location as any;
+    const targetPrice = (targetProperty.price as any)?.value;
+    const targetCategory = normalizeCategory(targetProperty.category);
+    const targetBedrooms = targetProperty.bedrooms;
+    const targetBathrooms = targetProperty.bathrooms;
+
+    const candidates = await prisma.property.findMany({
+      where: {
+        isDeleted: false,
+        status: 'AVAILABLE',
+        id: { not: propertyId },
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+      },
+      take: 200,
+    });
+
+    const scored = candidates
+      .map((property) => {
+        const location = property.location as any;
+        const price = (property.price as any)?.value;
+        const category = normalizeCategory(property.category);
+
+        const distance =
+          targetLocation &&
+          typeof targetLocation.lat === 'number' &&
+          typeof targetLocation.lng === 'number' &&
+          location &&
+          typeof location.lat === 'number' &&
+          typeof location.lng === 'number'
+            ? getDistanceKm(targetLocation.lat, targetLocation.lng, location.lat, location.lng)
+            : null;
+
+        let score = 0;
+        if (targetCategory && category && category.includes(targetCategory)) score += 4;
+        if (
+          typeof price === 'number' &&
+          typeof targetPrice === 'number' &&
+          Math.abs(price - targetPrice) <= (targetPrice * 0.25 || 0)
+        ) {
+          score += 3;
+        }
+        if (typeof targetBedrooms === 'number' && property.bedrooms === targetBedrooms) score += 2;
+        if (typeof targetBathrooms === 'number' && property.bathrooms === targetBathrooms) score += 1;
+        if (distance !== null) {
+          score += Math.max(0, 2 - distance / 10);
+        }
+
+        return {
+          property,
+          score,
+          distance,
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.distance === null) return 1;
+        if (b.distance === null) return -1;
+        return a.distance - b.distance;
+      })
+      .slice(0, limit);
+
+    return scored.map((item) => ({
+      ...formatPropertyResponse(item.property),
+      ...(item.distance !== null ? { distance: Number(item.distance.toFixed(2)) } : {}),
+    }));
   },
 
   async getPropertyById(propertyId: string, language = 'en') {
