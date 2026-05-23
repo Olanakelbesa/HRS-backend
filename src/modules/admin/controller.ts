@@ -247,6 +247,33 @@ export async function agreementRiskAssessment(req: Request, res: Response) {
   return res.status(200).json({ status: 'success', data });
 }
 
+export async function agreementPaymentSummary(req: Request, res: Response) {
+  const params = paramIdSchema.parse(req.params);
+  const data = await adminService.getAgreementPaymentSummary(params.id);
+  if (!data) {
+    return res.status(404).json({ status: 'error', message: 'Agreement not found' });
+  }
+  return res.status(200).json({ status: 'success', data });
+}
+
+export async function agreementPaymentsList(req: Request, res: Response) {
+  const params = paramIdSchema.parse(req.params);
+  const data = await adminService.listAgreementPaymentsAdmin(params.id);
+  if (data === null) {
+    return res.status(404).json({ status: 'error', message: 'Agreement not found' });
+  }
+  return res.status(200).json({ status: 'success', data });
+}
+
+export async function paymentProofGet(req: Request, res: Response) {
+  const params = paramIdSchema.parse(req.params);
+  const data = await adminService.getPaymentProofAdmin(params.id);
+  if (!data) {
+    return res.status(404).json({ status: 'error', message: 'Payment not found' });
+  }
+  return res.status(200).json({ status: 'success', data });
+}
+
 export async function notificationsList(req: Request, res: Response) {
   const query = paginationQuerySchema.parse(req.query);
   const data = await adminService.getNotifications(query);

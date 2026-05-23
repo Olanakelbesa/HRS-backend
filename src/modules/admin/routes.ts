@@ -723,6 +723,81 @@ router.get('/agreements/:id/risk-assessment', controller.agreementRiskAssessment
 
 /**
  * @swagger
+ * /api/v1/admin/agreements/{id}/payment-summary:
+ *   get:
+ *     summary: Payment summary for an agreement (admin)
+ *     description: |
+ *       Aggregates payment records for the agreement. Use this instead of
+ *       GET /agreements/{id}/payments, which only allows the renter or owner.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Agreement payment summary
+ *       404:
+ *         description: Agreement not found
+ */
+router.get('/agreements/:id/payment-summary', controller.agreementPaymentSummary);
+
+/**
+ * @swagger
+ * /api/v1/admin/agreements/{id}/payments:
+ *   get:
+ *     summary: List all payments for an agreement (admin)
+ *     description: |
+ *       Full payment history for platform oversight. Party-scoped clients should use
+ *       GET /api/v1/agreements/{id}/payments when the signed-in user is renter or owner.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Agreement payments retrieved
+ *       404:
+ *         description: Agreement not found
+ */
+router.get('/agreements/:id/payments', controller.agreementPaymentsList);
+
+/**
+ * @swagger
+ * /api/v1/admin/payments/{id}/proof:
+ *   get:
+ *     summary: Get payment proof for an agreement payment (admin)
+ *     description: |
+ *       Admin access to proof URLs. GET /api/v1/payments/{id}/proof requires the
+ *       caller to be the renter or owner on the linked agreement.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Payment proof metadata
+ *       404:
+ *         description: Payment not found
+ */
+router.get('/payments/:id/proof', controller.paymentProofGet);
+
+/**
+ * @swagger
  * /api/v1/admin/agreements/{id}/status:
  *   patch:
  *     summary: Update lifecycle status of an agreement
