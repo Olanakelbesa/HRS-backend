@@ -148,6 +148,9 @@ export async function listRenterAgreements(renterId: string, query: ListQuery) {
   const where: Prisma.AgreementWhereInput = { renterId };
   if (query.status) where.status = query.status;
 
+  const page = Number(query.page ?? 1) || 1;
+  const limit = Number(query.limit ?? 20) || 20;
+
   const [items, total] = await Promise.all([
     prisma.agreement.findMany({
       where,
@@ -156,15 +159,15 @@ export async function listRenterAgreements(renterId: string, query: ListQuery) {
         owner: { select: { id: true, first_name: true, last_name: true } },
       },
       orderBy: { createdAt: 'desc' },
-      skip: (query.page - 1) * query.limit,
-      take: query.limit,
+      skip: (page - 1) * limit,
+      take: limit,
     }),
     prisma.agreement.count({ where }),
   ]);
 
   return {
     items: items.map(mapAgreementResponse),
-    meta: { page: query.page, limit: query.limit, total },
+    meta: { page, limit, total },
   };
 }
 
