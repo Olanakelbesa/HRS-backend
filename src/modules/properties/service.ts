@@ -3,6 +3,7 @@ import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } fro
 import { PropertyStatus } from '@prisma/client';
 import { AppError } from '../../core/AppError';
 import { deleteFromCloudinary } from '../../utils/uploadToCloudinary';
+import interactionService from '../interactions/service';
 
 const SUPPORTED_LANGUAGES = new Set(['en', 'am']);
 
@@ -659,26 +660,8 @@ export const propertyService = {
   async trackPropertyView(propertyId: string, userId: string) {
     if (!userId) return;
 
-    const existingView = await prisma.userInteraction.findFirst({
-      where: {
-        propertyId,
-        type: 'VIEW',
-        userId,
-        createdAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        },
-      },
-    });
-
-    if (existingView) return;
-
-    await prisma.userInteraction.create({
-      data: {
-        propertyId,
-        userId,
-        type: 'VIEW',
-      },
-    });
+    const isNewView = await interactionService.trackLegacyDailyView(propertyId, userId);
+    if (!isNewView) return;
 
     await prisma.property.update({
       where: { id: propertyId },
@@ -715,83 +698,60 @@ export const propertyService = {
       throw new AppError('Property not found', 404);
     }
 
-    const existing = await prisma.userInteraction.findFirst({
-      where: {
-        userId,
-        propertyId,
-        type: 'SAVE',
-      },
-    });
-
-    if (existing) {
+    const existingSavedAt = await interactionService.getSavedAt(userId, propertyId);
+    if (existingSavedAt) {
       return {
         property: formatPropertyResponse(property),
-        savedAt: existing.createdAt,
+        savedAt: existingSavedAt,
       };
     }
 
-    const saved = await prisma.userInteraction.create({
-      data: {
-        userId,
-        propertyId,
-        type: 'SAVE',
-      },
-      include: {
-        property: {
-          include: {
-            owner: {
-              select: { id: true, first_name: true, last_name: true, email: true },
-            },
-          },
-        },
-      },
+    const result = await interactionService.saveProperty(userId, {
+      propertyId,
+      idempotencyKey: `property-save-${userId}-${propertyId}-${Date.now()}`,
+      source: 'PROPERTY_DETAIL_PAGE',
     });
 
+    const eventData = (result.body as { data: { recordedAt?: string; originalRecordedAt?: string } }).data;
+    const recordedAt = new Date(
+      eventData.recordedAt ?? eventData.originalRecordedAt ?? Date.now()
+    );
+
     return {
-      property: formatPropertyResponse(saved.property),
-      savedAt: saved.createdAt,
+      property: formatPropertyResponse(property),
+      savedAt: recordedAt,
     };
   },
 
   async removeSavedProperty(userId: string, propertyId: string) {
-    const result = await prisma.userInteraction.deleteMany({
-      where: {
-        userId,
-        propertyId,
-        type: 'SAVE',
-      },
-    });
+    const isSaved = await interactionService.isPropertySaved(userId, propertyId);
+    if (!isSaved) return false;
 
-    return result.count > 0;
+    try {
+      await interactionService.unsaveProperty(userId, {
+        propertyId,
+        idempotencyKey: `property-unsave-${userId}-${propertyId}-${Date.now()}`,
+        source: 'SAVED_PROPERTIES_PAGE',
+      });
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   async getSavedProperties(userId: string) {
-    const savedInteractions = await prisma.userInteraction.findMany({
-      where: {
-        userId,
-        type: 'SAVE',
-        property: {
-          isDeleted: false,
-        },
-      },
-      include: {
-        property: {
-          include: {
-            owner: {
-              select: { id: true, first_name: true, last_name: true, email: true },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    const savedStates = await interactionService.listSavedPropertyRecords(userId);
 
-    return savedInteractions.map((interaction) => ({
-      ...formatPropertyResponse(interaction.property),
-      savedAt: interaction.createdAt,
-    }));
+    return Promise.all(
+      savedStates.map(async (state) => {
+        const savedAt =
+          (await interactionService.getSavedAt(userId, state.propertyId)) ?? state.updatedAt;
+        return {
+          ...formatPropertyResponse(state.property),
+          savedAt,
+        };
+      })
+    );
   },
 
   /**

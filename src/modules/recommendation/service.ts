@@ -1,6 +1,6 @@
 import prisma from '../../config/database';
 import { cosineSimilarity } from '../../utils/similarity.utils';
-import { InteractionType } from '@prisma/client';
+import interactionService from '../interactions/service';
 
 type LocalizedText = {
   en: string | null;
@@ -133,17 +133,33 @@ class RecommendationService {
   // ========================
   // INTERACTIONS
   // ========================
-  async trackInteraction(userId: string, propertyId: string, type: InteractionType) {
-    // Ensure the property exists to avoid foreign key violation
-    const property = await prisma.property.findUnique({ where: { id: propertyId } });
-    if (!property) {
-      // Use AppError for consistent error handling
-      const { AppError } = await import('../../core/AppError');
-      throw new AppError('Property not found', 404);
+  async trackInteraction(
+    userId: string,
+    propertyId: string,
+    type: 'VIEW' | 'LIKE' | 'SAVE'
+  ) {
+    const idempotencyKey = `legacy-track-${type}-${userId}-${propertyId}`;
+
+    if (type === 'VIEW') {
+      const dayKey = new Date().toISOString().slice(0, 10);
+      return interactionService.recordView(userId, {
+        propertyId,
+        idempotencyKey: `legacy-view-${userId}-${propertyId}-${dayKey}`,
+      });
     }
 
-    return prisma.userInteraction.create({
-      data: { userId, propertyId, type },
+    if (type === 'LIKE') {
+      return interactionService.likeProperty(userId, {
+        propertyId,
+        idempotencyKey,
+        source: 'PROPERTY_DETAIL_PAGE',
+      });
+    }
+
+    return interactionService.saveProperty(userId, {
+      propertyId,
+      idempotencyKey,
+      source: 'PROPERTY_DETAIL_PAGE',
     });
   }
 
@@ -151,21 +167,23 @@ class RecommendationService {
   // USER EMBEDDING (NEW)
   // ========================
   async getUserEmbedding(userId: string) {
-    const interactions = await prisma.userInteraction.findMany({
+    const likedAndSaved = await prisma.userPropertyState.findMany({
       where: {
         userId,
-        type: { in: ['LIKE', 'SAVE'] },
+        OR: [{ isLiked: true }, { isSaved: true }],
       },
-      include: {
-        property: {
-          include: { embedding: true },
-        },
-      },
+      select: { propertyId: true },
     });
 
-    // ✅ properly typed filtering
-    const vectors: number[][] = interactions
-      .map((i) => i.property.embedding?.embedding)
+    const propertyIds = likedAndSaved.map((s) => s.propertyId);
+
+    const properties = await prisma.property.findMany({
+      where: { id: { in: propertyIds } },
+      include: { embedding: true },
+    });
+
+    const vectors: number[][] = properties
+      .map((p) => p.embedding?.embedding)
       .filter((e): e is number[] => Array.isArray(e));
 
     if (vectors.length === 0) return null;
@@ -185,28 +203,33 @@ class RecommendationService {
   // COLLABORATIVE FILTERING (NEW)
   // ========================
   async getCollaborativeRecommendations(userId: string) {
-    const myInteractions = await prisma.userInteraction.findMany({
-      where: { userId },
+    const myStates = await prisma.userPropertyState.findMany({
+      where: {
+        userId,
+        OR: [{ isLiked: true }, { isSaved: true }],
+      },
       select: { propertyId: true },
     });
 
-    const propertyIds = myInteractions.map((i) => i.propertyId);
+    const propertyIds = myStates.map((s) => s.propertyId);
     if (propertyIds.length === 0) return [];
 
-    const similarUsers = await prisma.userInteraction.findMany({
+    const similarUsers = await prisma.userPropertyState.findMany({
       where: {
         propertyId: { in: propertyIds },
         userId: { not: userId },
+        OR: [{ isLiked: true }, { isSaved: true }],
       },
       select: { userId: true },
     });
 
     const userIds = [...new Set(similarUsers.map((u) => u.userId))];
 
-    const recommendations = await prisma.userInteraction.findMany({
+    const recommendations = await prisma.userPropertyState.findMany({
       where: {
         userId: { in: userIds },
         propertyId: { notIn: propertyIds },
+        OR: [{ isLiked: true }, { isSaved: true }],
       },
       select: { propertyId: true },
     });
@@ -230,8 +253,8 @@ class RecommendationService {
     const preferences = await prisma.userPreference.findUnique({ where: { userId } });
     const searches = await this.getSearchHistory(userId);
 
-    const interactions = await prisma.userInteraction.findMany({
-      where: { userId },
+    const interactions = await prisma.userInteractionEvent.findMany({
+      where: { userId, type: 'VIEW' },
       orderBy: { createdAt: 'desc' },
       take: 5,
     });

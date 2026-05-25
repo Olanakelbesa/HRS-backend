@@ -74,7 +74,8 @@ model User {
 
   preferences      UserPreference?
   searchHistories  SearchHistory[]
-  interactions     UserInteraction[]
+  interactionEvents UserInteractionEvent[]
+  propertyStates   UserPropertyState[]
   
   bankDetail            BankDetail?
   notificationPreference NotificationPreference?
@@ -222,7 +223,8 @@ model Property {
   conversations Conversation[]
   appointments  Appointment[]
   agreements    Agreement[]
-  interactions UserInteraction[]
+  interactionEvents UserInteractionEvent[]
+  propertyStates    UserPropertyState[]
   embedding   PropertyEmbedding?
   @@index([ownerId])
   @@index([status])
@@ -620,26 +622,72 @@ model SearchHistory {
   @@index([userId, createdAt])
 }
 
-model UserInteraction {
-  id         String   @id @default(cuid())
-  userId     String   
-  propertyId String
-
-  type       InteractionType
-  
-
-  createdAt  DateTime @default(now())
-
-  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([userId, propertyId])
-  @@index([type])
-}
 enum InteractionType {
   VIEW
-  LIKE
-  SAVE
+  LIKE_ADDED
+  LIKE_REMOVED
+  SAVE_ADDED
+  SAVE_REMOVED
+  CONTACT
+  SHARE
+  SCHEDULE
+}
+
+enum InteractionSource {
+  SEARCH_RESULTS
+  SEARCH_RESULTS_CARD
+  RECOMMENDATIONS
+  RECOMMENDATIONS_CARD
+  SIMILAR_PROPERTIES
+  SIMILAR_PROPERTIES_CARD
+  DIRECT_LINK
+  CATEGORY_BROWSE
+  LOCATION_BROWSE
+  OWNER_PROFILE
+  PROPERTY_DETAIL_PAGE
+  SAVED_PROPERTIES_PAGE
+}
+
+model UserInteractionEvent {
+  id              String             @id @default(cuid())
+  userId          String
+  propertyId      String
+  type            InteractionType
+  source          InteractionSource?
+  sessionId       String?
+  viewDuration    Int?
+  imagesViewed    Int?
+  metadata        Json?
+  idempotencyKey  String
+  createdAt       DateTime           @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId, type, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([propertyId, createdAt])
+  @@index([userId, propertyId, createdAt])
+  @@index([userId, propertyId, type, createdAt])
+  @@index([sessionId, createdAt])
+}
+
+model UserPropertyState {
+  userId     String
+  propertyId String
+
+  isLiked    Boolean @default(false)
+  isSaved    Boolean @default(false)
+
+  lastLikeEventId String?
+  lastSaveEventId String?
+
+  updatedAt DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@id([userId, propertyId])
 }
 
 model PropertyEmbedding {

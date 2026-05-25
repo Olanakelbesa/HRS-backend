@@ -18,6 +18,7 @@ import { searchSchema, interactionSchema } from './modules/recommendation/schema
 import reportRoutes from './modules/reports/routes';
 import verificationRoutes from './modules/verification/routes';
 import ownerRoutes from './modules/owner/routes';
+import interactionRoutes from './modules/interactions/routes';
 import * as appointmentController from './modules/appointments/controller';
 import { listAppointmentsQuerySchema } from './modules/appointments/schema';
 const router = Router();
@@ -51,6 +52,9 @@ router.use('/reviews', reviewRoutes);
 
 //Recommendation Routes
 router.use('/recommendation', recommendationRoutes);
+
+// Renter interaction tracking (event-sourced)
+router.use('/interactions', interactionRoutes);
 
 // Expose user preferences at /user/preferences for backward-compatible client paths
 router.post('/user/preferences', requireAuth, recommendationController.savePreferences as any);
