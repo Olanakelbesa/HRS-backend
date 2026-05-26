@@ -14,7 +14,7 @@ import { seedRenterRecommendationData } from './seedRenters';
 
 const prisma = new PrismaClient();
 
-const SEED_TAG = '@seed:ethiopian-rentals-2026';
+const SEED_TAG = '';
 const DEFAULT_PASSWORD = 'Password123!';
 const PROPERTY_TOTAL = 300;
 const KM_PER_LATITUDE_DEGREE = 111.32;
@@ -164,7 +164,7 @@ const NEIGHBORHOODS: Neighborhood[] = [
 const PROPERTY_TYPES: PropertyTypeConfig[] = [
   {
     type: PROPERTY_TYPE.APARTMENT,
-    count: 120,
+    count: 95,
     category: textPair('Apartment', 'አፓርታማ'),
     noun: textPair('Apartment', 'አፓርታማ'),
     priceMin: 12000,
@@ -183,14 +183,14 @@ const PROPERTY_TYPES: PropertyTypeConfig[] = [
       textPair('Backup generator', 'ጀነሬተር'),
       textPair('CCTV', 'ሲሲቲቪ'),
       textPair('Gym', 'የጂም መጠቀሚያ'),
-
+      textPair('Near public transport', 'ለህዝብ መጓጓዣ ቅርብ'),
     ],
     furnishingOptions: ['unfurnished', 'semi-furnished', 'furnished'],
     minLeaseMonths: 6,
   },
   {
     type: PROPERTY_TYPE.STUDIO,
-    count: 60,
+    count: 45,
     category: textPair('Studio', 'ስቱዲዮ'),
     noun: textPair('Studio', 'ስቱዲዮ'),
     priceMin: 8000,
@@ -207,14 +207,14 @@ const PROPERTY_TYPES: PropertyTypeConfig[] = [
       textPair('Balcony', 'በረንዳ'),
       textPair('Backup generator', 'ጀነሬተር'),
       textPair('Smart TV', 'ስማርት ቲቪ'),
-
+      textPair('Near public transport', 'ለህዝብ መጓጓዣ ቅርብ'),
     ],
     furnishingOptions: ['semi-furnished', 'furnished'],
     minLeaseMonths: 3,
   },
   {
     type: PROPERTY_TYPE.VILLA,
-    count: 45,
+    count: 40,
     category: textPair('Villa', 'ቪላ'),
     noun: textPair('Villa', 'ቪላ'),
     priceMin: 25000,
@@ -236,8 +236,55 @@ const PROPERTY_TYPES: PropertyTypeConfig[] = [
     minLeaseMonths: 12,
   },
   {
+    type: PROPERTY_TYPE.CONDO,
+    count: 35,
+    category: textPair('Condo', 'ኮንዶ'),
+    noun: textPair('Condo', 'ኮንዶ'),
+    priceMin: 10000,
+    priceMax: 38000,
+    bedroomOptions: [1, 2, 2, 3],
+    bathroomOffset: 1,
+    areaRange: [50, 120],
+    amenities: [
+      textPair('WiFi', 'ዋይፋይ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Parking', 'መኪና ማቆሚያ'),
+      textPair('Water tank', 'የውሃ ታንክ'),
+      textPair('Balcony', 'በረንዳ'),
+      textPair('Elevator', 'ሊፍት'),
+      textPair('Kitchen cabinets', 'የወጥ ቤት ካቢኔት'),
+      textPair('Near public transport', 'ለህዝብ መጓጓዣ ቅርብ'),
+      textPair('Children play area', 'የልጆች መጫወቻ ቦታ'),
+    ],
+    furnishingOptions: ['unfurnished', 'semi-furnished'],
+    minLeaseMonths: 6,
+  },
+  {
+    type: PROPERTY_TYPE.HOUSE,
+    count: 25,
+    category: textPair('House', 'ቤት'),
+    noun: textPair('House', 'ቤት'),
+    priceMin: 16000,
+    priceMax: 55000,
+    bedroomOptions: [2, 3, 3, 4],
+    bathroomOffset: 1,
+    areaRange: [90, 220],
+    amenities: [
+      textPair('Parking', 'መኪና ማቆሚያ'),
+      textPair('Garden', 'አትክልት ቦታ'),
+      textPair('Water tank', 'የውሃ ታንክ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Private compound', 'የግል ግቢ'),
+      textPair('Kitchen cabinets', 'የወጥ ቤት ካቢኔት'),
+      textPair('Near public transport', 'ለህዝብ መጓጓዣ ቅርብ'),
+      textPair('Service quarter', 'የአገልግሎት ክፍል'),
+    ],
+    furnishingOptions: ['unfurnished', 'semi-furnished', 'furnished'],
+    minLeaseMonths: 12,
+  },
+  {
     type: PROPERTY_TYPE.SHARED_ROOM,
-    count: 30,
+    count: 25,
     category: textPair('Shared Room', 'የጋራ ክፍል'),
     noun: textPair('Shared Room', 'የጋራ ክፍል'),
     priceMin: 4000,
@@ -253,13 +300,14 @@ const PROPERTY_TYPES: PropertyTypeConfig[] = [
       textPair('Bed frame', 'የአልጋ ፍሬም'),
       textPair('Study desk', 'የጥናት ጠረጴዛ'),
       textPair('Hot shower', 'ሙቅ ሻወር'),
+      textPair('Near public transport', 'ለህዝብ መጓጓዣ ቅርብ'),
     ],
     furnishingOptions: ['furnished'],
     minLeaseMonths: 1,
   },
   {
     type: PROPERTY_TYPE.SERVICED_APARTMENT,
-    count: 30,
+    count: 25,
     category: textPair('Serviced Apartment', 'አገልግሎት ያለው አፓርታማ'),
     noun: textPair('Serviced Apartment', 'አገልግሎት ያለው አፓርታማ'),
     priceMin: 20000,
@@ -276,13 +324,14 @@ const PROPERTY_TYPES: PropertyTypeConfig[] = [
       textPair('Reception', 'መቀበያ'),
       textPair('Gym', 'የጂም መጠቀሚያ'),
       textPair('Smart TV', 'ስማርት ቲቪ'),
+      textPair('Near public transport', 'ለህዝብ መጓጓዣ ቅርብ'),
     ],
     furnishingOptions: ['furnished'],
     minLeaseMonths: 1,
   },
   {
     type: PROPERTY_TYPE.PENTHOUSE,
-    count: 15,
+    count: 10,
     category: textPair('Penthouse', 'ፔንትሃውስ'),
     noun: textPair('Penthouse', 'ፔንትሃውስ'),
     priceMin: 40000,
@@ -490,6 +539,61 @@ function buildTitle(draft: PropertyDraft): LocaleText {
   );
 }
 
+const DESCRIPTION_AUDIENCES: LocaleText[] = [
+  textPair('professionals who need short commutes', 'አጭር የመጓጓዣ ጊዜ ለሚፈልጉ ባለሙያዎች'),
+  textPair('families looking for calm residential streets', 'ጸጥ ያለ የመኖሪያ አካባቢ ለሚፈልጉ ቤተሰቦች'),
+  textPair('students and first-time renters comparing value', 'ዋጋን ለሚያወዳድሩ ተማሪዎች እና አዲስ ተከራዮች'),
+  textPair('remote workers who need reliable utilities', 'አስተማማኝ አገልግሎት ለሚፈልጉ ከቤት የሚሰሩ ሰዎች'),
+  textPair('long-term renters prioritizing safety and convenience', 'ደህንነትን እና ምቾትን ቅድሚያ ለሚሰጡ የረጅም ጊዜ ተከራዮች'),
+];
+
+const DESCRIPTION_SURROUNDINGS: LocaleText[] = [
+  textPair('near cafes, supermarkets, clinics, and minibus routes', 'ለካፌዎች፣ ሱፐርማርኬቶች፣ ክሊኒኮች እና የሚኒባስ መስመሮች ቅርብ'),
+  textPair('close to schools, pharmacies, groceries, and main roads', 'ለትምህርት ቤቶች፣ ፋርማሲዎች፣ ግሮሰሪዎች እና ዋና መንገዶች ቅርብ'),
+  textPair('with quick access to business districts and ride-hailing pickup points', 'ወደ የንግድ አካባቢዎች እና የታክሲ መጠባበቂያ ቦታዎች ፈጣን መዳረሻ ያለው'),
+  textPair('near gyms, restaurants, banks, and evening transport options', 'ለጂሞች፣ ሬስቶራንቶች፣ ባንኮች እና የማታ መጓጓዣ አማራጮች ቅርብ'),
+  textPair('in a walkable area with daily services within a short distance', 'የዕለት ተዕለት አገልግሎቶች በአጭር ርቀት የሚገኙበት በእግር ለመጓዝ ምቹ አካባቢ'),
+];
+
+const DESCRIPTION_KEYWORDS: Record<SeedPropertyType, LocaleText[]> = {
+  [PROPERTY_TYPE.APARTMENT]: [
+    textPair('elevator access, city living, apartment security', 'ሊፍት፣ የከተማ ኑሮ፣ የአፓርታማ ጥበቃ'),
+    textPair('balcony space, backup power, managed building', 'በረንዳ፣ ተጠባባቂ ጀነሬተር፣ የተደራጀ ሕንፃ'),
+  ],
+  [PROPERTY_TYPE.STUDIO]: [
+    textPair('compact layout, furnished option, starter rental', 'አነስተኛ አቀማመጥ፣ የታጠቀ አማራጭ፣ የመጀመሪያ ኪራይ'),
+    textPair('low budget, single renter, easy maintenance', 'ዝቅተኛ በጀት፣ ነጠላ ተከራይ፣ ቀላል እንክብካቤ'),
+  ],
+  [PROPERTY_TYPE.VILLA]: [
+    textPair('private compound, family space, garden lifestyle', 'የግል ግቢ፣ የቤተሰብ ቦታ፣ የአትክልት ቦታ ኑሮ'),
+    textPair('large bedrooms, parking, quiet neighborhood', 'ሰፊ መኝታ ቤቶች፣ መኪና ማቆሚያ፣ ጸጥ ያለ አካባቢ'),
+  ],
+  [PROPERTY_TYPE.CONDO]: [
+    textPair('condominium block, predictable rent, community services', 'የኮንዶሚኒየም ሕንፃ፣ የታወቀ ኪራይ፣ የማህበረሰብ አገልግሎቶች'),
+    textPair('affordable family unit, transport access, managed compound', 'ተመጣጣኝ የቤተሰብ ክፍል፣ የመጓጓዣ መዳረሻ፣ የተደራጀ ግቢ'),
+  ],
+  [PROPERTY_TYPE.HOUSE]: [
+    textPair('standalone home, private entrance, flexible family layout', 'ራሱን የቻለ ቤት፣ የግል መግቢያ፣ ለቤተሰብ ተስማሚ አቀማመጥ'),
+    textPair('compound space, service quarter, long lease stability', 'የግቢ ቦታ፣ የአገልግሎት ክፍል፣ የረጅም ጊዜ ኪራይ መረጋጋት'),
+  ],
+  [PROPERTY_TYPE.SHARED_ROOM]: [
+    textPair('shared kitchen, study desk, budget room', 'የጋራ ወጥ ቤት፣ የጥናት ጠረጴዛ፣ በጀት ክፍል'),
+    textPair('student housing, furnished bed, transport access', 'የተማሪ መኖሪያ፣ የታጠቀ አልጋ፣ የመጓጓዣ መዳረሻ'),
+  ],
+  [PROPERTY_TYPE.SERVICED_APARTMENT]: [
+    textPair('serviced living, reception, flexible monthly stay', 'አገልግሎት ያለው ኑሮ፣ መቀበያ፣ ተለዋዋጭ ወርሃዊ ቆይታ'),
+    textPair('furnished apartment, utilities ready, executive rental', 'የታጠቀ አፓርታማ፣ ዝግጁ አገልግሎቶች፣ የኤክዜክቲቭ ኪራይ'),
+  ],
+  [PROPERTY_TYPE.PENTHOUSE]: [
+    textPair('city view, private terrace, premium residence', 'የከተማ እይታ፣ የግል ቴራስ፣ ፕሪሚየም መኖሪያ'),
+    textPair('luxury finish, elevator access, high-end amenities', 'የቅንጦት አጨራረስ፣ ሊፍት፣ ከፍተኛ ደረጃ መገልገያዎች'),
+  ],
+};
+
+function pickVariant<T>(items: readonly T[], index: number): T {
+  return items[index % items.length];
+}
+
 /**
  * Builds a detailed bilingual property description.
  */
@@ -500,10 +604,13 @@ function buildDescription(draft: PropertyDraft): LocaleText {
       : `ETB ${draft.price.value.toLocaleString()} per month`;
   const englishFeatures = draft.amenities.slice(0, 4).map((amenity) => amenity.en).join(', ');
   const amharicFeatures = draft.amenities.slice(0, 4).map((amenity) => amenity.am).join('፣ ');
+  const audience = pickVariant(DESCRIPTION_AUDIENCES, draft.sequence + draft.bedrooms);
+  const surroundings = pickVariant(DESCRIPTION_SURROUNDINGS, draft.sequence + draft.area);
+  const keywords = pickVariant(DESCRIPTION_KEYWORDS[draft.config.type], draft.sequence);
 
   return textPair(
-    `${SEED_TAG} This ${draft.config.category.en.toLowerCase()} is located in ${draft.neighborhood.neighborhoodEn}, ${draft.neighborhood.cityEn}, close to services and transport links. It offers ${draft.bedrooms} bedroom${draft.bedrooms === 1 ? '' : 's'}, ${draft.bathrooms} bathroom${draft.bathrooms === 1 ? '' : 's'}, and about ${draft.area} sqm of usable space. Key features include ${englishFeatures}. The monthly rent is ${priceText}, with lease terms designed for ${draft.config.minLeaseMonths}+ month stays.`,
-    `${SEED_TAG} ይህ ${draft.config.category.am} በ${draft.neighborhood.neighborhoodAm}፣ ${draft.neighborhood.cityAm} ውስጥ ይገኛል፣ ለዕለታዊ አገልግሎቶች እና መጓጓዣ ቅርብ ነው። ${draft.bedrooms} መኝታ ቤት፣ ${draft.bathrooms} መታጠቢያ ቤት እና በግምት ${draft.area} ካሬ ሜትር ቦታ አለው። ዋና ገጽታዎቹ ${amharicFeatures} ያካትታሉ። ወርሃዊ ኪራዩ ${priceText} ሲሆን የኪራይ ውሉ ለ${draft.config.minLeaseMonths}+ ወር ቆይታ ተዘጋጅቷል።`
+    `${SEED_TAG} This ${draft.config.category.en.toLowerCase()} is located in ${draft.neighborhood.neighborhoodEn}, ${draft.neighborhood.cityEn}, ${surroundings.en}. It works well for ${audience.en}. It offers ${draft.bedrooms} bedroom${draft.bedrooms === 1 ? '' : 's'}, ${draft.bathrooms} bathroom${draft.bathrooms === 1 ? '' : 's'}, and about ${draft.area} sqm of usable space. Key features include ${englishFeatures}. Search highlights: ${keywords.en}. The monthly rent is ${priceText}, with lease terms designed for ${draft.config.minLeaseMonths}+ month stays.`,
+    `${SEED_TAG} ይህ ${draft.config.category.am} በ${draft.neighborhood.neighborhoodAm}፣ ${draft.neighborhood.cityAm} ውስጥ ይገኛል፣ ${surroundings.am}። ለ${audience.am} ተስማሚ ነው። ${draft.bedrooms} መኝታ ቤት፣ ${draft.bathrooms} መታጠቢያ ቤት እና በግምት ${draft.area} ካሬ ሜትር ቦታ አለው። ዋና ገጽታዎቹ ${amharicFeatures} ያካትታሉ። የፍለጋ ቁልፍ ቃላት፦ ${keywords.am}። ወርሃዊ ኪራዩ ${priceText} ሲሆን የኪራይ ውሉ ለ${draft.config.minLeaseMonths}+ ወር ቆይታ ተዘጋጅቷል።`
   );
 }
 
