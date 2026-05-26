@@ -55,12 +55,12 @@ import {
  *         name: status
  *         schema:
  *           type: string
- *           enum: [available, pending, rented, unavailable]
+ *           enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE, MAINTENANCE, RESTRICTED]
  *       - in: query
- *         name: type
+ *         name: category
  *         schema:
  *           type: string
- *           enum: [VILLA, APARTMENT, CONDOMINIUM, SERVICES, PRIVATE_COMPOUND]
+ *           enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE, SHARED_ROOM, SERVICED_APARTMENT, PENTHOUSE]
  *       - in: query
  *         name: minPrice
  *         schema:
@@ -85,7 +85,7 @@ import {
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: [createdAt, price, viewsCount]
+ *           enum: [createdAt, price, viewCount]
  *         example: createdAt
  *       - in: query
  *         name: order
@@ -217,7 +217,7 @@ router.get('/saved', requireAuth, getSavedPropertiesController);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE]
+ *           enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE, MAINTENANCE, RESTRICTED]
  *       - in: query
  *         name: category
  *         schema:
@@ -444,7 +444,7 @@ router.get('/analytics', requireAuth, getOwnerPropertyAnalyticsController);
  *                   properties:
  *                     id:
  *                       type: string
- *                     type:
+ *                     category:
  *                       type: object
  *                       properties:
  *                         en:
@@ -476,6 +476,16 @@ router.get('/analytics', requireAuth, getOwnerPropertyAnalyticsController);
  *                           type: number
  *                         unit:
  *                           type: string
+ *                     amenities:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           en:
+ *                             type: string
+ *                           am:
+ *                             type: string
+ *                       example: [{ "en": "WiFi", "am": "ዋይፋይ" }]
  *                     leaseTerms:
  *                       type: object
  *                       properties:
@@ -531,6 +541,7 @@ router.get('/:propertyId', validate(getPropertyByIdSchema, 'params'), getPropert
  *           schema:
  *             type: object
  *             required:
+ *               - category
  *               - title
  *               - description
  *               - location
@@ -538,9 +549,9 @@ router.get('/:propertyId', validate(getPropertyByIdSchema, 'params'), getPropert
  *               - amenities
  *               - images
  *             properties:
- *               type:
- *                 type: string
- *                 enum: [VILLA, APARTMENT, CONDOMINIUM, SERVICES, PRIVATE_COMPOUND]
+ *               category:
+ *                 type: object
+ *                 example: { "en": "Apartment", "am": "አፓርታማ" }
  *               title:
  *                 type: object
  *                 example: { "en": "Modern Apartment", "am": "ዘመናዊ አፓርታማ" }
@@ -548,14 +559,14 @@ router.get('/:propertyId', validate(getPropertyByIdSchema, 'params'), getPropert
  *                 type: object
  *                 example: { "en": "Nice house", "am": "ጥሩ ቤት" }
  *               location:
- *                 type: string
- *                 example: "POINT(38.7578 9.0300)"
+ *                 type: object
+ *                 example: { "lat": 9.03, "lng": 38.74 }
  *               address:
- *                 type: string
- *                 example: "Bole, Addis Ababa"
+ *                 type: object
+ *                 example: { "en": "Bole, Addis Ababa", "am": "ቦሌ፣ አዲስ አበባ" }
  *               price:
- *                 type: number
- *                 example: 35000
+ *                 type: object
+ *                 example: { "value": 35000, "currency": "ETB" }
  *               bedrooms:
  *                 type: integer
  *                 example: 2
@@ -563,14 +574,19 @@ router.get('/:propertyId', validate(getPropertyByIdSchema, 'params'), getPropert
  *                 type: integer
  *                 example: 1
  *               area:
- *                 type: number
- *                 example: 120
+ *                 type: object
+ *                 example: { "value": 120, "unit": "sqm" }
  *               amenities:
  *                 type: array
  *                 items:
- *                   type: string
- *                 example: ["wifi", "parking"]
- *               furnishingType:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                     am:
+ *                       type: string
+ *                 example: [{ "en": "WiFi", "am": "ዋይፋይ" }, { "en": "Parking", "am": "መኪና ማቆሚያ" }]
+ *               furnishingStatus:
  *                 type: string
  *                 example: "furnished"
  *               images:
@@ -717,7 +733,7 @@ router.delete(
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE, MAINTENANCE]
+ *                 enum: [AVAILABLE, PENDING, RENTED, UNAVAILABLE, MAINTENANCE, RESTRICTED]
  *                 example: "RENTED"
  *     responses:
  *       200:

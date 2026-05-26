@@ -7,13 +7,18 @@ export const PropertyStatusEnum = z.preprocess(
 );
 
 export const SupportedLanguageEnum = z.enum(['en', 'am']);
-export const SortByEnum = z.enum(['createdAt', 'price', 'viewsCount']);
+export const SortByEnum = z.enum(['createdAt', 'price', 'viewCount', 'viewsCount']);
 export const OrderEnum = z.enum(['asc', 'desc']);
 
 export const MultiLangTextSchema = z.object({
   en: z.string().min(1),
   am: z.string().min(1),
 });
+
+const AmenitySchema = z.union([
+  MultiLangTextSchema,
+  z.string().min(1).transform((value) => ({ en: value, am: value })),
+]);
 
 /**
  * Parses JSON-string fields sent via multipart/form-data.
@@ -95,7 +100,7 @@ export const createPropertySchema = z.object({
   bedrooms: z.coerce.number().int().min(0).optional(),
   bathrooms: z.coerce.number().int().min(0).optional(),
   area: jsonPreprocess(areaSchema).optional(),
-  amenities: jsonPreprocess(z.array(z.string()).optional()),
+  amenities: jsonPreprocess(z.array(AmenitySchema).optional()),
   furnishingStatus: z.string().optional(),
   images: mediaUrlsSchema,
   videos: mediaUrlsSchema,
@@ -116,7 +121,7 @@ export const updatePropertySchema = z.object({
   bedrooms: z.coerce.number().int().min(0).optional(),
   bathrooms: z.coerce.number().int().min(0).optional(),
   area: jsonPreprocess(areaSchema).optional(),
-  amenities: jsonPreprocess(z.array(z.string()).optional()),
+  amenities: jsonPreprocess(z.array(AmenitySchema).optional()),
   furnishingStatus: z.string().optional(),
   images: mediaUrlsSchema,
   videos: mediaUrlsSchema,

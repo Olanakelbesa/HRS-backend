@@ -22,7 +22,7 @@ type PreferencePayload = {
     lat?: number;
     lng?: number;
   }>;
-  preferredType?: 'VILLA' | 'APARTMENT' | 'CONDO' | 'STUDIO' | 'HOUSE' | 'PENTHOUSE';
+  preferredType?: 'VILLA' | 'APARTMENT' | 'CONDO' | 'STUDIO' | 'HOUSE' | 'SHARED_ROOM' | 'SERVICED_APARTMENT' | 'PENTHOUSE';
   amenities?: string[];
   furnishStatus?: 'furnished' | 'semi-furnished' | 'unfurnished';
 };
@@ -37,6 +37,8 @@ function buildPreferenceResponse(pref: any) {
     CONDO: { en: 'CONDO', am: 'ኮንዶ' },
     STUDIO: { en: 'STUDIO', am: 'ስቱዲዮ' },
     HOUSE: { en: 'HOUSE', am: 'ቤት' },
+    SHARED_ROOM: { en: 'SHARED_ROOM', am: 'የጋራ ክፍል' },
+    SERVICED_APARTMENT: { en: 'SERVICED_APARTMENT', am: 'አገልግሎት ያለው አፓርታማ' },
     PENTHOUSE: { en: 'PENTHOUSE', am: 'ፔንትሃውስ' },
   };
 

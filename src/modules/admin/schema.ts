@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PropertyStatus, PropertyType } from '@prisma/client';
 
 export const getAnalyticsQuerySchema = z.object({
   range: z.enum(['7d', '30d', '90d']).optional(),
@@ -33,13 +34,18 @@ export const getAuditLogsQuerySchema = paginationQuerySchema.extend({
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
-const PropertyTypeEnum = z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE']);
-const PropertyStatusEnum = z.enum(['AVAILABLE', 'PENDING', 'RENTED', 'UNAVAILABLE', 'RESTRICTED']);
+const PropertyTypeEnum = z.nativeEnum(PropertyType);
+const PropertyStatusEnum = z.nativeEnum(PropertyStatus);
 
 const MultiLangTextSchema = z.object({
   en: z.string().min(1),
   am: z.string().min(1),
 });
+
+const AmenitySchema = z.union([
+  MultiLangTextSchema,
+  z.string().min(1).transform((value) => ({ en: value, am: value })),
+]);
 
 export const adminUpdatePropertyParamsSchema = z.object({
   id: z.string().min(1, 'Property id is required'),
@@ -57,7 +63,7 @@ export const adminUpdatePropertyBodySchema = z
     bedrooms: z.number().int().min(0).optional(),
     bathrooms: z.number().int().min(0).optional(),
     area: z.number().positive().optional(),
-    amenities: z.any().optional(),
+    amenities: z.array(AmenitySchema).optional(),
     furnishingType: z.string().optional(),
     images: z.array(z.string().url()).optional(),
     videos: z.array(z.string().url()).optional(),

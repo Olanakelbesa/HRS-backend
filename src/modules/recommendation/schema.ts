@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PropertyType } from '@prisma/client';
 
 const localizedTextSchema = z.object({
   en: z.string().min(1),
@@ -37,7 +38,7 @@ export const preferenceSchema = z.object({
       lng: z.number().optional(),
     })
   ).optional(),
-  preferredType: z.enum(['VILLA', 'APARTMENT', 'CONDO', 'STUDIO', 'HOUSE', 'PENTHOUSE']).optional(),
+  preferredType: z.nativeEnum(PropertyType).optional(),
   amenities: z.array(z.string()).optional(),
   furnishStatus: z.enum(['furnished', 'semi-furnished', 'unfurnished']).optional(),
 });

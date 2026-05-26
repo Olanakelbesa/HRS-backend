@@ -1,1019 +1,844 @@
-import 'dotenv/config';
 /// <reference types="node" />
+import 'dotenv/config';
 import {
+  Prisma,
   PrismaClient,
-  Role,
-  PropertyType,
   PropertyStatus,
+  Role,
   UserStatus,
   VerificationState,
-  AgreementStatus,
-  GatewayPaymentStatus,
-  PaymentPurpose,
-  PaymentProvider,
-  ReportStatus,
-  ReportTargetType,
   VerificationStatus,
-  ReviewStatus,
-  AppointmentStatus,
-  NotificationType,
-  MessageStatus,
-  MessageType,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { seedRenterRecommendationData } from './seedRenters';
 
 const prisma = new PrismaClient();
 
+const SEED_TAG = '@seed:ethiopian-rentals-2026';
 const DEFAULT_PASSWORD = 'Password123!';
+const PROPERTY_TOTAL = 300;
+const KM_PER_LATITUDE_DEGREE = 111.32;
 
-function textPair(en: string, am: string) {
+type LocaleText = Prisma.InputJsonObject & { en: string; am: string };
+type JsonLocation = Prisma.InputJsonObject & { lat: number; lng: number };
+type JsonPrice = Prisma.InputJsonObject & {
+  value: number;
+  currency: 'ETB' | 'USD';
+  amountEtb?: number;
+};
+
+type SeedOwner = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  location: LocaleText;
+  bio: LocaleText;
+  image: string;
+  bankName: string;
+  bankBranch: string;
+  accountNumber: string;
+};
+
+type ColumnMetadata = {
+  dataType: string;
+  udtName: string;
+};
+
+type Neighborhood = {
+  cityEn: string;
+  cityAm: string;
+  subcityEn: string;
+  subcityAm: string;
+  neighborhoodEn: string;
+  neighborhoodAm: string;
+  lat: number;
+  lng: number;
+  weight: number;
+  premium: number;
+};
+
+const PROPERTY_TYPE = {
+  VILLA: 'VILLA',
+  APARTMENT: 'APARTMENT',
+  CONDO: 'CONDO',
+  STUDIO: 'STUDIO',
+  HOUSE: 'HOUSE',
+  SHARED_ROOM: 'SHARED_ROOM',
+  SERVICED_APARTMENT: 'SERVICED_APARTMENT',
+  PENTHOUSE: 'PENTHOUSE',
+} as const;
+
+type SeedPropertyType = (typeof PROPERTY_TYPE)[keyof typeof PROPERTY_TYPE];
+
+type PropertyTypeConfig = {
+  type: SeedPropertyType;
+  count: number;
+  category: LocaleText;
+  noun: LocaleText;
+  priceMin: number;
+  priceMax: number;
+  bedroomOptions: number[];
+  bathroomOffset: number;
+  areaRange: [number, number];
+  amenities: LocaleText[];
+  furnishingOptions: string[];
+  minLeaseMonths: number;
+};
+
+type PropertyDraft = {
+  ownerId: string;
+  config: PropertyTypeConfig;
+  neighborhood: Neighborhood;
+  sequence: number;
+  bedrooms: number;
+  bathrooms: number;
+  price: JsonPrice;
+  location: JsonLocation;
+  amenities: LocaleText[];
+  imageCount: number;
+  area: number;
+  furnishingStatus: string;
+  availableFrom: Date;
+};
+
+/// @seed
+const OWNER_NAME_ROWS: Array<[string, string]> = [
+  ['Selam', 'Tadesse'], ['Yonas', 'Bekele'], ['Meron', 'Girma'], ['Dawit', 'Mekonnen'], ['Hana', 'Alemu'],
+  ['Abel', 'Tesfaye'], ['Liya', 'Kebede'], ['Nahom', 'Getachew'], ['Bethlehem', 'Wolde'], ['Samuel', 'Haile'],
+  ['Tigist', 'Abebe'], ['Robel', 'Worku'], ['Saron', 'Demissie'], ['Kaleb', 'Assefa'], ['Rediet', 'Fikru'],
+  ['Biniam', 'Tola'], ['Mahlet', 'Gebre'], ['Henok', 'Desta'], ['Kalkidan', 'Mulugeta'], ['Fitsum', 'Kebede'],
+  ['Eden', 'Tesema'], ['Natnael', 'Eshetu'], ['Meklit', 'Hailu'], ['Yared', 'Solomon'], ['Rahel', 'Negash'],
+  ['Eyob', 'Tadesse'], ['Sara', 'Mohammed'], ['Elias', 'Kassa'], ['Feven', 'Alemayehu'], ['Biruk', 'Shiferaw'],
+  ['Frehiwot', 'Ayele'], ['Bereket', 'Mengistu'], ['Tsehay', 'Tesfaye'], ['Ermias', 'Wolde'], ['Ruth', 'Daniel'],
+  ['Mikiya', 'Abera'], ['Kidus', 'Fanta'], ['Sosina', 'Berhanu'], ['Yohannes', 'Zewdu'], ['Hiwot', 'Tilahun'],
+  ['Aman', 'Tekle'], ['Genet', 'Melaku'], ['Leul', 'Endale'], ['Blen', 'Wondimu'], ['Helen', 'Desta'],
+  ['Nahom', 'Teklu'], ['Selamawit', 'Demeke'], ['Michael', 'Legesse'], ['Tsega', 'Gebremariam'], ['Beza', 'Adane'],
+];
+
+const LEGACY_OWNER_EMAILS = [
+  'selam.tadesse@smart-rentals.com',
+  'yonas.bekele@smart-rentals.com',
+  'meron.girma@smart-rentals.com',
+];
+
+/// @seed
+const OWNERS: SeedOwner[] = OWNER_NAME_ROWS.map(([firstName, lastName], index) =>
+  buildSeedOwner(firstName, lastName, index)
+);
+
+const OWNER_EMAILS = OWNERS.map((owner) => owner.email);
+const CLEANUP_OWNER_EMAILS = [...OWNER_EMAILS, ...LEGACY_OWNER_EMAILS];
+
+/// @seed
+const NEIGHBORHOODS: Neighborhood[] = [
+  ['Addis Ababa', 'አዲስ አበባ', 'Bole', 'ቦሌ', 'Bole Medhanialem', 'ቦሌ መድሃኔዓለም', 8.9956, 38.7891, 10, 1.22],
+  ['Addis Ababa', 'አዲስ አበባ', 'Bole', 'ቦሌ', 'CMC', 'ሲኤምሲ', 9.0236, 38.8617, 8, 1.06],
+  ['Addis Ababa', 'አዲስ አበባ', 'Kirkos', 'ቂርቆስ', 'Kazanchis', 'ካዛንቺስ', 9.0168, 38.7652, 9, 1.16],
+  ['Addis Ababa', 'አዲስ አበባ', 'Yeka', 'የካ', 'Megenagna', 'መገናኛ', 9.0231, 38.8023, 8, 1.08],
+  ['Addis Ababa', 'አዲስ አበባ', 'Nifas Silk-Lafto', 'ንፋስ ስልክ-ላፍቶ', 'Bisrate Gabriel', 'ብስራተ ገብርኤል', 8.9953, 38.7303, 7, 1.02],
+  ['Addis Ababa', 'አዲስ አበባ', 'Lideta', 'ልደታ', 'Mexico Square', 'ሜክሲኮ አደባባይ', 9.0107, 38.7469, 7, 0.98],
+  ['Addis Ababa', 'አዲስ አበባ', 'Arada', 'አራዳ', 'Piassa', 'ፒያሳ', 9.0353, 38.7524, 7, 1.0],
+  ['Addis Ababa', 'አዲስ አበባ', 'Bole', 'ቦሌ', 'Summit', 'ሰሚት', 9.0154, 38.8943, 7, 0.96],
+  ['Addis Ababa', 'አዲስ አበባ', 'Akaky Kaliti', 'አቃቂ ቃሊቲ', 'Saris', 'ሳሪስ', 8.9556, 38.7669, 6, 0.9],
+  ['Addis Ababa', 'አዲስ አበባ', 'Lemi Kura', 'ለሚ ኩራ', 'Ayat', 'አያት', 9.0366, 38.8812, 8, 1.04],
+  ['Addis Ababa', 'አዲስ አበባ', 'Kolfe Keranio', 'ኮልፌ ቀራኒዮ', 'Old Airport', 'ኦልድ ኤርፖርት', 8.9994, 38.7109, 8, 1.18],
+  ['Adama', 'አዳማ', 'Adama City', 'አዳማ ከተማ', 'Bole Adama', 'ቦሌ አዳማ', 8.5407, 39.2696, 5, 0.82],
+  ['Bahir Dar', 'ባሕር ዳር', 'Bahir Dar City', 'ባሕር ዳር ከተማ', 'Lake Tana', 'ጣና ሐይቅ', 11.5936, 37.3908, 5, 0.86],
+  ['Hawassa', 'ሀዋሳ', 'Hawassa City', 'ሀዋሳ ከተማ', 'Tabor', 'ታቦር', 7.0506, 38.4766, 5, 0.84],
+  ['Mekelle', 'መቐለ', 'Mekelle City', 'መቐለ ከተማ', 'Ayder', 'አይደር', 13.4967, 39.4753, 4, 0.78],
+].map(([cityEn, cityAm, subcityEn, subcityAm, neighborhoodEn, neighborhoodAm, lat, lng, weight, premium]) => ({
+  cityEn: String(cityEn),
+  cityAm: String(cityAm),
+  subcityEn: String(subcityEn),
+  subcityAm: String(subcityAm),
+  neighborhoodEn: String(neighborhoodEn),
+  neighborhoodAm: String(neighborhoodAm),
+  lat: Number(lat),
+  lng: Number(lng),
+  weight: Number(weight),
+  premium: Number(premium),
+}));
+
+/// @seed
+const PROPERTY_TYPES: PropertyTypeConfig[] = [
+  {
+    type: PROPERTY_TYPE.APARTMENT,
+    count: 120,
+    category: textPair('Apartment', 'አፓርታማ'),
+    noun: textPair('Apartment', 'አፓርታማ'),
+    priceMin: 12000,
+    priceMax: 60000,
+    bedroomOptions: [1, 2, 2, 3, 3, 4],
+    bathroomOffset: 1,
+    areaRange: [58, 165],
+    amenities: [
+      textPair('WiFi', 'ዋይፋይ'),
+      textPair('Water tank', 'የውሃ ታንክ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Parking', 'መኪና ማቆሚያ'),
+      textPair('Balcony', 'በረንዳ'),
+      textPair('Kitchen cabinets', 'የወጥ ቤት ካቢኔት'),
+      textPair('Elevator', 'ሊፍት'),
+      textPair('Backup generator', 'ጀነሬተር'),
+      textPair('CCTV', 'ሲሲቲቪ'),
+      textPair('Gym', 'የጂም መጠቀሚያ'),
+
+    ],
+    furnishingOptions: ['unfurnished', 'semi-furnished', 'furnished'],
+    minLeaseMonths: 6,
+  },
+  {
+    type: PROPERTY_TYPE.STUDIO,
+    count: 60,
+    category: textPair('Studio', 'ስቱዲዮ'),
+    noun: textPair('Studio', 'ስቱዲዮ'),
+    priceMin: 8000,
+    priceMax: 25000,
+    bedroomOptions: [0, 0, 1],
+    bathroomOffset: 0,
+    areaRange: [28, 55],
+    amenities: [
+      textPair('WiFi', 'ዋይፋይ'),
+      textPair('Water tank', 'የውሃ ታንክ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Compact kitchen', 'አነስተኛ ወጥ ቤት'),
+      textPair('Hot shower', 'ሙቅ ሻወር'),
+      textPair('Balcony', 'በረንዳ'),
+      textPair('Backup generator', 'ጀነሬተር'),
+      textPair('Smart TV', 'ስማርት ቲቪ'),
+
+    ],
+    furnishingOptions: ['semi-furnished', 'furnished'],
+    minLeaseMonths: 3,
+  },
+  {
+    type: PROPERTY_TYPE.VILLA,
+    count: 45,
+    category: textPair('Villa', 'ቪላ'),
+    noun: textPair('Villa', 'ቪላ'),
+    priceMin: 25000,
+    priceMax: 80000,
+    bedroomOptions: [3, 4, 4, 5, 5, 6],
+    bathroomOffset: 1,
+    areaRange: [180, 420],
+    amenities: [
+      textPair('Parking', 'መኪና ማቆሚያ'),
+      textPair('Garden', 'አትክልት ቦታ'),
+      textPair('Water tank', 'የውሃ ታንክ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Maid room', 'የሰራተኛ ክፍል'),
+      textPair('Private compound', 'የግል ግቢ'),
+      textPair('Backup generator', 'ጀነሬተር'),
+      textPair('CCTV', 'ሲሲቲቪ'),
+    ],
+    furnishingOptions: ['unfurnished', 'semi-furnished', 'furnished'],
+    minLeaseMonths: 12,
+  },
+  {
+    type: PROPERTY_TYPE.SHARED_ROOM,
+    count: 30,
+    category: textPair('Shared Room', 'የጋራ ክፍል'),
+    noun: textPair('Shared Room', 'የጋራ ክፍል'),
+    priceMin: 4000,
+    priceMax: 12000,
+    bedroomOptions: [1, 1, 2],
+    bathroomOffset: 0,
+    areaRange: [18, 38],
+    amenities: [
+      textPair('WiFi', 'ዋይፋይ'),
+      textPair('Shared kitchen', 'የጋራ ወጥ ቤት'),
+      textPair('Water tank', 'የውሃ ታንክ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Bed frame', 'የአልጋ ፍሬም'),
+      textPair('Study desk', 'የጥናት ጠረጴዛ'),
+      textPair('Hot shower', 'ሙቅ ሻወር'),
+    ],
+    furnishingOptions: ['furnished'],
+    minLeaseMonths: 1,
+  },
+  {
+    type: PROPERTY_TYPE.SERVICED_APARTMENT,
+    count: 30,
+    category: textPair('Serviced Apartment', 'አገልግሎት ያለው አፓርታማ'),
+    noun: textPair('Serviced Apartment', 'አገልግሎት ያለው አፓርታማ'),
+    priceMin: 20000,
+    priceMax: 50000,
+    bedroomOptions: [1, 1, 2, 2, 3],
+    bathroomOffset: 0,
+    areaRange: [45, 130],
+    amenities: [
+      textPair('WiFi', 'ዋይፋይ'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Furnished', 'የታጠቀ'),
+      textPair('Backup generator', 'ጀነሬተር'),
+      textPair('Elevator', 'ሊፍት'),
+      textPair('Reception', 'መቀበያ'),
+      textPair('Gym', 'የጂም መጠቀሚያ'),
+      textPair('Smart TV', 'ስማርት ቲቪ'),
+    ],
+    furnishingOptions: ['furnished'],
+    minLeaseMonths: 1,
+  },
+  {
+    type: PROPERTY_TYPE.PENTHOUSE,
+    count: 15,
+    category: textPair('Penthouse', 'ፔንትሃውስ'),
+    noun: textPair('Penthouse', 'ፔንትሃውስ'),
+    priceMin: 40000,
+    priceMax: 100000,
+    bedroomOptions: [3, 3, 4, 4, 5],
+    bathroomOffset: 0,
+    areaRange: [150, 360],
+    amenities: [
+      textPair('WiFi', 'ዋይፋይ'),
+      textPair('Elevator', 'ሊፍት'),
+      textPair('Security', 'ጥበቃ'),
+      textPair('Parking', 'መኪና ማቆሚያ'),
+      textPair('Backup generator', 'ጀነሬተር'),
+      textPair('City view', 'የከተማ እይታ'),
+      textPair('Private terrace', 'የግል ቴራስ'),
+      textPair('CCTV', 'ሲሲቲቪ'),
+      textPair('Gym', 'የጂም መጠቀሚያ'),
+      textPair('Jacuzzi', 'ጃኩዚ'),
+    ],
+    furnishingOptions: ['semi-furnished', 'furnished'],
+    minLeaseMonths: 6,
+  },
+];
+
+/**
+ * Builds multilingual text JSON used by the backend.
+ */
+function textPair(en: string, am: string): LocaleText {
   return { en, am };
 }
 
-function daysFromNow(days: number) {
+/**
+ * Builds a deterministic verified owner profile from a name.
+ */
+function buildSeedOwner(firstName: string, lastName: string, index: number): SeedOwner {
+  const bankNames = ['Commercial Bank of Ethiopia', 'Dashen Bank', 'Awash Bank', 'Bank of Abyssinia', 'Cooperative Bank of Oromia'];
+  const neighborhoods = [
+    textPair('Bole, Addis Ababa, Ethiopia', 'ቦሌ፣ አዲስ አበባ፣ ኢትዮጵያ'),
+    textPair('Kazanchis, Addis Ababa, Ethiopia', 'ካዛንቺስ፣ አዲስ አበባ፣ ኢትዮጵያ'),
+    textPair('Piassa, Addis Ababa, Ethiopia', 'ፒያሳ፣ አዲስ አበባ፣ ኢትዮጵያ'),
+    textPair('Megenagna, Addis Ababa, Ethiopia', 'መገናኛ፣ አዲስ አበባ፣ ኢትዮጵያ'),
+    textPair('Ayat, Addis Ababa, Ethiopia', 'አያት፣ አዲስ አበባ፣ ኢትዮጵያ'),
+  ];
+  const phoneDigits = String(911200000 + index);
+  const email = `${firstName}.${lastName}@smartrental.com`.toLowerCase();
+
+  return {
+    email,
+    firstName,
+    lastName,
+    phone: `+251 ${phoneDigits.slice(0, 3)} ${phoneDigits.slice(3, 6)} ${phoneDigits.slice(6)}`,
+    location: neighborhoods[index % neighborhoods.length],
+    bio: textPair(
+      `${SEED_TAG} Verified Ethiopian rental owner managing residential listings on Smart Rental.`,
+      `${SEED_TAG} በSmart Rental ላይ የመኖሪያ ቤት ማስታወቂያዎችን የሚያስተዳድሩ የተረጋገጡ ኢትዮጵያዊ ባለንብረት።`
+    ),
+    image: `https://i.pravatar.cc/300?u=${firstName.toLowerCase()}-${lastName.toLowerCase()}-seed-owner`,
+    bankName: bankNames[index % bankNames.length],
+    bankBranch: `${neighborhoods[index % neighborhoods.length].en.split(',')[0]} Branch`,
+    accountNumber: `1000${String(index + 1).padStart(8, '0')}`,
+  };
+}
+
+/**
+ * Creates a deterministic random generator for stable seed output.
+ */
+function createRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+/**
+ * Returns a random integer between inclusive bounds.
+ */
+function randomInt(random: () => number, min: number, max: number): number {
+  return Math.floor(random() * (max - min + 1)) + min;
+}
+
+/**
+ * Chooses one array item using the deterministic random source.
+ */
+function chooseOne<T>(items: readonly T[], random: () => number): T {
+  return items[randomInt(random, 0, items.length - 1)];
+}
+
+/**
+ * Rounds a number to a fixed decimal precision.
+ */
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+/**
+ * Returns a future date at 09:00 local time.
+ */
+function daysFromNow(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() + days);
+  date.setHours(9, 0, 0, 0);
   return date;
 }
 
-function addHours(date: Date, hours: number) {
-  const next = new Date(date);
-  next.setHours(next.getHours() + hours);
-  return next;
-}
+/**
+ * Returns a coordinate within roughly two kilometers of a neighborhood center.
+ */
+function jitterLocation(neighborhood: Neighborhood, random: () => number): JsonLocation {
+  const distanceKm = Math.sqrt(random()) * 2;
+  const angle = random() * Math.PI * 2;
+  const latOffset = (distanceKm * Math.cos(angle)) / KM_PER_LATITUDE_DEGREE;
+  const lngOffset =
+    (distanceKm * Math.sin(angle)) /
+    (KM_PER_LATITUDE_DEGREE * Math.cos((neighborhood.lat * Math.PI) / 180));
 
-function addMinutes(date: Date, minutes: number) {
-  const next = new Date(date);
-  next.setMinutes(next.getMinutes() + minutes);
-  return next;
-}
-
-function appointmentSlot(daysAhead: number, startHour: number, durationMinutes = 45) {
-  const start = daysFromNow(daysAhead);
-  start.setHours(startHour, 0, 0, 0);
   return {
-    startsAt: start,
-    endsAt: addMinutes(start, durationMinutes),
+    lat: roundTo(neighborhood.lat + latOffset, 6),
+    lng: roundTo(neighborhood.lng + lngOffset, 6),
+    city: neighborhood.cityEn,
+    subcity: neighborhood.subcityEn,
+    neighborhood: neighborhood.neighborhoodEn,
   };
 }
 
-async function main() {
-  console.log('Seeding database...');
+/**
+ * Selects neighborhoods by demand weight for realistic distribution.
+ */
+function weightedNeighborhood(index: number): Neighborhood {
+  const weighted = NEIGHBORHOODS.flatMap((neighborhood) =>
+    Array.from({ length: neighborhood.weight }, () => neighborhood)
+  );
+  return weighted[index % weighted.length];
+}
 
-  // Cleanup in dependency-safe order
-  // await prisma.messageReaction.deleteMany();
-  // await prisma.messageAttachment.deleteMany();
-  // await prisma.message.deleteMany();
-  // await prisma.conversation.deleteMany();
-  // await prisma.auditLog.deleteMany();
-  // await prisma.notification.deleteMany();
-  // await prisma.review.deleteMany();
-  // await prisma.verificationDocument.deleteMany();
-  // await prisma.report.deleteMany();
-  // await prisma.agreement.deleteMany();
-  // await prisma.appointment.deleteMany();
-  // await prisma.property.deleteMany();
-  // await prisma.refreshToken.deleteMany();
-  // await prisma.session.deleteMany();
-  // await prisma.account.deleteMany();
-  // await prisma.verificationToken.deleteMany();
-  // await prisma.payment.deleteMany();
-  // await prisma.user.deleteMany();
+/**
+ * Builds a price in ETB, with occasional USD listings for high-end rentals.
+ */
+function buildPrice(config: PropertyTypeConfig, neighborhood: Neighborhood, random: () => number): JsonPrice {
+  const base = randomInt(random, config.priceMin, config.priceMax);
+  const adjusted = Math.min(config.priceMax, Math.max(config.priceMin, base * neighborhood.premium));
+  const amountEtb = Math.round(adjusted / 500) * 500;
+  const shouldUseUsd =
+    (config.type === PROPERTY_TYPE.PENTHOUSE && amountEtb >= 80000) ||
+    (config.type === PROPERTY_TYPE.SERVICED_APARTMENT && random() > 0.82);
 
-  // 1) Users
-  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  if (shouldUseUsd) {
+    return { value: Math.round(amountEtb / 56), currency: 'USD', amountEtb };
+  }
 
-  const admin = await prisma.user.create({
-    data: {
-      email: 'admin@smartrental.com',
-      password: passwordHash,
-      first_name: 'Super',
-      last_name: 'Admin',
-      phone: '+251 900 000 000',
-      role: Role.admin,
-      emailVerified: true,
-      isVerified: true,
-      verificationState: VerificationState.verified,
-      status: UserStatus.active,
-    },
+  return { value: amountEtb, currency: 'ETB' };
+}
+
+/**
+ * Computes a practical bathroom count for each property type.
+ */
+function bathroomCount(config: PropertyTypeConfig, bedrooms: number): number {
+  if (config.type === PROPERTY_TYPE.SHARED_ROOM || config.type === PROPERTY_TYPE.STUDIO) {
+    return 1;
+  }
+
+  return Math.max(1, bedrooms - config.bathroomOffset);
+}
+
+/**
+ * Selects 4-8 bilingual amenities from the property type's configured amenity list.
+ */
+function buildAmenities(config: PropertyTypeConfig, random: () => number): LocaleText[] {
+  const targetCount = randomInt(random, 4, 8);
+  const amenities: LocaleText[] = [];
+
+  while (amenities.length < targetCount && amenities.length < config.amenities.length) {
+    const amenity = chooseOne(config.amenities, random);
+    if (!amenities.some((item) => item.en === amenity.en)) {
+      amenities.push(amenity);
+    }
+  }
+
+  return amenities;
+}
+
+/**
+ * Builds deterministic placeholder image URLs.
+ */
+function buildImages(type: SeedPropertyType, sequence: number, count: number): string[] {
+  return Array.from({ length: count }, (_, index) => {
+    const seed = `${type.toLowerCase()}-${String(sequence).padStart(3, '0')}-${index + 1}`;
+    return `https://picsum.photos/seed/${seed}/1200/800`;
   });
+}
 
-  const owner1 = await prisma.user.create({
-    data: {
-      email: 'michael.c@example.com',
-      password: passwordHash,
-      first_name: 'Michael',
-      last_name: 'Chen',
-      phone: '+251 911 111 111',
-      role: Role.owner,
-      emailVerified: true,
-      isVerified: true,
-      verificationState: VerificationState.verified,
-      status: UserStatus.active,
-      image: 'https://i.pravatar.cc/150?u=michael',
-    },
-  });
+/**
+ * Builds a bilingual property title.
+ */
+function buildTitle(draft: PropertyDraft): LocaleText {
+  const englishPrefix =
+    draft.config.type === PROPERTY_TYPE.STUDIO ? 'Studio' : `${draft.bedrooms} Bedroom ${draft.config.noun.en}`;
+  const amharicPrefix =
+    draft.config.type === PROPERTY_TYPE.STUDIO ? 'ስቱዲዮ' : `${draft.bedrooms} መኝታ ቤት ${draft.config.noun.am}`;
 
-  const owner2 = await prisma.user.create({
-    data: {
-      email: 'sarah.j@example.com',
-      password: passwordHash,
-      first_name: 'Sarah',
-      last_name: 'Jenkins',
-      phone: '+251 922 222 222',
-      role: Role.owner,
-      emailVerified: true,
-      isVerified: false,
-      verificationState: VerificationState.pending,
-      status: UserStatus.active,
-      image: 'https://i.pravatar.cc/150?u=sarah',
-    },
-  });
+  return textPair(
+    `${englishPrefix} in ${draft.neighborhood.neighborhoodEn}`,
+    `${amharicPrefix} - ${draft.neighborhood.neighborhoodAm}`
+  );
+}
 
-  const owner3 = await prisma.user.create({
-    data: {
-      email: 'david.v@example.com',
-      password: passwordHash,
-      first_name: 'David',
-      last_name: 'Vance',
-      phone: '+251 933 333 333',
-      role: Role.owner,
-      emailVerified: true,
-      isVerified: false,
-      verificationState: VerificationState.resubmit,
-      status: UserStatus.suspended,
-      image: 'https://i.pravatar.cc/150?u=david',
-    },
-  });
+/**
+ * Builds a detailed bilingual property description.
+ */
+function buildDescription(draft: PropertyDraft): LocaleText {
+  const priceText =
+    draft.price.currency === 'USD'
+      ? `USD ${draft.price.value.toLocaleString()} per month, approximately ETB ${draft.price.amountEtb?.toLocaleString()}`
+      : `ETB ${draft.price.value.toLocaleString()} per month`;
+  const englishFeatures = draft.amenities.slice(0, 4).map((amenity) => amenity.en).join(', ');
+  const amharicFeatures = draft.amenities.slice(0, 4).map((amenity) => amenity.am).join('፣ ');
 
-  const owner4 = await prisma.user.create({
-    data: {
-      email: 'mulugeta.a@example.com',
-      password: passwordHash,
-      first_name: 'Mulugeta',
-      last_name: 'Abebe',
-      phone: '+251 911 234 567',
-      role: Role.owner,
-      emailVerified: false,
-      isVerified: false,
-      verificationState: VerificationState.pending,
-      status: UserStatus.active,
-    },
-  });
+  return textPair(
+    `${SEED_TAG} This ${draft.config.category.en.toLowerCase()} is located in ${draft.neighborhood.neighborhoodEn}, ${draft.neighborhood.cityEn}, close to services and transport links. It offers ${draft.bedrooms} bedroom${draft.bedrooms === 1 ? '' : 's'}, ${draft.bathrooms} bathroom${draft.bathrooms === 1 ? '' : 's'}, and about ${draft.area} sqm of usable space. Key features include ${englishFeatures}. The monthly rent is ${priceText}, with lease terms designed for ${draft.config.minLeaseMonths}+ month stays.`,
+    `${SEED_TAG} ይህ ${draft.config.category.am} በ${draft.neighborhood.neighborhoodAm}፣ ${draft.neighborhood.cityAm} ውስጥ ይገኛል፣ ለዕለታዊ አገልግሎቶች እና መጓጓዣ ቅርብ ነው። ${draft.bedrooms} መኝታ ቤት፣ ${draft.bathrooms} መታጠቢያ ቤት እና በግምት ${draft.area} ካሬ ሜትር ቦታ አለው። ዋና ገጽታዎቹ ${amharicFeatures} ያካትታሉ። ወርሃዊ ኪራዩ ${priceText} ሲሆን የኪራይ ውሉ ለ${draft.config.minLeaseMonths}+ ወር ቆይታ ተዘጋጅቷል።`
+  );
+}
 
-  const owner5 = await prisma.user.create({
-    data: {
-      email: 'dawit.m@email.com',
-      password: passwordHash,
-      first_name: 'Dawit',
-      last_name: 'Mekonnen',
-      phone: '+251 91 234 5678',
-      role: Role.owner,
-      emailVerified: true,
-      isVerified: true,
-      verificationState: VerificationState.verified,
-      status: UserStatus.active,
-      location: 'Addis Ababa, Ethiopia',
-      bio: 'Property owner with 5+ years of experience managing residential rentals in Addis Ababa. Specializing in premium villas and modern apartments.',
-      image: 'https://cdn.example.com/avatars/dawit.jpg',
-    },
-  });
+/**
+ * Builds a bilingual address from city, subcity, and neighborhood.
+ */
+function buildAddress(neighborhood: Neighborhood): LocaleText {
+  return textPair(
+    `${neighborhood.neighborhoodEn}, ${neighborhood.subcityEn}, ${neighborhood.cityEn}, Ethiopia`,
+    `${neighborhood.neighborhoodAm}፣ ${neighborhood.subcityAm}፣ ${neighborhood.cityAm}፣ ኢትዮጵያ`
+  );
+}
 
-  const renter1 = await prisma.user.create({
-    data: {
-      email: 'dawit.g@example.com',
-      password: passwordHash,
-      first_name: 'Dawit',
-      last_name: 'Gebre',
-      phone: '+251 944 444 444',
-      role: Role.renter,
-      emailVerified: true,
-      isVerified: true,
-      verificationState: VerificationState.verified,
-      status: UserStatus.active,
-      image: 'https://i.pravatar.cc/150?u=dawit',
-    },
-  });
-
-  const renter2 = await prisma.user.create({
-    data: {
-      email: 'hana.b@example.com',
-      password: passwordHash,
-      first_name: 'Hana',
-      last_name: 'Bekele',
-      phone: '+251 955 555 555',
-      role: Role.renter,
-      emailVerified: true,
-      isVerified: true,
-      verificationState: VerificationState.verified,
-      status: UserStatus.active,
-      image: 'https://i.pravatar.cc/150?u=hana',
-    },
-  });
-
-  const renter3 = await prisma.user.create({
-    data: {
-      email: 'liya.t@example.com',
-      password: passwordHash,
-      first_name: 'Liya',
-      last_name: 'Teklu',
-      phone: '+251 966 666 666',
-      role: Role.renter,
-      emailVerified: false,
-      isVerified: false,
-      verificationState: VerificationState.pending,
-      status: UserStatus.active,
-    },
-  });
-
-  console.log('Created Users');
-
-  // 1b) User preferences aligned with the recommendation endpoint payload
-  const renter1Preference = {
-    preferredLocations: [
-      {
-        city: textPair('Seattle', 'ሲያትል'),
-        region: textPair('Washington', 'ዋሽንግተን'),
-        lat: 47.6062,
-        lng: -122.3321,
-      },
-    ],
-    budget: { min: 800, max: 1600, currency: 'ETB' },
-    bedrooms: { min: 1, max: 2 },
-    bathrooms: { min: 1, max: 2 },
-    amenities: ['parking', 'wifi', 'dishwasher'],
-    furnishStatus: 'unfunished' as const,
-    notes: textPair('Prefer quiet buildings near transit', 'በትራንስፖርት አቅራቢያ ጸጥ ያሉ ህንፃዎችን እመርጣለሁ'),
-    preferredPropertyType: textPair('Villa', 'ቪላ'),
-    locale: 'en',
-    supportedLocales: ['en', 'am'],
+/**
+ * Builds lease terms and embeds the seed tag for database-level traceability.
+ */
+function buildLeaseTerms(draft: PropertyDraft): Prisma.InputJsonObject {
+  const deposit = draft.price.amountEtb ?? draft.price.value;
+  return {
+    seedTag: SEED_TAG,
+    secureDeposit: { value: deposit, currency: 'ETB' },
+    conditions: textPair(
+      `${draft.config.minLeaseMonths} months minimum. Utilities are paid by the tenant unless otherwise agreed.`,
+      `ቢያንስ ${draft.config.minLeaseMonths} ወር። ሌላ ስምምነት ካልተደረገ የመብራት፣ ውሃ እና ሌሎች ክፍያዎች በተከራይ ይከፈላሉ።`
+    ),
+    minDuration: draft.config.minLeaseMonths,
+    availableFrom: draft.availableFrom.toISOString(),
   };
+}
 
-  await prisma.userPreference.create({
-    data: {
-      userId: renter1.id,
-      preferredPriceMin: renter1Preference.budget.min,
-      preferredPriceMax: renter1Preference.budget.max,
-      preferredBedrooms: renter1Preference.bedrooms.min,
-      preferredLocations: renter1Preference.preferredLocations.map(
-        (location) => `${location.city.en}, ${location.region.en}`
-      ),
-      preferredAmenities: renter1Preference.amenities,
-      preferredType: PropertyType.VILLA,
-    },
+/**
+ * Builds all property drafts in the exact requested distribution.
+ */
+function buildPropertyDrafts(ownerIds: string[]): PropertyDraft[] {
+  const random = createRandom(20260525);
+  const drafts: PropertyDraft[] = [];
+
+  PROPERTY_TYPES.forEach((config) => {
+    for (let offset = 0; offset < config.count; offset += 1) {
+      const sequence = drafts.length + 1;
+      const neighborhood = weightedNeighborhood(sequence + offset);
+      const bedrooms = chooseOne(config.bedroomOptions, random);
+      const price = buildPrice(config, neighborhood, random);
+
+      drafts.push({
+        ownerId: ownerIds[sequence % ownerIds.length],
+        config,
+        neighborhood,
+        sequence,
+        bedrooms,
+        bathrooms: bathroomCount(config, bedrooms),
+        price,
+        location: jitterLocation(neighborhood, random),
+        amenities: buildAmenities(config, random),
+        imageCount: randomInt(random, 3, 8),
+        area: randomInt(random, config.areaRange[0], config.areaRange[1]),
+        furnishingStatus: chooseOne(config.furnishingOptions, random),
+        availableFrom: daysFromNow(randomInt(random, 0, 45)),
+      });
+    }
   });
 
-  const renter2Preference = {
-    preferredLocations: [
-      {
-        city: textPair('Kazanchis', 'ካዛንቺስ'),
-        region: textPair('Addis Ababa', 'አዲስ አበባ'),
-        lat: 8.9955,
-        lng: 38.7898,
+  return drafts;
+}
+
+/**
+ * Ensures seed-required schema changes are present when `db seed` is run before migrations.
+ */
+async function ensureSeedSchemaCompatibility(): Promise<void> {
+  await prisma.$executeRawUnsafe(`ALTER TYPE "PropertyType" ADD VALUE IF NOT EXISTS 'SHARED_ROOM'`);
+  await prisma.$executeRawUnsafe(`ALTER TYPE "PropertyType" ADD VALUE IF NOT EXISTS 'SERVICED_APARTMENT'`);
+
+  const [amenitiesColumn] = await prisma.$queryRaw<ColumnMetadata[]>`
+    SELECT data_type AS "dataType", udt_name AS "udtName"
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'Property'
+      AND column_name = 'amenities'
+  `;
+
+  if (!amenitiesColumn) {
+    throw new Error('Property.amenities column was not found. Run Prisma migrations before seeding.');
+  }
+
+  if (amenitiesColumn.udtName === 'jsonb' || amenitiesColumn.udtName === 'json') {
+    return;
+  }
+
+  if (amenitiesColumn.dataType !== 'ARRAY') {
+    throw new Error(
+      `Property.amenities must be jsonb/json or text[]. Found ${amenitiesColumn.dataType} (${amenitiesColumn.udtName}).`
+    );
+  }
+
+  console.log('Converting Property.amenities from text[] to jsonb for bilingual seed data...');
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Property"
+      ALTER COLUMN "amenities" DROP DEFAULT,
+      ALTER COLUMN "amenities" TYPE JSONB USING to_jsonb("amenities"),
+      ALTER COLUMN "amenities" SET DEFAULT '[]'::jsonb
+  `);
+}
+
+/**
+ * Deletes only data owned by the deterministic seed owner emails.
+ */
+async function clearSeedData(): Promise<void> {
+  const seedOwners = await prisma.user.findMany({
+    where: { email: { in: CLEANUP_OWNER_EMAILS } },
+    select: { id: true },
+  });
+  const ownerIds = seedOwners.map((owner) => owner.id);
+
+  if (ownerIds.length === 0) {
+    console.log('No existing Ethiopian rental seed data found.');
+    return;
+  }
+
+  const properties = await prisma.property.findMany({
+    where: { ownerId: { in: ownerIds } },
+    select: { id: true },
+  });
+  const propertyIds = properties.map((property) => property.id);
+  const conversations = await prisma.conversation.findMany({
+    where: { OR: [{ ownerId: { in: ownerIds } }, { propertyId: { in: propertyIds } }] },
+    select: { id: true },
+  });
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const messages = await prisma.message.findMany({
+    where: { conversationId: { in: conversationIds } },
+    select: { id: true },
+  });
+  const messageIds = messages.map((message) => message.id);
+  const agreements = await prisma.agreement.findMany({
+    where: { OR: [{ ownerId: { in: ownerIds } }, { propertyId: { in: propertyIds } }] },
+    select: { id: true },
+  });
+  const agreementIds = agreements.map((agreement) => agreement.id);
+
+  console.log(`Clearing existing seed data for ${ownerIds.length} owners and ${propertyIds.length} properties...`);
+
+  await prisma.$transaction([
+    prisma.propertyEmbedding.deleteMany({ where: { propertyId: { in: propertyIds } } }),
+    prisma.userPropertyState.deleteMany({ where: { propertyId: { in: propertyIds } } }),
+    prisma.userInteractionEvent.deleteMany({ where: { propertyId: { in: propertyIds } } }),
+    prisma.review.deleteMany({ where: { propertyId: { in: propertyIds } } }),
+    prisma.payment.deleteMany({ where: { agreementId: { in: agreementIds } } }),
+    prisma.agreement.deleteMany({ where: { id: { in: agreementIds } } }),
+    prisma.appointment.deleteMany({
+      where: { OR: [{ ownerId: { in: ownerIds } }, { propertyId: { in: propertyIds } }] },
+    }),
+    prisma.messageReaction.deleteMany({
+      where: { OR: [{ userId: { in: ownerIds } }, { messageId: { in: messageIds } }] },
+    }),
+    prisma.messageAttachment.deleteMany({ where: { messageId: { in: messageIds } } }),
+    prisma.message.deleteMany({ where: { id: { in: messageIds } } }),
+    prisma.conversation.deleteMany({ where: { id: { in: conversationIds } } }),
+    prisma.notification.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.auditLog.deleteMany({ where: { actorId: { in: ownerIds } } }),
+    prisma.report.deleteMany({
+      where: {
+        OR: [
+          { reportedById: { in: ownerIds } },
+          { targetId: { in: [...ownerIds, ...propertyIds, ...agreementIds] } },
+        ],
       },
-    ],
-    budget: { min: 12000, max: 28000, currency: 'ETB' },
-    bedrooms: { min: 2, max: 2 },
-    bathrooms: { min: 1, max: 1 },
-    amenities: ['wifi', 'elevator', 'backup power'],
-    furnishStatus: 'semiFurnished' as const,
-    notes: textPair('Prefers walkable neighborhoods', 'በእግር የሚደርሱ አካባቢዎችን ይመርጣል'),
-    preferredPropertyType: textPair('Apartment', 'አፓርትመንት'),
-    locale: 'en',
-    supportedLocales: ['en', 'am'],
-  };
+    }),
+    prisma.verificationDocument.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.bankDetail.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.notificationPreference.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.property.deleteMany({ where: { id: { in: propertyIds } } }),
+    prisma.refreshToken.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.session.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.account.deleteMany({ where: { userId: { in: ownerIds } } }),
+    prisma.user.deleteMany({ where: { id: { in: ownerIds } } }),
+  ]);
+}
 
-  await prisma.userPreference.create({
-    data: {
-      userId: renter2.id,
-      preferredPriceMin: renter2Preference.budget.min,
-      preferredPriceMax: renter2Preference.budget.max,
-      preferredBedrooms: renter2Preference.bedrooms.min,
-      preferredLocations: renter2Preference.preferredLocations.map(
-        (location) => `${location.city.en}, ${location.region.en}`
-      ),
-      preferredAmenities: renter2Preference.amenities,
-      preferredType: PropertyType.APARTMENT,
-    },
-  });
+/**
+ * Creates verified owners and profile-related records.
+ */
+async function createSeedOwners(passwordHash: string): Promise<Array<{ id: string; email: string }>> {
+  const owners: Array<{ id: string; email: string }> = [];
 
-  console.log('Created User Preferences');
-
-  // 2) Auth-supporting records
-  await prisma.account.createMany({
-    data: [
-      {
-        userId: owner1.id,
-        type: 'oauth',
-        provider: 'google',
-        providerAccountId: `google-${owner1.id}`,
-      },
-      {
-        userId: renter1.id,
-        type: 'oauth',
-        provider: 'google',
-        providerAccountId: `google-${renter1.id}`,
-      },
-    ],
-  });
-
-  await prisma.session.createMany({
-    data: [
-      {
-        userId: admin.id,
-        sessionToken: crypto.randomUUID(),
-        expires: daysFromNow(7),
-      },
-      {
-        userId: owner1.id,
-        sessionToken: crypto.randomUUID(),
-        expires: daysFromNow(7),
-      },
-    ],
-  });
-
-  await prisma.refreshToken.createMany({
-    data: [
-      {
-        userId: admin.id,
-        token: crypto.randomUUID(),
-        expiresAt: daysFromNow(14),
-      },
-      {
-        userId: renter1.id,
-        token: crypto.randomUUID(),
-        expiresAt: daysFromNow(14),
-      },
-    ],
-  });
-
-  await prisma.verificationToken.create({
-    data: {
-      identifier: renter3.email ?? 'liya.t@example.com',
-      token: crypto.randomUUID(),
-      expires: daysFromNow(1),
-    },
-  });
-
-  console.log('Created Auth records');
-
-  // 3) Verification documents — one record per user, admin reviews all at once
-  await prisma.verificationDocument.createMany({
-    data: [
-      {
-        // owner2 (Sarah) — submitted front + back, pending admin review
-        userId: owner2.id,
-        frontUrl: 'https://example.com/docs/sarah-national-id-front.jpg',
-        backUrl: 'https://example.com/docs/sarah-national-id-back.jpg',
-        status: VerificationStatus.pending,
-      },
-      {
-        // owner3 (David) — needs to resubmit
-        userId: owner3.id,
-        frontUrl: 'https://example.com/docs/david-national-id-front.jpg',
-        backUrl: 'https://example.com/docs/david-national-id-back.jpg',
-        livePhotoUrl: 'https://example.com/docs/david-national-id-live.jpg',
-        status: VerificationStatus.resubmit,
-      },
-      {
-        // owner4 (Mulugeta) — only front submitted, pending
-        userId: owner4.id,
-        frontUrl: 'https://example.com/docs/mulugeta-national-id-front.jpg',
-        status: VerificationStatus.pending,
-      },
-      {
-        // owner5 (Dawit) — fully verified with all three docs
-        userId: owner5.id,
-        frontUrl: 'national-id-front-2026.pdf',
-        backUrl: 'national-id-back-2026.pdf',
-        livePhotoUrl: 'owner-photo-2026.jpg',
-        status: VerificationStatus.approved,
-        submittedAt: new Date('2026-03-15T10:00:00.000Z'),
-      },
-    ],
-  });
-
-  // 3b) Profile related records for Dawit
-  await prisma.bankDetail.create({
-    data: {
-      userId: owner5.id,
-      bankName: 'Commercial Bank of Ethiopia',
-      accountNumber: '1000123456784521',
-      holderName: 'Dawit Mekonnen',
-      branch: 'Bole Branch',
-    },
-  });
-
-  await prisma.notificationPreference.create({
-    data: {
-      userId: owner5.id,
-      appointments: true,
-      agreements: true,
-      payments: true,
-      reviews: false,
-      reports: true,
-      system: false,
-    },
-  });
-
-  console.log('Created Verification Docs');
-
-  // 4) Properties
-  const prop1 = await prisma.property.create({
-    data: {
-      ownerId: owner1.id,
-      title: textPair('Horizon Peak Villa', 'ሆራይዘን ፒክ ቪላ'),
-      description: textPair(
-        'A beautiful villa overlooking the city with modern amenities.',
-        'ዘመናዊ አገልግሎቶች ያሉት ከተማን የሚመለከት ቪላ።'
-      ),
-      location: { lat: 8.9806, lng: 38.7636 },
-      address: textPair('Bole, Addis Ababa', 'ቦሌ, አዲስ አበባ'),
-      category: textPair('VILLA', 'ቪላ'),
-      status: PropertyStatus.PENDING,
-      price: { value: 45000, currency: 'ETB' },
-      amenities: ['WiFi', 'Parking', 'CCTV', 'Balcony'],
-      images: ['https://example.com/properties/horizon.jpg'],
-      videos: ['https://example.com/properties/horizon-tour.mp4'],
-      bedrooms: 4,
-      bathrooms: 3,
-      area: { value: 250, unit: 'sqm' },
-      furnishingStatus: 'furnished',
-      leaseTerms: {
-        secureDeposit: { value: 45000, currency: 'ETB' },
-        conditions: textPair('6 months minimum, first and last month upfront', 'ቢያንስ 6 ወር፣ የመጀመሪያ እና የመጨረሻ ወር ቅድሚያ ክፍያ'),
-      },
-    },
-  });
-
-  const prop2 = await prisma.property.create({
-    data: {
-      ownerId: owner2.id,
-      title: textPair('Urban Loft 42', 'ከተማ ሎፍት 42'),
-      description: textPair(
-        'Modern loft in the heart of Addis with walkable services.',
-        'በአዲስ አበባ መሀል የሚገኝ ዘመናዊ ሎፍት።'
-      ),
-      location: { lat: 9.0167, lng: 38.7612 },
-      address: textPair('Kazanchis, Addis Ababa', 'ካዛንቺስ, አዲስ አበባ'),
-      category: textPair('APARTMENT', 'አፓርትመንት'),
-      status: PropertyStatus.AVAILABLE,
-      price: { value: 25000, currency: 'ETB' },
-      amenities: ['WiFi', 'Elevator', 'Backup Power'],
-      images: ['https://example.com/properties/loft.jpg'],
-      bedrooms: 2,
-      bathrooms: 1,
-      area: { value: 90, unit: 'sqm' },
-      furnishingStatus: 'semi-furnished',
-      leaseTerms: {
-        secureDeposit: { value: 25000, currency: 'ETB' },
-        conditions: textPair('3 months minimum, first month upfront', 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ'),
-      },
-    },
-  });
-
-  const prop3 = await prisma.property.create({
-    data: {
-      ownerId: owner3.id,
-      title: textPair('Suspicious Listing', 'አስጠራጣሪ ማስታወቂያ'),
-      description: textPair(
-        'Cheap house listing with inconsistent details.',
-        'ዝርዝሮቹ የማይጣጣሙ ዝቅተኛ ዋጋ ቤት ማስታወቂያ።'
-      ),
-      location: { lat: 9.0100, lng: 38.8470 },
-      address: textPair('Megenagna, Addis Ababa', 'መገናኛ, አዲስ አበባ'),
-      category: textPair('HOUSE', 'ቤት'),
-      status: PropertyStatus.UNAVAILABLE,
-      price: { value: 5000, currency: 'ETB' },
-      amenities: [],
-      images: [],
-      bedrooms: 1,
-      bathrooms: 1,
-      area: { value: 50, unit: 'sqm' },
-      leaseTerms: {
-        secureDeposit: { value: 5000, currency: 'ETB' },
-        conditions: textPair('1 month minimum', 'ቢያንስ 1 ወር'),
-      },
-    },
-  });
-
-  const prop4 = await prisma.property.create({
-    data: {
-      ownerId: owner1.id,
-      title: textPair('Cottage by the Lake', 'የሐይቅ ዳር ኮተጅ'),
-      description: textPair(
-        'Perfect family home close to the lake and parks.',
-        'ከሐይቅና ፓርኮች አቅራቢያ የሚገኝ ለቤተሰብ ተስማሚ ቤት።'
-      ),
-      location: { lat: 7.0570, lng: 38.4795 },
-      address: textPair('Hawassa', 'ሀዋሳ'),
-      category: textPair('HOUSE', 'ቤት'),
-      status: PropertyStatus.RENTED,
-      price: { value: 15000, currency: 'ETB' },
-      amenities: ['Garden', 'Water Tank'],
-      images: ['https://example.com/properties/cottage.jpg'],
-      bedrooms: 3,
-      bathrooms: 2,
-      area: { value: 120, unit: 'sqm' },
-      leaseTerms: {
-        secureDeposit: { value: 15000, currency: 'ETB' },
-        conditions: textPair('12 months minimum, negotiable for long-term leases', 'ቢያንስ 12 ወር፣ ረጅም ጊዜ ኪራይ ከሆነ ይከናወናል'),
-      },
-    },
-  });
-
-  const prop5 = await prisma.property.create({
-    data: {
-      ownerId: owner4.id,
-      title: textPair('Sunset Studio', 'ሰንሴት ስቱዲዮ'),
-      description: textPair(
-        'Affordable studio for single professionals.',
-        'ለነጠላ ሰራተኞች ተመጣጣኝ ዋጋ ያለው ስቱዲዮ።'
-      ),
-      location: { lat: 9.0302, lng: 38.7485 },
-      address: textPair('CMC, Addis Ababa', 'ሲኤምሲ, አዲስ አበባ'),
-      category: textPair('STUDIO', 'ስቱዲዮ'),
-      status: PropertyStatus.AVAILABLE,
-      price: { value: 12000, currency: 'ETB' },
-      amenities: ['WiFi'],
-      images: ['https://example.com/properties/studio.jpg'],
-      bedrooms: 1,
-      bathrooms: 1,
-      area: { value: 45, unit: 'sqm' },
-      leaseTerms: {
-        secureDeposit: { value: 12000, currency: 'ETB' },
-        conditions: textPair('3 months minimum, first month deposit', 'ቢያንስ 3 ወር፣ የመጀመሪያ ወር ቅድሚያ'),
-      },
-    },
-  });
-
-  console.log('Created Properties');
-
-  // 5) Conversations + Messages + Attachments + Reactions (Messaging endpoints)
-  const conversation1 = await prisma.conversation.create({
-    data: {
-      propertyId: prop1.id,
-      ownerId: owner1.id,
-      renterId: renter1.id,
-    },
-  });
-
-  const conversation2 = await prisma.conversation.create({
-    data: {
-      propertyId: prop2.id,
-      ownerId: owner2.id,
-      renterId: renter2.id,
-    },
-  });
-
-  const conversation3 = await prisma.conversation.create({
-    data: {
-      propertyId: prop5.id,
-      ownerId: owner4.id,
-      renterId: renter3.id,
-    },
-  });
-
-  const message1 = await prisma.message.create({
-    data: {
-      conversationId: conversation1.id,
-      senderId: renter1.id,
-      type: MessageType.TEXT,
-      content: 'Hi, is Horizon Peak Villa still available this week?',
-      status: MessageStatus.DELIVERED,
-    },
-  });
-
-  const message2 = await prisma.message.create({
-    data: {
-      conversationId: conversation1.id,
-      senderId: owner1.id,
-      type: MessageType.TEXT,
-      content: 'Yes, it is available. We can schedule a visit tomorrow.',
-      replyToId: message1.id,
-      status: MessageStatus.READ,
-    },
-  });
-
-  const message3 = await prisma.message.create({
-    data: {
-      conversationId: conversation2.id,
-      senderId: renter2.id,
-      type: MessageType.IMAGE,
-      content: 'Sharing my document preview',
-      status: MessageStatus.SENT,
-      attachments: {
-        create: {
-          url: '/uploads/sample-lease-proof.jpg',
-          fileName: 'sample-lease-proof.jpg',
-          mimeType: 'image/jpeg',
-          fileSize: 182431,
+  for (const owner of OWNERS) {
+    const created = await prisma.user.create({
+      data: {
+        email: owner.email,
+        password: passwordHash,
+        first_name: owner.firstName,
+        last_name: owner.lastName,
+        phone: owner.phone,
+        role: Role.owner,
+        emailVerified: true,
+        isVerified: true,
+        verificationState: VerificationState.verified,
+        status: UserStatus.active,
+        preferredLanguage: 'en',
+        location: owner.location.en,
+        bio: owner.bio.en,
+        image: owner.image,
+        verificationDocs: {
+          create: {
+            frontUrl: `https://picsum.photos/seed/${owner.firstName.toLowerCase()}-id-front/900/600`,
+            backUrl: `https://picsum.photos/seed/${owner.firstName.toLowerCase()}-id-back/900/600`,
+            livePhotoUrl: owner.image,
+            status: VerificationStatus.approved,
+            note: `${SEED_TAG} approved owner verification`,
+            reviewedAt: new Date(),
+          },
+        },
+        bankDetail: {
+          create: {
+            bankName: owner.bankName,
+            branch: owner.bankBranch,
+            accountNumber: owner.accountNumber,
+            holderName: `${owner.firstName} ${owner.lastName}`,
+          },
+        },
+        notificationPreference: {
+          create: {
+            appointments: true,
+            agreements: true,
+            payments: true,
+            reviews: true,
+            reports: true,
+            system: true,
+          },
         },
       },
-    },
+      select: { id: true, email: true },
+    });
+
+    owners.push({ id: created.id, email: created.email ?? owner.email });
+  }
+
+  console.log(`Created ${owners.length} verified owners.`);
+  return owners;
+}
+
+/**
+ * Converts a property draft into a Prisma create payload.
+ */
+function toPropertyCreateInput(draft: PropertyDraft): Prisma.PropertyUncheckedCreateInput {
+  return {
+    ownerId: draft.ownerId,
+    category: draft.config.category,
+    status: PropertyStatus.AVAILABLE,
+    title: buildTitle(draft),
+    description: buildDescription(draft),
+    location: draft.location,
+    address: buildAddress(draft.neighborhood),
+    price: draft.price,
+    bedrooms: draft.bedrooms,
+    bathrooms: draft.bathrooms,
+    area: { value: draft.area, unit: 'sqm' },
+    furnishingStatus: draft.furnishingStatus,
+    images: buildImages(draft.config.type, draft.sequence, draft.imageCount),
+    videos: [],
+    leaseTerms: buildLeaseTerms(draft),
+    viewCount: draft.sequence % 37,
+    isVerified: true,
+    isDeleted: false,
+  };
+}
+
+/**
+ * Creates properties and logs progress every 50 records.
+ */
+async function createSeedProperties(ownerIds: string[]): Promise<void> {
+  const drafts = buildPropertyDrafts(ownerIds);
+
+  if (drafts.length !== PROPERTY_TOTAL) {
+    throw new Error(`Expected ${PROPERTY_TOTAL} properties, built ${drafts.length}.`);
+  }
+
+  for (let index = 0; index < drafts.length; index += 1) {
+    const draft = drafts[index];
+    const property = await prisma.property.create({
+      data: toPropertyCreateInput(draft),
+      select: { id: true },
+    });
+
+    await prisma.$executeRaw`
+      UPDATE "Property"
+      SET "amenities" = CAST(${JSON.stringify(draft.amenities)} AS jsonb)
+      WHERE "id" = ${property.id}
+    `;
+
+    if ((index + 1) % 50 === 0) {
+      console.log(`Created ${index + 1}/${PROPERTY_TOTAL} properties...`);
+    }
+  }
+}
+
+/**
+ * Logs the generated property distribution.
+ */
+function logDistribution(): void {
+  console.log('Property distribution:');
+  PROPERTY_TYPES.forEach((config) => {
+    const percentage = Math.round((config.count / PROPERTY_TOTAL) * 100);
+    console.log(`- ${config.category.en}: ${config.count} (${percentage}%)`);
   });
+}
 
-  await prisma.messageReaction.createMany({
-    data: [
-      { messageId: message1.id, userId: owner1.id, emoji: '👍' },
-      { messageId: message2.id, userId: renter1.id, emoji: '✅' },
-      { messageId: message3.id, userId: owner2.id, emoji: '👀' },
-    ],
-  });
+/**
+ * Runs the seed script.
+ */
+async function main(): Promise<void> {
+  console.log('Seeding Ethiopian rental owners and properties...');
+  console.log(`Seed tag: ${SEED_TAG}`);
 
-  await prisma.conversation.updateMany({
-    where: { id: { in: [conversation1.id, conversation2.id, conversation3.id] } },
-    data: { updatedAt: new Date() },
-  });
+  const requestedTotal = PROPERTY_TYPES.reduce((sum, config) => sum + config.count, 0);
+  if (requestedTotal !== PROPERTY_TOTAL) {
+    throw new Error(`Property type counts must equal ${PROPERTY_TOTAL}; received ${requestedTotal}.`);
+  }
 
-  console.log('Created Messaging data');
+  await ensureSeedSchemaCompatibility();
+  await clearSeedData();
 
-  // 6) Appointments
-  const slotPending = appointmentSlot(2, 10, 30);
-  const slotConfirmed = appointmentSlot(3, 14, 45);
-  const slotCancelled = appointmentSlot(5, 9, 30);
-  const slotDeclined = appointmentSlot(1, 16, 60);
-  const slotPastConfirmed = appointmentSlot(-2, 11, 45);
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const owners = await createSeedOwners(passwordHash);
+  await createSeedProperties(owners.map((owner) => owner.id));
+  await seedRenterRecommendationData(prisma, passwordHash);
 
-  const appointment1 = await prisma.appointment.create({
-    data: {
-      propertyId: prop1.id,
-      renterId: renter1.id,
-      ownerId: owner1.id,
-      startsAt: slotPending.startsAt,
-      endsAt: slotPending.endsAt,
-      status: AppointmentStatus.PENDING,
-      note: 'Please confirm if parking is available.',
-    },
-  });
-
-  const appointment2 = await prisma.appointment.create({
-    data: {
-      propertyId: prop2.id,
-      renterId: renter2.id,
-      ownerId: owner2.id,
-      startsAt: slotConfirmed.startsAt,
-      endsAt: slotConfirmed.endsAt,
-      status: AppointmentStatus.ACCEPTED,
-      note: 'Will arrive with family member.',
-    },
-  });
-
-  const appointment3 = await prisma.appointment.create({
-    data: {
-      propertyId: prop5.id,
-      renterId: renter3.id,
-      ownerId: owner4.id,
-      startsAt: slotCancelled.startsAt,
-      endsAt: slotCancelled.endsAt,
-      status: AppointmentStatus.REJECTED,
-      note: 'Rescheduling due to work.',
-    },
-  });
-
-  const appointment4 = await prisma.appointment.create({
-    data: {
-      propertyId: prop1.id,
-      renterId: renter2.id,
-      ownerId: owner1.id,
-      startsAt: slotDeclined.startsAt,
-      endsAt: slotDeclined.endsAt,
-      status: AppointmentStatus.REJECTED,
-      note: 'Requested slot conflicts with owner travel plans.',
-    },
-  });
-
-  const appointment5 = await prisma.appointment.create({
-    data: {
-      propertyId: prop4.id,
-      renterId: renter1.id,
-      ownerId: owner1.id,
-      startsAt: slotPastConfirmed.startsAt,
-      endsAt: slotPastConfirmed.endsAt,
-      status: AppointmentStatus.ACCEPTED,
-      note: 'Visited and discussed lease terms.',
-    },
-  });
-
-  console.log('Created Appointments');
-
-  // 7) Agreements
-  const ag1 = await prisma.agreement.create({
-    data: {
-      propertyId: prop1.id,
-      renterId: renter1.id,
-      ownerId: owner1.id,
-      monthlyRent: 45000,
-      startDate: new Date('2026-04-01'),
-      endDate: new Date('2027-04-01'),
-      status: AgreementStatus.completed,
-      depositAmountEtb: 45000,
-      depositOriginal: { value: 45000, currency: 'ETB' },
-      activatedAt: new Date('2026-04-01'),
-      offerExpiresAt: new Date('2026-12-31'),
-    },
-  });
-
-  const ag2 = await prisma.agreement.create({
-    data: {
-      propertyId: prop2.id,
-      renterId: renter2.id,
-      ownerId: owner2.id,
-      monthlyRent: 25000,
-      startDate: new Date('2026-05-01'),
-      endDate: new Date('2027-05-01'),
-      status: AgreementStatus.draft,
-      offerExpiresAt: new Date('2026-12-31'),
-    },
-  });
-
-  const ag3 = await prisma.agreement.create({
-    data: {
-      propertyId: prop4.id,
-      renterId: renter1.id,
-      ownerId: owner1.id,
-      monthlyRent: 15000,
-      startDate: new Date('2025-03-01'),
-      endDate: new Date('2026-03-01'),
-      status: AgreementStatus.expired,
-      offerExpiresAt: new Date('2025-02-01'),
-    },
-  });
-
-  const ag4 = await prisma.agreement.create({
-    data: {
-      propertyId: prop5.id,
-      renterId: renter3.id,
-      ownerId: owner4.id,
-      monthlyRent: 12000,
-      startDate: new Date('2026-02-01'),
-      endDate: new Date('2027-02-01'),
-      status: AgreementStatus.draft,
-      offerExpiresAt: new Date('2026-12-31'),
-    },
-  });
-
-  const ag5 = await prisma.agreement.create({
-    data: {
-      propertyId: prop2.id,
-      renterId: renter2.id,
-      ownerId: owner2.id,
-      monthlyRent: 25000,
-      startDate: new Date('2026-06-01'),
-      endDate: new Date('2027-06-01'),
-      status: AgreementStatus.sent,
-      sentAt: new Date(),
-      offerExpiresAt: new Date('2026-12-31'),
-    },
-  });
-
-  console.log('Created Agreements');
-
-  await prisma.payment.createMany({
-    data: [
-      {
-        agreementId: ag1.id,
-        purpose: PaymentPurpose.security_deposit,
-        provider: PaymentProvider.chapa,
-        amount: 45000,
-        amountEtb: 45000,
-        currency: 'ETB',
-        status: GatewayPaymentStatus.success,
-        paidAt: new Date('2026-04-05'),
-        confirmedAt: new Date('2026-04-06'),
-        chapaTxRef: `seed-ag1-dep-${crypto.randomUUID()}`,
-      },
-      {
-        agreementId: ag1.id,
-        purpose: PaymentPurpose.monthly_rent,
-        provider: PaymentProvider.manual,
-        amount: 45000,
-        amountEtb: 45000,
-        currency: 'ETB',
-        status: GatewayPaymentStatus.processing,
-        paidAt: new Date('2026-05-05'),
-        proofUrl: 'https://example.com/proofs/may-payment.jpg',
-      },
-      {
-        agreementId: ag1.id,
-        purpose: PaymentPurpose.monthly_rent,
-        provider: PaymentProvider.manual,
-        amount: 45000,
-        amountEtb: 45000,
-        currency: 'ETB',
-        status: GatewayPaymentStatus.pending,
-        paidAt: new Date('2026-06-05'),
-      },
-      {
-        agreementId: ag3.id,
-        purpose: PaymentPurpose.security_deposit,
-        provider: PaymentProvider.chapa,
-        amount: 15000,
-        amountEtb: 15000,
-        currency: 'ETB',
-        status: GatewayPaymentStatus.success,
-        paidAt: new Date('2025-12-05'),
-        confirmedAt: new Date('2025-12-06'),
-        chapaTxRef: `seed-ag3-dep-${crypto.randomUUID()}`,
-      },
-      {
-        agreementId: ag4.id,
-        purpose: PaymentPurpose.monthly_rent,
-        provider: PaymentProvider.manual,
-        amount: 12000,
-        amountEtb: 12000,
-        currency: 'ETB',
-        status: GatewayPaymentStatus.processing,
-        paidAt: new Date('2026-02-02'),
-        proofUrl: 'https://example.com/proofs/ag4-feb-payment.jpg',
-      },
-    ],
-  });
-
-  console.log('Created Payments');
-
-  // 8) Reports
-  await prisma.report.createMany({
-    data: [
-      {
-        reportedById: renter1.id,
-        targetId: owner3.id,
-        targetType: ReportTargetType.user,
-        category: 'fraud',
-        description: 'Owner tried to increase rent mid-lease and refused maintenance.',
-        status: ReportStatus.in_review,
-      },
-      {
-        reportedById: renter2.id,
-        targetId: prop3.id,
-        targetType: ReportTargetType.property,
-        category: 'false_advertising',
-        description: 'Property does not exist at the location.',
-        status: ReportStatus.open,
-      },
-      {
-        reportedById: admin.id,
-        targetId: ag1.id,
-        targetType: ReportTargetType.agreement,
-        category: 'document_mismatch',
-        description: 'Manual review required for uploaded payment document.',
-        status: ReportStatus.resolved,
-      },
-    ],
-  });
-
-  console.log('Created Reports');
-
-  // 9) Reviews
-  await prisma.review.createMany({
-    data: [
-      {
-        reviewerId: renter1.id,
-        propertyId: prop1.id,
-        rating: 5,
-        comment: 'Outstanding property! Exceeded all expectations.',
-        status: ReviewStatus.published,
-      },
-      {
-        reviewerId: renter2.id,
-        propertyId: prop2.id,
-        rating: 4,
-        comment: 'Great location and reasonable price.',
-        status: ReviewStatus.published,
-      },
-      {
-        reviewerId: renter3.id,
-        propertyId: prop5.id,
-        rating: 4,
-        comment: 'Compact and practical for one person.',
-        status: ReviewStatus.published,
-      },
-      {
-        reviewerId: renter1.id,
-        propertyId: prop3.id,
-        rating: 1,
-        comment: 'Listing information looked inaccurate during inspection.',
-        status: ReviewStatus.flagged,
-      },
-      {
-        reviewerId: admin.id,
-        propertyId: prop4.id,
-        rating: 1,
-        comment: 'Spam-style review removed by moderation.',
-        status: ReviewStatus.removed,
-      },
-    ],
-  });
-
-  console.log('Created Reviews');
-
-  // 10) Notifications
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: admin.id,
-        type: NotificationType.MESSAGE_NEW,
-        title: 'New document submission',
-        body: 'Mulugeta Abebe submitted documents for verification.',
-        payload: { verificationState: 'pending_documents' },
-      },
-      {
-        userId: admin.id,
-        type: NotificationType.MESSAGE_NEW,
-        title: 'Fraud report filed',
-        body: 'Report against suspicious listing requires review.',
-        payload: { reportCategory: 'fraud' },
-      },
-      {
-        userId: renter1.id,
-        type: NotificationType.APPOINTMENT_BOOKED,
-        title: 'Agreement activated',
-        body: 'Your agreement for Horizon Peak Villa is now active.',
-        payload: { agreementPropertyId: prop1.id },
-      },
-      {
-        userId: renter2.id,
-        type: NotificationType.APPOINTMENT_UPDATED,
-        title: 'Visit confirmed',
-        body: 'Your visit appointment was confirmed.',
-        payload: { appointmentId: appointment2.id },
-        readAt: new Date(),
-      },
-    ],
-  });
-
-  console.log('Created Notifications');
-
-  // 11) Audit logs
-  await prisma.auditLog.createMany({
-    data: [
-      {
-        actorId: admin.id,
-        eventType: 'USER_SUSPENDED',
-        entityType: 'User',
-        entityId: owner3.id,
-        metadata: { reason: 'Multiple fraud reports' },
-      },
-      {
-        actorId: admin.id,
-        eventType: 'PROPERTY_APPROVED',
-        entityType: 'Property',
-        entityId: prop4.id,
-        metadata: {},
-      },
-      {
-        actorId: renter1.id,
-        eventType: 'APPOINTMENT_BOOKED',
-        entityType: 'Appointment',
-        entityId: appointment1.id,
-        metadata: { propertyId: prop1.id },
-      },
-      {
-        actorId: owner1.id,
-        eventType: 'APPOINTMENT_STATUS_UPDATED',
-        entityType: 'Appointment',
-        entityId: appointment4.id,
-        metadata: { status: 'REJECTED' },
-      },
-      {
-        actorId: owner1.id,
-        eventType: 'APPOINTMENT_NOTE_UPDATED',
-        entityType: 'Appointment',
-        entityId: appointment5.id,
-        metadata: { note: 'Visited and discussed lease terms.' },
-      },
-      {
-        actorId: renter2.id,
-        eventType: 'MESSAGE_SENT',
-        entityType: 'Message',
-        entityId: message3.id,
-        metadata: { conversationId: conversation2.id, type: 'IMAGE' },
-      },
-    ],
-  });
-
-  console.log('Created Audit Logs');
-  console.log('Seeding Complete!');
-  console.log('----------------------------------------');
-  console.log('Default password for all users:', DEFAULT_PASSWORD);
-  console.log('Admin email:', admin.email);
-  console.log('Owner email:', owner1.email);
-  console.log('Renter email:', renter1.email);
-  console.log('Sample conversation IDs:');
-  console.log(' -', conversation1.id);
-  console.log(' -', conversation2.id);
-  console.log(' -', conversation3.id);
-  console.log('Sample message IDs:');
-  console.log(' -', message1.id);
-  console.log(' -', message2.id);
-  console.log(' -', message3.id);
-  console.log('----------------------------------------');
+  logDistribution();
+  console.log('Seeding complete.');
+  console.log('Default password for seed owners:', DEFAULT_PASSWORD);
+  console.log('Owner emails:', owners.map((owner) => owner.email).join(', '));
 }
 
 main()
-  .catch((e) => {
-    console.error('Seeding Failed:', e);
+  .catch((error: unknown) => {
+    console.error('Seeding failed:', error);
     process.exit(1);
   })
   .finally(async () => {

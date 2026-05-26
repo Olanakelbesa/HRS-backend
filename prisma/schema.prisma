@@ -203,7 +203,7 @@ model Property {
   bathrooms Int?
   area      Json?
 
-  amenities        String[] @default([])
+  amenities        Json     @default("[]")
   furnishingStatus String?
 
   images String[] @default([])
@@ -247,6 +247,8 @@ enum PropertyType {
   CONDO
   STUDIO
   HOUSE
+  SHARED_ROOM
+  SERVICED_APARTMENT
   PENTHOUSE
 }
 

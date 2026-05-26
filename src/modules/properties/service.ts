@@ -49,6 +49,47 @@ function localizeText(value: unknown, language: string): string {
   return typeof first === 'string' ? first : '';
 }
 
+function normalizeAmenities(value: unknown): Array<{ en: string; am: string }> {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((amenity) => {
+      if (typeof amenity === 'string') {
+        return { en: amenity, am: amenity };
+      }
+      if (!amenity || typeof amenity !== 'object' || Array.isArray(amenity)) {
+        return null;
+      }
+
+      const record = amenity as Record<string, unknown>;
+      const en = typeof record.en === 'string' ? record.en : '';
+      const am = typeof record.am === 'string' ? record.am : en;
+      return en ? { en, am } : null;
+    })
+    .filter((amenity): amenity is { en: string; am: string } => amenity !== null);
+}
+
+async function setPropertyAmenities(propertyId: string, amenities: unknown): Promise<void> {
+  const amenitiesJson = JSON.stringify(amenities);
+
+  await prisma.$executeRaw`
+    UPDATE "Property"
+    SET "amenities" = CAST(${amenitiesJson} AS jsonb)
+    WHERE "id" = ${propertyId}
+  `;
+}
+
+async function getPropertyForResponse(propertyId: string) {
+  return prisma.property.findFirst({
+    where: { id: propertyId, isDeleted: false },
+    include: {
+      owner: {
+        select: { id: true, first_name: true, last_name: true, email: true },
+      },
+    },
+  });
+}
+
 function localizeProperty<T extends { title: unknown; description: unknown }>(
   property: T,
   language: string
@@ -67,6 +108,8 @@ const TYPE_LABELS: Record<string, { en: string; am: string }> = {
   CONDO: { en: 'Condo', am: 'ኮንዶ' },
   STUDIO: { en: 'Studio', am: 'ስቱዲዮ' },
   HOUSE: { en: 'House', am: 'ቤት' },
+  SHARED_ROOM: { en: 'Shared Room', am: 'የጋራ ክፍል' },
+  SERVICED_APARTMENT: { en: 'Serviced Apartment', am: 'አገልግሎት ያለው አፓርታማ' },
   PENTHOUSE: { en: 'Penthouse', am: 'ፔንትሃውስ' },
 };
 
@@ -111,7 +154,7 @@ function formatPropertyResponse(property: any) {
     bedrooms: property.bedrooms ?? 0,
     bathrooms: property.bathrooms ?? 0,
     furnishingStatus: property.furnishingStatus ?? 'Unfurnished',
-    amenities: Array.isArray(property.amenities) ? property.amenities : [],
+    amenities: property.amenities,
     title,
     description,
     address,
@@ -183,7 +226,6 @@ export const propertyService = {
         bedrooms: data.bedrooms ?? null,
         bathrooms: data.bathrooms ?? null,
         area: data.area as any ?? null,
-        amenities: data.amenities ?? [],
         furnishingStatus: data.furnishingStatus ?? null,
         images: data.images ?? [],
         videos: data.videos ?? [],
@@ -197,7 +239,12 @@ export const propertyService = {
       }
     });
 
-    return formatPropertyResponse(property);
+    if (data.amenities !== undefined) {
+      await setPropertyAmenities(property.id, data.amenities);
+    }
+
+    const propertyWithJsonAmenities = await getPropertyForResponse(property.id);
+    return formatPropertyResponse(propertyWithJsonAmenities ?? property);
   },
 
   async getProperties(query: GetPropertiesQueryInput, language = 'en') {
@@ -220,8 +267,13 @@ export const propertyService = {
     const bathrooms = toNumber(raw.bathrooms);
 
     const allowedSortBy = new Set(['createdAt', 'price', 'viewCount']);
+    const requestedSortBy = typeof raw.sortBy === 'string' ? raw.sortBy : undefined;
     const sortBy =
-      typeof raw.sortBy === 'string' && allowedSortBy.has(raw.sortBy) ? raw.sortBy : 'createdAt';
+      requestedSortBy === 'viewsCount'
+        ? 'viewCount'
+        : requestedSortBy && allowedSortBy.has(requestedSortBy)
+          ? requestedSortBy
+          : 'createdAt';
 
     const order = raw.order === 'asc' || raw.order === 'desc' ? raw.order : 'desc';
 
@@ -490,7 +542,6 @@ export const propertyService = {
         ...(data.bedrooms !== undefined && { bedrooms: data.bedrooms }),
         ...(data.bathrooms !== undefined && { bathrooms: data.bathrooms }),
         ...(data.area !== undefined && { area: data.area as any }),
-        ...(data.amenities !== undefined && { amenities: data.amenities }),
         ...(data.furnishingStatus !== undefined && { furnishingStatus: data.furnishingStatus }),
         ...(data.images !== undefined && { images: data.images }),
         ...(data.videos !== undefined && { videos: data.videos }),
@@ -511,7 +562,12 @@ export const propertyService = {
       }
     });
 
-    return formatPropertyResponse(updated);
+    if (data.amenities !== undefined) {
+      await setPropertyAmenities(propertyId, data.amenities);
+    }
+
+    const propertyWithJsonAmenities = await getPropertyForResponse(propertyId);
+    return formatPropertyResponse(propertyWithJsonAmenities ?? updated);
   },
 
   async softDeleteProperty(ownerId: string, propertyId: string) {
@@ -525,13 +581,15 @@ export const propertyService = {
     if (!existing) return null;
     if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
 
-    return await prisma.property.update({
+    const deleted = await prisma.property.update({
       where: { id: propertyId },
       data: {
         isDeleted: true,
         deletedAt: new Date(),
       },
     });
+
+    return formatPropertyResponse(deleted);
   },
 
   async getMyProperties(ownerId: string) {
@@ -563,10 +621,17 @@ export const propertyService = {
     if (!existing) return null;
     if (existing.ownerId !== ownerId) return 'UNAUTHORIZED';
 
-    return await prisma.property.update({
+    const updated = await prisma.property.update({
       where: { id: propertyId },
       data: { status },
+      include: {
+        owner: {
+          select: { id: true, first_name: true, last_name: true, email: true },
+        },
+      },
     });
+
+    return formatPropertyResponse(updated);
   },
 
   async upsertPropertyTranslation(

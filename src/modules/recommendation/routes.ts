@@ -61,7 +61,7 @@ const router = Router();
  *                       example: 38.7758
  *               preferredType:
  *                 type: string
- *                 enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE, PENTHOUSE]
+ *                 enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE, SHARED_ROOM, SERVICED_APARTMENT, PENTHOUSE]
  *                 example: APARTMENT
  *               amenities:
  *                 type: array
