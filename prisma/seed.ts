@@ -760,6 +760,7 @@ function toPropertyCreateInput(draft: PropertyDraft): Prisma.PropertyUncheckedCr
     bedrooms: draft.bedrooms,
     bathrooms: draft.bathrooms,
     area: { value: draft.area, unit: 'sqm' },
+    amenities: draft.amenities as unknown as Prisma.InputJsonValue,
     furnishingStatus: draft.furnishingStatus,
     images: buildImages(draft.config.type, draft.sequence, draft.imageCount),
     videos: [],
@@ -782,16 +783,10 @@ async function createSeedProperties(ownerIds: string[]): Promise<void> {
 
   for (let index = 0; index < drafts.length; index += 1) {
     const draft = drafts[index];
-    const property = await prisma.property.create({
+    await prisma.property.create({
       data: toPropertyCreateInput(draft),
       select: { id: true },
     });
-
-    await prisma.$executeRaw`
-      UPDATE "Property"
-      SET "amenities" = CAST(${JSON.stringify(draft.amenities)} AS jsonb)
-      WHERE "id" = ${property.id}
-    `;
 
     if ((index + 1) % 50 === 0) {
       console.log(`Created ${index + 1}/${PROPERTY_TOTAL} properties...`);

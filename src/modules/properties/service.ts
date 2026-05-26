@@ -1,11 +1,12 @@
 import prisma from '../../config/database';
 import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from './schema';
-import { PropertyStatus } from '@prisma/client';
+import { Prisma, PropertyStatus } from '@prisma/client';
 import { AppError } from '../../core/AppError';
 import { deleteFromCloudinary } from '../../utils/uploadToCloudinary';
 import interactionService from '../interactions/service';
 
 const SUPPORTED_LANGUAGES = new Set(['en', 'am']);
+type Amenity = { en: string; am: string };
 
 /**
  * Check if a user is verified (helper function)
@@ -49,45 +50,43 @@ function localizeText(value: unknown, language: string): string {
   return typeof first === 'string' ? first : '';
 }
 
-function normalizeAmenities(value: unknown): Array<{ en: string; am: string }> {
-  if (!Array.isArray(value)) return [];
+function normalizeAmenity(value: unknown): Amenity | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? { en: trimmed, am: trimmed } : null;
+  }
 
-  return value
-    .map((amenity) => {
-      if (typeof amenity === 'string') {
-        return { en: amenity, am: amenity };
-      }
-      if (!amenity || typeof amenity !== 'object' || Array.isArray(amenity)) {
-        return null;
-      }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
 
-      const record = amenity as Record<string, unknown>;
-      const en = typeof record.en === 'string' ? record.en : '';
-      const am = typeof record.am === 'string' ? record.am : en;
-      return en ? { en, am } : null;
-    })
-    .filter((amenity): amenity is { en: string; am: string } => amenity !== null);
+  const record = value as Record<string, unknown>;
+  const en = typeof record.en === 'string' ? record.en.trim() : '';
+  const am = typeof record.am === 'string' ? record.am.trim() : en;
+
+  return en ? { en, am: am || en } : null;
 }
 
-async function setPropertyAmenities(propertyId: string, amenities: unknown): Promise<void> {
-  const amenitiesJson = JSON.stringify(amenities);
+function parseAmenitiesSource(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
 
-  await prisma.$executeRaw`
-    UPDATE "Property"
-    SET "amenities" = CAST(${amenitiesJson} AS jsonb)
-    WHERE "id" = ${propertyId}
-  `;
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return trimmed;
+  }
 }
 
-async function getPropertyForResponse(propertyId: string) {
-  return prisma.property.findFirst({
-    where: { id: propertyId, isDeleted: false },
-    include: {
-      owner: {
-        select: { id: true, first_name: true, last_name: true, email: true },
-      },
-    },
-  });
+function normalizeAmenities(value: unknown): Amenity[] {
+  const parsed = parseAmenitiesSource(value);
+  const source = Array.isArray(parsed) ? parsed : parsed === undefined || parsed === null ? [] : [parsed];
+
+  return source
+    .map(normalizeAmenity)
+    .filter((amenity): amenity is Amenity => amenity !== null);
 }
 
 function localizeProperty<T extends { title: unknown; description: unknown }>(
@@ -154,7 +153,7 @@ function formatPropertyResponse(property: any) {
     bedrooms: property.bedrooms ?? 0,
     bathrooms: property.bathrooms ?? 0,
     furnishingStatus: property.furnishingStatus ?? 'Unfurnished',
-    amenities: property.amenities,
+    amenities: normalizeAmenities(property.amenities),
     title,
     description,
     address,
@@ -226,6 +225,7 @@ export const propertyService = {
         bedrooms: data.bedrooms ?? null,
         bathrooms: data.bathrooms ?? null,
         area: data.area as any ?? null,
+        amenities: normalizeAmenities(data.amenities) as unknown as Prisma.InputJsonValue,
         furnishingStatus: data.furnishingStatus ?? null,
         images: data.images ?? [],
         videos: data.videos ?? [],
@@ -238,13 +238,7 @@ export const propertyService = {
         }
       }
     });
-
-    if (data.amenities !== undefined) {
-      await setPropertyAmenities(property.id, data.amenities);
-    }
-
-    const propertyWithJsonAmenities = await getPropertyForResponse(property.id);
-    return formatPropertyResponse(propertyWithJsonAmenities ?? property);
+    return formatPropertyResponse(property);
   },
 
   async getProperties(query: GetPropertiesQueryInput, language = 'en') {
@@ -542,6 +536,9 @@ export const propertyService = {
         ...(data.bedrooms !== undefined && { bedrooms: data.bedrooms }),
         ...(data.bathrooms !== undefined && { bathrooms: data.bathrooms }),
         ...(data.area !== undefined && { area: data.area as any }),
+        ...(data.amenities !== undefined && {
+          amenities: normalizeAmenities(data.amenities) as unknown as Prisma.InputJsonValue,
+        }),
         ...(data.furnishingStatus !== undefined && { furnishingStatus: data.furnishingStatus }),
         ...(data.images !== undefined && { images: data.images }),
         ...(data.videos !== undefined && { videos: data.videos }),
@@ -561,13 +558,7 @@ export const propertyService = {
         }
       }
     });
-
-    if (data.amenities !== undefined) {
-      await setPropertyAmenities(propertyId, data.amenities);
-    }
-
-    const propertyWithJsonAmenities = await getPropertyForResponse(propertyId);
-    return formatPropertyResponse(propertyWithJsonAmenities ?? updated);
+    return formatPropertyResponse(updated);
   },
 
   async softDeleteProperty(ownerId: string, propertyId: string) {
