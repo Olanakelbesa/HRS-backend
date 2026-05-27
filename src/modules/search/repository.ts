@@ -1,8 +1,8 @@
 import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 
-// BAAI/bge-large-en has a dimension of 1024
-const EMBEDDING_DIMENSION = 1024;
+// BAAI/bge-small-en-v1.5 has a dimension of 384
+const EMBEDDING_DIMENSION = 384;
 
 /**
  * Initializes pgvector and creates the HNSW expression index.
@@ -14,7 +14,7 @@ export async function initVectorSearch() {
     await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector;');
 
     // 2. Create expression index for efficient cosine similarity calculations
-    // We cast the double precision[] column to vector(1024) inside the index definition
+    // We cast the double precision[] column to vector(384) inside the index definition
     await prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS property_embedding_vector_idx
       ON "PropertyEmbedding"

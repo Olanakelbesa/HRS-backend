@@ -1,4 +1,3 @@
 fastapi
 uvicorn[standard]
-sentence-transformers
-torch
+fastembed

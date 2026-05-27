@@ -1,18 +1,18 @@
 services:
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: smart-rental-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: house_rental
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-house_rental}
     ports:
-      - '5432:5432'
+      - '${DB_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ 'CMD-SHELL', 'pg_isready -U postgres' ]
+      test: [ 'CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}' ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
     image: redis:7-alpine
     container_name: smart-rental-redis
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -36,19 +36,35 @@ services:
       dockerfile: Dockerfile
     container_name: smart-rental-backend
     ports:
-      - '5000:5000'
+      - '${PORT:-5000}:${PORT:-5000}'
     environment:
-      PORT: 5000
-      NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/house_rental
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret-min-32-chars}
+      PORT: ${PORT:-5000}
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-house_rental}}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-house_rental}}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      EMBEDDING_URL: http://embedding-service:8000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL}
+      GOOGLE_EMAIL_USER: ${GOOGLE_EMAIL_USER}
+      GOOGLE_EMAIL_PASS: ${GOOGLE_EMAIL_PASS}
+      CLOUDINARY_URL: ${CLOUDINARY_URL}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      CHAPA_ENCRIPTION_KEY: ${CHAPA_ENCRIPTION_KEY}
+      CHAPA_PUBLICK_KEY: ${CHAPA_PUBLICK_KEY}
+      CHAPA_SECRET_KEY: ${CHAPA_SECRET_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_URL: ${EMBEDDING_URL:-http://embedding-service:8000}
+      APP_BASE_URL: ${APP_BASE_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +80,7 @@ services:
       dockerfile: Dockerfile
     container_name: smart-rental-bge
     ports:
-      - '8000:8000'
+      - '${EMBEDDING_PORT:-8000}:8000'
     restart: unless-stopped
 
 volumes:

@@ -2,8 +2,8 @@ import { getCache, setCache } from '../../utils/cache';
 import { vectorSearch } from './repository';
 import { formatPropertyResponse } from '../properties/service';
 
-// BAAI/bge-large-en has a dimension of 1024
-const EMBEDDING_DIMENSION = 1024;
+// BAAI/bge-small-en-v1.5 has a dimension of 384
+const EMBEDDING_DIMENSION = 384;
 
 /**
  * Interface representing parsed query filters extracted by LLM.

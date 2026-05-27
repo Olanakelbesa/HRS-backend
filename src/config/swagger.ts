@@ -27,11 +27,10 @@ const options: swaggerJsdoc.Options = {
       },
     },
   },
-  // Avoid duplicate/competing definitions by scanning one source per environment.
-  apis:
-    env.NODE_ENV === 'production'
-      ? [path.join(process.cwd(), 'dist/modules/**/*.js')]
-      : [path.join(process.cwd(), 'src/modules/**/*.ts')],
+  // Avoid duplicate/competing definitions by scanning one source based on the running file type.
+  apis: __filename.endsWith('.js')
+    ? [path.join(__dirname, '../modules/**/*.js')]
+    : [path.join(__dirname, '../modules/**/*.ts')],
 };
 
 const baseSpec = swaggerJsdoc(options) as {
