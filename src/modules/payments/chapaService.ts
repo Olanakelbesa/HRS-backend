@@ -13,6 +13,13 @@ export async function processChapaTxRef(txRef: string) {
 
   if (!payment) throw new AppError('Payment not found for this reference', 404);
 
+  if (payment.status === 'success') {
+    return { payment, agreement: payment.agreement, alreadyCompleted: true };
+  }
+  if (payment.status === 'failed') {
+    return { payment, agreement: payment.agreement, alreadyCompleted: false, failed: true };
+  }
+
   const verified = await verifyTransaction(txRef);
   const normalized = (verified.status || '').toLowerCase();
 

@@ -23,14 +23,31 @@ export async function finalizeSecurityDeposit(payment: Payment) {
       return { payment: current, agreement, alreadyCompleted: true };
     }
 
-    const updatedPayment = await tx.payment.update({
-      where: { id: current.id },
+    const updateResult = await tx.payment.updateMany({
+      where: {
+        id: current.id,
+        status: { not: 'success' },
+      },
       data: {
         status: 'success',
         paidAt: new Date(),
         confirmedAt: new Date(),
       },
     });
+
+    if (updateResult.count === 0) {
+      const freshPayment = await tx.payment.findUnique({
+        where: { id: current.id },
+        include: { agreement: true },
+      });
+      if (!freshPayment) throw new AppError('Payment not found', 404);
+      return { payment: freshPayment, agreement: freshPayment.agreement, alreadyCompleted: true };
+    }
+
+    const updatedPayment = await tx.payment.findUnique({
+      where: { id: current.id },
+    });
+    if (!updatedPayment) throw new AppError('Payment not found', 404);
 
     const agreement = await tx.agreement.findUnique({
       where: { id: current.agreementId },
@@ -93,5 +110,7 @@ export async function finalizeSecurityDeposit(payment: Payment) {
     });
 
     return { payment: updatedPayment, agreement: activated as Agreement, alreadyCompleted: false };
+  }, {
+    timeout: 15000,
   });
 }
