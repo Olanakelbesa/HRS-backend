@@ -47,11 +47,24 @@ services:
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      EMBEDDING_URL: http://embedding-service:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      embedding-service:
+        condition: service_started
+    restart: unless-stopped
+
+  embedding-service:
+    build:
+      context: ./embedding-service
+      dockerfile: Dockerfile
+    container_name: smart-rental-bge
+    ports:
+      - '8000:8000'
     restart: unless-stopped
 
 volumes:

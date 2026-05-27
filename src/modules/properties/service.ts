@@ -1,4 +1,5 @@
 import prisma from '../../config/database';
+import { syncPropertyEmbedding } from '../search/repository';
 import { CreatePropertyInput, GetPropertiesQueryInput, UpdatePropertyInput } from './schema';
 import { Prisma, PropertyStatus } from '@prisma/client';
 import { AppError } from '../../core/AppError';
@@ -123,7 +124,7 @@ function buildLeaseTerms(
   return Object.keys(base).length > 0 ? base : null;
 }
 
-function formatPropertyResponse(property: any) {
+export function formatPropertyResponse(property: any) {
   const category = (property.category as any) || { en: '', am: '' };
   const location = (property.location as any) || { lat: 0, lng: 0 };
   const price = (property.price as any) || { value: 0, currency: 'ETB' };
@@ -238,7 +239,9 @@ export const propertyService = {
         }
       }
     });
-    return formatPropertyResponse(property);
+    const formatted = formatPropertyResponse(property);
+    syncPropertyEmbedding(property.id).catch((err) => console.error('Background embedding sync failed:', err));
+    return formatted;
   },
 
   async getProperties(query: GetPropertiesQueryInput, language = 'en') {
@@ -558,7 +561,9 @@ export const propertyService = {
         }
       }
     });
-    return formatPropertyResponse(updated);
+    const formatted = formatPropertyResponse(updated);
+    syncPropertyEmbedding(updated.id).catch((err) => console.error('Background embedding sync failed:', err));
+    return formatted;
   },
 
   async softDeleteProperty(ownerId: string, propertyId: string) {
