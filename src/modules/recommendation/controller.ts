@@ -14,6 +14,16 @@ class RecommendationController {
     });
   };
 
+  updatePreferences: RequestHandler = async (req, res) => {
+    const { userId } = req as AuthenticatedRequest;
+    const result = await service.updatePreferences(userId, req.body);
+    res.json({
+      status: 'success',
+      message: 'Preferences updated successfully',
+      data: result,
+    });
+  };
+
   getPreferences: RequestHandler = async (req, res) => {
     const { userId } = req as AuthenticatedRequest;
     const result = await service.getPreferences(userId);

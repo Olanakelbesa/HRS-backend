@@ -2,18 +2,6 @@ import prisma from '../../config/database';
 import { cosineSimilarity } from '../../utils/similarity.utils';
 import interactionService from '../interactions/service';
 
-type LocalizedText = {
-  en: string | null;
-  am: string | null;
-};
-
-type PreferenceLocation = {
-  city: LocalizedText;
-  region: LocalizedText;
-  lat: number | null;
-  lng: number | null;
-};
-
 type PreferencePayload = {
   budget?: { min?: number; max?: number; currency?: string };
   bedrooms?: number | { min?: number; max?: number };
@@ -30,25 +18,6 @@ type PreferencePayload = {
 function buildPreferenceResponse(pref: any) {
   if (!pref) return null;
 
-  // Multilingual mapping for Property Type
-  const propertyTypeMap: Record<string, { en: string; am: string }> = {
-    VILLA: { en: 'VILLA', am: 'ቪላ' },
-    APARTMENT: { en: 'APARTMENT', am: 'አፓርትመንት' },
-    CONDO: { en: 'CONDO', am: 'ኮንዶ' },
-    STUDIO: { en: 'STUDIO', am: 'ስቱዲዮ' },
-    HOUSE: { en: 'HOUSE', am: 'ቤት' },
-    SHARED_ROOM: { en: 'SHARED_ROOM', am: 'የጋራ ክፍል' },
-    SERVICED_APARTMENT: { en: 'SERVICED_APARTMENT', am: 'አገልግሎት ያለው አፓርታማ' },
-    PENTHOUSE: { en: 'PENTHOUSE', am: 'ፔንትሃውስ' },
-  };
-
-  // Multilingual mapping for Furnish Status
-  const furnishStatusMap: Record<string, { en: string; am: string }> = {
-    furnished: { en: 'furnished', am: 'የታጠቀ' },
-    'semi-furnished': { en: 'semi-furnished', am: 'በከፊል የታጠቀ' },
-    unfurnished: { en: 'unfurnished', am: 'ያልታጠቀ' },
-  };
-
   return {
     budget: {
       min: pref.preferredPriceMin,
@@ -57,9 +26,9 @@ function buildPreferenceResponse(pref: any) {
     },
     bedrooms: pref.preferredBedrooms,
     preferredLocations: pref.preferredLocations || [],
-    preferredType: pref.preferredType ? (propertyTypeMap[pref.preferredType] || { en: pref.preferredType, am: pref.preferredType }) : null,
+    preferredType: pref.preferredType ?? null,
     amenities: pref.preferredAmenities || [],
-    furnishStatus: pref.furnishStatus ? (furnishStatusMap[pref.furnishStatus] || { en: pref.furnishStatus, am: pref.furnishStatus }) : null,
+    furnishStatus: pref.furnishStatus ?? null,
     updatedAt: pref.updatedAt,
   };
 }
@@ -72,32 +41,36 @@ class RecommendationService {
     const dbData: any = {};
 
     if (data.budget) {
-      dbData.preferredPriceMin = data.budget.min;
-      dbData.preferredPriceMax = data.budget.max;
-      dbData.preferredCurrency = data.budget.currency;
+      if (data.budget.min !== undefined) dbData.preferredPriceMin = data.budget.min;
+      if (data.budget.max !== undefined) dbData.preferredPriceMax = data.budget.max;
+      if (data.budget.currency !== undefined) dbData.preferredCurrency = data.budget.currency;
     }
 
     if (data.bedrooms !== undefined) {
       if (typeof data.bedrooms === 'number') {
         dbData.preferredBedrooms = data.bedrooms;
       } else {
-        dbData.preferredBedrooms = data.bedrooms.min || data.bedrooms.max;
+        dbData.preferredBedrooms = data.bedrooms.min ?? data.bedrooms.max;
       }
     }
 
-    if (data.preferredLocations) {
-      dbData.preferredLocations = data.preferredLocations;
+    if (data.preferredLocations !== undefined) {
+      dbData.preferredLocations = data.preferredLocations.map((location) => ({
+        address: location.address,
+        lat: location.lat ?? null,
+        lng: location.lng ?? null,
+      }));
     }
 
-    if (data.preferredType) {
+    if (data.preferredType !== undefined) {
       dbData.preferredType = data.preferredType;
     }
 
-    if (data.amenities) {
+    if (data.amenities !== undefined) {
       dbData.preferredAmenities = data.amenities;
     }
 
-    if (data.furnishStatus) {
+    if (data.furnishStatus !== undefined) {
       dbData.furnishStatus = data.furnishStatus;
     }
 
@@ -108,6 +81,10 @@ class RecommendationService {
     });
 
     return buildPreferenceResponse(pref);
+  }
+
+  async updatePreferences(userId: string, data: PreferencePayload) {
+    return this.savePreferences(userId, data);
   }
 
   async getPreferences(userId: string) {

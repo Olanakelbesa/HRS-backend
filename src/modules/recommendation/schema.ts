@@ -1,24 +1,6 @@
 import { z } from 'zod';
 import { PropertyType } from '@prisma/client';
 
-const localizedTextSchema = z.object({
-  en: z.string().min(1),
-  am: z.string().min(1).optional(),
-});
-
-const localizedValueSchema = z.union([localizedTextSchema, z.string().min(1)]);
-
-const locationSchema = z.object({
-  city: localizedValueSchema,
-  region: localizedValueSchema.optional(),
-  state: localizedValueSchema.optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-});
-
-const propertyTypeSchema = z.union([localizedTextSchema, z.string().min(1)]);
-const furnishStatusSchema = z.enum(['furnished', 'semiFurnished', 'unfunished']);
-
 export const preferenceSchema = z.object({
   budget: z
     .object({
@@ -26,6 +8,11 @@ export const preferenceSchema = z.object({
       max: z.number().nonnegative().optional(),
       currency: z.string().default('ETB'),
     })
+    .refine(
+      (budget) =>
+        budget.min === undefined || budget.max === undefined || budget.min <= budget.max,
+      'Minimum budget must be less than or equal to maximum budget'
+    )
     .optional(),
   bedrooms: z.union([z.number().int().nonnegative(), z.object({
     min: z.number().int().nonnegative().optional(),

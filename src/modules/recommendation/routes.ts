@@ -2,7 +2,7 @@ import { Router } from 'express';
 import controller from './controller';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate';
-import { preferenceSchema, searchSchema, interactionSchema } from './schema';
+import { searchSchema, interactionSchema } from './schema';
 
 const router = Router();
 
@@ -12,97 +12,6 @@ const router = Router();
  *   - name: Recommendation
  *     description: User preferences, search history, interactions, and recommendations
  */
-
-/**
- * @openapi
- * /api/v1/recommendations/preferences:
- *   post:
- *     summary: Save user preferences
- *     description: |
- *       Store or update the renter's search preferences including budget, location, and property type.
- *     tags: [Recommendation]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               budget:
- *                 type: object
- *                 properties:
- *                   min:
- *                     type: number
- *                     example: 15000
- *                   max:
- *                     type: number
- *                     example: 80000
- *                   currency:
- *                     type: string
- *                     example: "ETB"
- *               bedrooms:
- *                 type: integer
- *                 example: 2
- *               preferredLocations:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     address:
- *                       type: string
- *                       example: "Bole, Addis Ababa"
- *                     lat:
- *                       type: number
- *                       example: 9.0044
- *                     lng:
- *                       type: number
- *                       example: 38.7758
- *               preferredType:
- *                 type: string
- *                 enum: [VILLA, APARTMENT, CONDO, STUDIO, HOUSE, SHARED_ROOM, SERVICED_APARTMENT, PENTHOUSE]
- *                 example: APARTMENT
- *               amenities:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ["Parking", "Security", "WiFi / Broadband"]
- *               furnishStatus:
- *                 type: string
- *                 enum: [furnished, semi-furnished, unfurnished]
- *                 example: furnished
- *     responses:
- *       200:
- *         description: Preferences saved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *   get:
- *     summary: Get user preferences
- *     tags: [Recommendation]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User preferences fetched successfully
- */
-router.post(
-  '/preferences',
-  requireAuth,
-  validate(preferenceSchema),
-  controller.savePreferences
-);
-
-router.get('/preferences', requireAuth, controller.getPreferences);
 
 /**
  * @openapi

@@ -14,7 +14,7 @@ import recommendationRoutes from './modules/recommendation/routes';
 import recommendationController from './modules/recommendation/controller';
 import { requireAuth, restrictTo } from './middlewares/auth.middleware';
 import { validate } from './middlewares/validate';
-import { searchSchema, interactionSchema } from './modules/recommendation/schema';
+import { preferenceSchema, searchSchema, interactionSchema } from './modules/recommendation/schema';
 import reportRoutes from './modules/reports/routes';
 import verificationRoutes from './modules/verification/routes';
 import ownerRoutes from './modules/owner/routes';
@@ -56,9 +56,28 @@ router.use('/recommendation', recommendationRoutes);
 // Renter interaction tracking (event-sourced)
 router.use('/interactions', interactionRoutes);
 
-// Expose user preferences at /user/preferences for backward-compatible client paths
-router.post('/user/preferences', requireAuth, recommendationController.savePreferences as any);
-router.get('/user/preferences', requireAuth, recommendationController.getPreferences as any);
+// Renter-scoped preferences endpoint used by onboarding/profile flows.
+// Preferences are only available to renter accounts.
+router.post(
+  '/renter/preferences',
+  requireAuth,
+  restrictTo('renter'),
+  validate(preferenceSchema),
+  recommendationController.savePreferences as any
+);
+router.patch(
+  '/renter/preferences',
+  requireAuth,
+  restrictTo('renter'),
+  validate(preferenceSchema),
+  recommendationController.updatePreferences as any
+);
+router.get(
+  '/renter/preferences',
+  requireAuth,
+  restrictTo('renter'),
+  recommendationController.getPreferences as any
+);
 
 // Backwards-compatible search history endpoints at /search/history
 router.post(
