@@ -15,7 +15,8 @@
   },
   "keywords": [],
   "dependencies": {
-    "@prisma/client": "^6.19.2",
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "6.19.3",
     "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",

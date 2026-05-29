@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getCache, setCache } from '../../utils/cache';
 import { vectorSearch } from './repository';
 import { formatPropertyResponse } from '../properties/service';
@@ -18,58 +19,61 @@ interface ParsedFilters {
   style?: string | null;
 }
 
+// Lazily initialized Gemini Client to avoid errors if API key is not yet set at startup
+let genAI: GoogleGenerativeAI | null = null;
+function getGeminiClient(apiKey: string): GoogleGenerativeAI {
+  if (!genAI) {
+    genAI = new GoogleGenerativeAI(apiKey);
+  }
+  return genAI;
+}
+
 /**
- * Parses raw text search queries using OpenAI GPT-4o-mini to extract structured SQL filters.
- * Returns empty object if OpenAI API Key is missing or request fails.
+ * Parses raw text search queries using Gemini AI to extract structured SQL filters.
+ * Returns empty object if Gemini API Key is missing or request fails.
  */
 export async function parseQuery(query: string): Promise<ParsedFilters> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
-    console.warn('⚠ OPENAI_API_KEY is not configured. Falling back to pure vector similarity.');
+    console.warn('⚠ GEMINI_API_KEY is not configured. Falling back to pure vector similarity.');
     return {};
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+    const ai = getGeminiClient(apiKey);
+    const model = ai.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: `Analyze the user query for house rental search and output a JSON object containing:
-            - location: string or null (e.g. "Bole", "Kazanchis")
-            - maxPrice: number or null (budget ceiling, numeric)
-            - minPrice: number or null (budget floor, numeric)
-            - bedrooms: number or null (minimum rooms)
-            - bathrooms: number or null (minimum bathrooms)
-            - amenities: string[] (array of amenities, e.g. ["wifi", "pool", "gym", "parking"])
-            - style: string or null (design, status, or description keywords, e.g. "modern", "cheap", "luxury", "furnished", "spacious")`,
-          },
-          { role: 'user', content: query },
-        ],
-      }),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenAI API returned status ${response.status}: ${errText}`);
-    }
+    const prompt = `Analyze the user query for house rental search and output a JSON object.
 
-    const result = await response.json() as any;
-    const content = result.choices?.[0]?.message?.content;
-    return JSON.parse(content || '{}') as ParsedFilters;
+JSON Schema:
+{
+  "location": string | null (e.g. "Bole", "Kazanchis"),
+  "maxPrice": number | null (budget ceiling, numeric),
+  "minPrice": number | null (budget floor, numeric),
+  "bedrooms": number | null (minimum rooms),
+  "bathrooms": number | null (minimum bathrooms),
+  "amenities": string[] (array of amenities, e.g. ["wifi", "pool", "gym", "parking"]),
+  "style": string | null (design, status, or description keywords, e.g. "modern", "cheap", "luxury", "furnished", "spacious")
+}
+
+Return ONLY valid JSON. Do not wrap in markdown or include any explanations. If invalid, return an empty object.
+
+User query: "${query}"`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return JSON.parse(text || '{}') as ParsedFilters;
   } catch (err) {
-    console.error('Error parsing query with OpenAI:', err);
+    console.error('Error parsing query with Gemini:', err);
     return {};
   }
 }
+
 
 /**
  * Calls the local embedding service python container to create the 1024-dim BGE vector.
@@ -114,7 +118,7 @@ export async function searchProperties(query: string, page = 1, limit = 12) {
     return cached;
   }
 
-  // 2. Parse text query using OpenAI (Query understanding)
+  // 2. Parse text query using Gemini AI (Query understanding)
   const filters = await parseQuery(query);
 
   // 3. Generate BGE text embedding (Vectorization)
