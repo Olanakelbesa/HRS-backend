@@ -36,9 +36,12 @@ Return this structure:
 - "affordable" → maxPrice = 60000 ETB
 - "mid-range" → maxPrice = 100000 ETB
 - "luxury" → minPrice = 120000 ETB
-- "under X" / "$X" → maxPrice = X with matching priceCurrency
-- "over X" → minPrice = X with matching priceCurrency
+- "under X" / "less X" / "less than X" / "below X" → maxPrice = X
+- "15000 birr" / "15000 ETB" → maxPrice = 15000, priceCurrency = ETB
+- "$X" / "X USD" → maxPrice = X, priceCurrency = USD
+- "over X" / "more X" → minPrice = X with matching priceCurrency
 - Compare rents using ETB equivalent in the database (amountEtb)
+- "birr" always means ETB
 
 ### Bedrooms:
 - "1 bedroom" → 1
@@ -56,14 +59,15 @@ Extract only from:
 ### Property Types (exact match on category; use penthouse not house for penthouses):
 Infer only if explicitly stated:
 - apartment, villa, studio, house, penthouse, condo, shared room, serviced apartment
+- Do NOT set propertyType to "house" for generic phrases like "I need a house" or "looking for a house" (means any rental)
 
 ### Keywords:
 Include descriptive words like:
-- modern
-- cheap
-- spacious
-- new
-- luxury
+- modern, cheap, spacious, new, luxury, student, affordable
+
+### Student queries:
+- "I am a student" → add keyword "student"; if a birr/ETB budget is given use that as maxPrice
+- Prefer not to set propertyType unless a specific type is named (not generic "house")
 
 ### Confidence scoring:
 Estimate confidence from 0 to 1 based on:
@@ -98,6 +102,23 @@ Output:
   "propertyType": null,
   "keywords": ["cheap", "modern"],
   "confidence": 0.95
+}
+
+---
+
+Input: i am student and i need the house less 15000 birr
+
+Output:
+{
+  "location": null,
+  "bedrooms": null,
+  "minPrice": null,
+  "maxPrice": 15000,
+  "priceCurrency": "ETB",
+  "amenities": [],
+  "propertyType": null,
+  "keywords": ["student"],
+  "confidence": 0.5
 }`;
 
 export function buildQueryParserUserPrompt(query: string): string {

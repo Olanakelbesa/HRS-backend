@@ -13,11 +13,27 @@ export const ALLOWED_AMENITIES = [
   'elevator',
 ] as const;
 
-const KEYWORD_VOCAB = ['modern', 'cheap', 'spacious', 'new', 'luxury', 'affordable', 'cozy', 'bright'] as const;
+const KEYWORD_VOCAB = [
+  'modern',
+  'cheap',
+  'spacious',
+  'new',
+  'luxury',
+  'affordable',
+  'cozy',
+  'bright',
+  'student',
+] as const;
 
 const BEDROOM_PATTERN = /\b(\d+)\s*(?:bed(?:room)?s?|br)\b/i;
-const PRICE_UNDER_PATTERN = /\b(?:under|below|less than|max|upto|up to)\s*([\d,]+)\b/i;
-const PRICE_OVER_PATTERN = /\b(?:over|above|more than|min|from)\s*([\d,]+)\b/i;
+/** "under 15000", "less than 15000", "less 15000 birr" */
+const PRICE_UNDER_PATTERN =
+  /\b(?:under|below|upto|up to|max|less than|less)\s*([\d,]+)(?:\s*(?:birr|etb|br))?/i;
+const PRICE_OVER_PATTERN =
+  /\b(?:over|above|min|from|more than|more)\s*([\d,]+)(?:\s*(?:birr|etb|br))?/i;
+/** Colloquial housing request — not property category "House" */
+const GENERIC_HOUSE_PHRASE =
+  /\b(?:need|want|looking for|searching for|find|get)\s+(?:a\s+)?(?:the\s+)?house\b/i;
 const USD_AMOUNT_PATTERN = /\$\s*([\d,]+)|\b([\d,]+)\s*(?:usd|dollars?)\b/i;
 const ETB_AMOUNT_PATTERN = /\b([\d,]+)\s*(?:etb|birr)\b/i;
 const NEAR_LOCATION_PATTERN = /\b(?:near|in|around|at)\s+([a-z][a-z\s-]{1,40})/i;
@@ -84,6 +100,7 @@ function parseNumberToken(raw: string): number | null {
 
 function detectPriceCurrency(query: string): SupportedCurrency {
   if (/\$|usd\b|dollars?\b/i.test(query)) return 'USD';
+  if (/\bbirr\b|\betb\b|\bbr\b/i.test(query)) return 'ETB';
   return 'ETB';
 }
 
@@ -131,7 +148,9 @@ function applyPriceRulesFromText(query: string, filters: ParsedFilters, etbPerUs
     const amount = parseNumberToken(underMatch[1]);
     if (amount != null) {
       filters.maxPrice = amount;
-      if (priceCurrency === 'ETB' && /\$|usd/i.test(underMatch[0])) {
+      if (/\bbirr\b|\betb\b/i.test(underMatch[0]) || /\bbirr\b|\betb\b/i.test(query)) {
+        filters.priceCurrency = 'ETB';
+      } else if (/\$|usd/i.test(underMatch[0])) {
         filters.priceCurrency = 'USD';
       }
     }
@@ -145,9 +164,14 @@ function applyPriceRulesFromText(query: string, filters: ParsedFilters, etbPerUs
     }
   }
 
-  // Normalize: if user said cheap in ETB context, ensure USD listings aren't compared raw
-  if (filters.priceCurrency === 'ETB' && filters.maxPrice != null && priceCurrency === 'USD') {
-    // explicit USD amount already set
+  if (/\bstudent(s)?\b/i.test(lower)) {
+    if (!filters.keywords.includes('student')) {
+      filters.keywords = [...filters.keywords, 'student'];
+    }
+    if (filters.maxPrice == null) {
+      filters.maxPrice = 40_000;
+      filters.priceCurrency = 'ETB';
+    }
   }
 }
 
@@ -165,6 +189,10 @@ function extractKeywords(query: string): string[] {
 }
 
 function parsePropertyTypeFromQuery(query: string): PropertyTypeFilter | null {
+  if (GENERIC_HOUSE_PHRASE.test(query)) {
+    return null;
+  }
+
   for (const { pattern, type } of PROPERTY_TYPE_PARSE_ORDER) {
     if (pattern.test(query)) {
       return type;
@@ -241,6 +269,13 @@ export function sanitizeParsedFilters(
 
   if (!filters.keywords.length) {
     filters.keywords = extractKeywords(query);
+  } else {
+    const extra = extractKeywords(query);
+    filters.keywords = [...new Set([...filters.keywords, ...extra])];
+  }
+
+  if (/\bstudent(s)?\b/i.test(query.toLowerCase()) && filters.maxPrice == null) {
+    applyPriceRulesFromText(query, filters, FALLBACK_ETB_PER_USD);
   }
 
   if (filters.confidence === 0) {
