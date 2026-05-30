@@ -4,7 +4,9 @@ import { vectorSearch } from './repository';
 import { formatPropertyResponse } from '../properties/service';
 import {
   hasStructuredFilters,
+  mergeParsedFilters,
   normalizeParsedFilters,
+  parseQueryLocally,
   relaxFilters,
   type ParsedFilters,
 } from './filters';
@@ -21,15 +23,22 @@ function getGeminiClient(apiKey: string): GoogleGenerativeAI {
   return genAI;
 }
 
+function isGeminiQuotaError(err: unknown): boolean {
+  const status = (err as { status?: number })?.status;
+  const message = err instanceof Error ? err.message : String(err);
+  return status === 429 || /quota|rate.?limit|too many requests/i.test(message);
+}
+
 /**
- * Parses raw text search queries using Gemini AI to extract structured SQL filters.
- * Returns empty object if Gemini API Key is missing or request fails.
+ * Parses search queries: Gemini when available, local rules as fallback.
  */
 export async function parseQuery(query: string): Promise<ParsedFilters> {
+  const local = parseQueryLocally(query);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
+
   if (!apiKey) {
-    console.warn('⚠ GEMINI_API_KEY is not configured. Falling back to pure vector similarity.');
-    return {};
+    console.warn('⚠ GEMINI_API_KEY is not configured. Using local query parser.');
+    return local;
   }
 
   try {
@@ -63,10 +72,15 @@ User query: "${query}"`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    return JSON.parse(text || '{}') as ParsedFilters;
+    const gemini = JSON.parse(text || '{}') as ParsedFilters;
+    return mergeParsedFilters(gemini, local);
   } catch (err) {
-    console.error('Error parsing query with Gemini:', err);
-    return {};
+    if (isGeminiQuotaError(err)) {
+      console.warn('⚠ Gemini quota exceeded. Using local query parser for this request.');
+    } else {
+      console.warn('⚠ Gemini query parse failed. Using local query parser.', err);
+    }
+    return local;
   }
 }
 
