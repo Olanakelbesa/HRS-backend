@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getCache, setCache } from '../../utils/cache';
 import { vectorSearch } from './repository';
-import { formatPropertyResponse } from '../properties/service';
 import {
   finalizeParsedFilters,
   hasStructuredFilters,
@@ -17,8 +16,9 @@ import {
   parseQueryLocally,
   sanitizeParsedFilters,
 } from './queryParser';
+import { getEtbPerUsd, normalizeDisplayCurrency, type SupportedCurrency } from './currency';
+import { formatSearchProperty } from './formatSearchProperty';
 
-// BAAI/bge-small-en-v1.5 has a dimension of 384
 const EMBEDDING_DIMENSION = 384;
 
 let genAI: GoogleGenerativeAI | null = null;
@@ -35,11 +35,26 @@ function isGeminiQuotaError(err: unknown): boolean {
   return status === 429 || /quota|rate.?limit|too many requests/i.test(message);
 }
 
-/**
- * Parses search queries with Gemini; falls back to the local rule-based parser.
- */
-export async function parseQuery(query: string): Promise<ParsedFilters> {
-  const local = parseQueryLocally(query);
+function emptyFilters(keywords: string[], confidence: number, currency: SupportedCurrency): ParsedFilters {
+  return {
+    location: null,
+    bedrooms: null,
+    minPrice: null,
+    maxPrice: null,
+    priceCurrency: 'ETB',
+    currency,
+    amenities: [],
+    propertyType: null,
+    keywords,
+    confidence,
+  };
+}
+
+export async function parseQuery(
+  query: string,
+  displayCurrency: SupportedCurrency = 'ETB',
+): Promise<ParsedFilters> {
+  const local = parseQueryLocally(query, displayCurrency);
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
   if (!apiKey) {
@@ -70,8 +85,12 @@ export async function parseQuery(query: string): Promise<ParsedFilters> {
     });
 
     const text = result.response.text();
-    const gemini = sanitizeParsedFilters(JSON.parse(text || '{}') as Partial<ParsedFilters>, query);
-    return mergeParsedFilters(gemini, local, query);
+    const gemini = sanitizeParsedFilters(
+      JSON.parse(text || '{}') as Partial<ParsedFilters>,
+      query,
+      displayCurrency,
+    );
+    return mergeParsedFilters(gemini, local, query, displayCurrency);
   } catch (err) {
     if (isGeminiQuotaError(err)) {
       console.warn('⚠ Gemini quota exceeded. Using local query parser for this request.');
@@ -109,8 +128,14 @@ export async function createEmbedding(text: string): Promise<number[]> {
   }
 }
 
-export async function searchProperties(query: string, page = 1, limit = 12) {
-  const cacheKey = `search:${query.trim().toLowerCase()}:${page}:${limit}`;
+export async function searchProperties(
+  query: string,
+  page = 1,
+  limit = 12,
+  displayCurrency: SupportedCurrency = 'ETB',
+) {
+  const currency = normalizeDisplayCurrency(displayCurrency);
+  const cacheKey = `search:${query.trim().toLowerCase()}:${currency}:${page}:${limit}`;
 
   const cached = await getCache(cacheKey);
   if (cached) {
@@ -118,48 +143,33 @@ export async function searchProperties(query: string, page = 1, limit = 12) {
     return cached;
   }
 
-  const filters = finalizeParsedFilters(query, await parseQuery(query));
+  const etbPerUsd = await getEtbPerUsd();
+  const parsed = await parseQuery(query, currency);
+  const filters = finalizeParsedFilters(query, { ...parsed, currency });
 
   const embedding = await createEmbedding(query);
 
   const skip = (page - 1) * limit;
-  let { results, total } = await vectorSearch(embedding, filters, skip, limit);
+  let { results, total } = await vectorSearch(embedding, filters, skip, limit, etbPerUsd);
   let appliedFilters = filters;
 
   if (total === 0 && hasStructuredFilters(filters)) {
     const relaxed = relaxFilters(filters);
-    const relaxedResult = await vectorSearch(embedding, relaxed, skip, limit);
+    const relaxedResult = await vectorSearch(embedding, relaxed, skip, limit, etbPerUsd);
     if (relaxedResult.total > 0) {
       ({ results, total } = relaxedResult);
       appliedFilters = relaxed;
     } else {
       const vectorOnly = await vectorSearch(
         embedding,
-        {
-          location: null,
-          bedrooms: null,
-          minPrice: null,
-          maxPrice: null,
-          amenities: [],
-          propertyType: null,
-          keywords: filters.keywords,
-          confidence: filters.confidence,
-        },
+        emptyFilters(filters.keywords, filters.confidence, currency),
         skip,
         limit,
+        etbPerUsd,
       );
       if (vectorOnly.total > 0) {
         ({ results, total } = vectorOnly);
-        appliedFilters = {
-          location: null,
-          bedrooms: null,
-          minPrice: null,
-          maxPrice: null,
-          amenities: [],
-          propertyType: null,
-          keywords: filters.keywords,
-          confidence: filters.confidence,
-        };
+        appliedFilters = emptyFilters(filters.keywords, filters.confidence, currency);
       }
     }
   }
@@ -177,7 +187,7 @@ export async function searchProperties(query: string, page = 1, limit = 12) {
         : null,
     };
     return {
-      ...formatPropertyResponse(property),
+      ...formatSearchProperty(property, etbPerUsd, currency),
       similarity: Number(row.similarity?.toFixed(4) ?? 0),
     };
   });
@@ -190,6 +200,10 @@ export async function searchProperties(query: string, page = 1, limit = 12) {
       limit,
       totalPages: Math.ceil(total / limit),
       filters: appliedFilters,
+      fxRate: {
+        etbPerUsd,
+        base: 'ETB',
+      },
     },
   };
 

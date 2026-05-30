@@ -1,17 +1,30 @@
 import { sanitizeParsedFilters } from './queryParser';
+import { buildRentAmountEtbSql, type SupportedCurrency } from './currency';
+import { categoryLabelForPropertyType } from './propertyTypes';
+
+export type PropertyTypeFilter =
+  | 'apartment'
+  | 'villa'
+  | 'studio'
+  | 'house'
+  | 'penthouse'
+  | 'condo'
+  | 'shared room'
+  | 'serviced apartment';
 
 /**
  * Structured filters from the Smart House Rental query parser.
- * SQL filters: location, price, bedrooms, amenities, propertyType.
- * Keywords are semantic — handled by vector similarity on the full query.
+ * Price filters use ETB-equivalent rent unless priceCurrency is USD.
  */
 export interface ParsedFilters {
   location: string | null;
   bedrooms: number | null;
   minPrice: number | null;
   maxPrice: number | null;
+  priceCurrency: SupportedCurrency;
+  currency: SupportedCurrency;
   amenities: string[];
-  propertyType: 'apartment' | 'villa' | 'studio' | 'house' | null;
+  propertyType: PropertyTypeFilter | null;
   keywords: string[];
   confidence: number;
 }
@@ -33,7 +46,7 @@ export function hasStructuredFilters(filters: ParsedFilters): boolean {
 
 /** Re-run sanitization after merge (price rules + confidence). */
 export function finalizeParsedFilters(query: string, filters: ParsedFilters): ParsedFilters {
-  return sanitizeParsedFilters(filters, query);
+  return sanitizeParsedFilters(filters, query, filters.currency);
 }
 
 /** Filters used when strict SQL pre-filtering returns no rows. */
@@ -52,30 +65,55 @@ function sqlLikeLiteral(value: string): string {
   return `'%${escapeLikePattern(value)}%'`;
 }
 
+function sqlStringLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
 /**
  * Builds SQL AND clauses for hybrid search pre-filtering.
+ * @param etbPerUsd - used to compare USD-listed rents in ETB
  */
-export function buildFilterSql(filters: ParsedFilters): string {
+export function buildFilterSql(filters: ParsedFilters, etbPerUsd: number): string {
   let filterSql = '';
+  const rentEtb = buildRentAmountEtbSql(etbPerUsd);
 
   if (hasValue(filters.maxPrice)) {
-    filterSql += ` AND (p.price->>'value')::numeric <= ${Number(filters.maxPrice)}`;
+    const max = Number(filters.maxPrice);
+    if (filters.priceCurrency === 'USD') {
+      filterSql += ` AND (
+        (UPPER(COALESCE(p.price->>'currency', 'ETB')) = 'USD' AND (p.price->>'value')::numeric <= ${max})
+        OR
+        (UPPER(COALESCE(p.price->>'currency', 'ETB')) <> 'USD' AND ${rentEtb} <= ${Math.round(max * etbPerUsd)})
+      )`;
+    } else {
+      filterSql += ` AND ${rentEtb} <= ${max}`;
+    }
   }
+
   if (hasValue(filters.minPrice)) {
-    filterSql += ` AND (p.price->>'value')::numeric >= ${Number(filters.minPrice)}`;
+    const min = Number(filters.minPrice);
+    if (filters.priceCurrency === 'USD') {
+      filterSql += ` AND (
+        (UPPER(COALESCE(p.price->>'currency', 'ETB')) = 'USD' AND (p.price->>'value')::numeric >= ${min})
+        OR
+        (UPPER(COALESCE(p.price->>'currency', 'ETB')) <> 'USD' AND ${rentEtb} >= ${Math.round(min * etbPerUsd)})
+      )`;
+    } else {
+      filterSql += ` AND ${rentEtb} >= ${min}`;
+    }
   }
 
   if (filters.bedrooms != null) {
     if (filters.bedrooms === 0 || filters.propertyType === 'studio') {
-      filterSql += ` AND (p.bedrooms = 0 OR p.category::text ILIKE '%studio%')`;
+      filterSql += ` AND (p.bedrooms = 0 OR LOWER(TRIM(p.category->>'en')) = 'studio')`;
     } else {
       filterSql += ` AND p.bedrooms >= ${Number(filters.bedrooms)}`;
     }
   }
 
   if (hasValue(filters.propertyType) && filters.bedrooms !== 0) {
-    const pt = sqlLikeLiteral(filters.propertyType);
-    filterSql += ` AND p.category::text ILIKE ${pt}`;
+    const label = categoryLabelForPropertyType(filters.propertyType);
+    filterSql += ` AND LOWER(TRIM(p.category->>'en')) = ${sqlStringLiteral(label)}`;
   }
 
   if (hasValue(filters.location)) {

@@ -42,9 +42,10 @@ export async function vectorSearch(
   filters: ParsedFilters,
   skip: number,
   limit: number,
+  etbPerUsd: number,
 ) {
   const embeddingString = `[${embedding.join(',')}]`;
-  const filterSql = buildFilterSql(filters);
+  const filterSql = buildFilterSql(filters, etbPerUsd);
 
   // Execute raw query using pgvector operators
   // <=> computes cosine distance, similarity is 1 - distance

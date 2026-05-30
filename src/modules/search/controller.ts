@@ -17,10 +17,10 @@ export const searchPropertiesController = async (req: Request, res: Response) =>
     });
   }
 
-  const { query, page, limit } = parsed.data;
+  const { query, page, limit, currency } = parsed.data;
 
   try {
-    const result = await searchProperties(query, page, limit);
+    const result = await searchProperties(query, page, limit, currency);
     return res.status(200).json({
       status: 'success',
       message: 'Semantic search completed successfully',

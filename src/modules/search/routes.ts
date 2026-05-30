@@ -26,6 +26,13 @@ const router = Router();
  *         schema:
  *           type: integer
  *           default: 12
+ *       - in: query
+ *         name: currency
+ *         schema:
+ *           type: string
+ *           enum: [ETB, USD]
+ *           default: ETB
+ *         description: Preferred currency for price display (amountEtb always included)
  *     responses:
  *       200:
  *         description: Search completed successfully

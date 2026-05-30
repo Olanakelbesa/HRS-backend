@@ -1,4 +1,7 @@
-import type { ParsedFilters } from './filters';
+import type { ParsedFilters, PropertyTypeFilter } from './filters';
+import type { SupportedCurrency } from './currency';
+import { FALLBACK_ETB_PER_USD } from './currency';
+import { PROPERTY_TYPE_PARSE_ORDER } from './propertyTypes';
 
 export const ALLOWED_AMENITIES = [
   'gym',
@@ -10,18 +13,21 @@ export const ALLOWED_AMENITIES = [
   'elevator',
 ] as const;
 
-export const ALLOWED_PROPERTY_TYPES = ['apartment', 'villa', 'studio', 'house'] as const;
-
 const KEYWORD_VOCAB = ['modern', 'cheap', 'spacious', 'new', 'luxury', 'affordable', 'cozy', 'bright'] as const;
 
 const BEDROOM_PATTERN = /\b(\d+)\s*(?:bed(?:room)?s?|br)\b/i;
 const PRICE_UNDER_PATTERN = /\b(?:under|below|less than|max|upto|up to)\s*([\d,]+)\b/i;
 const PRICE_OVER_PATTERN = /\b(?:over|above|more than|min|from)\s*([\d,]+)\b/i;
+const USD_AMOUNT_PATTERN = /\$\s*([\d,]+)|\b([\d,]+)\s*(?:usd|dollars?)\b/i;
+const ETB_AMOUNT_PATTERN = /\b([\d,]+)\s*(?:etb|birr)\b/i;
 const NEAR_LOCATION_PATTERN = /\b(?:near|in|around|at)\s+([a-z][a-z\s-]{1,40})/i;
 
 const KNOWN_LOCATIONS = [
   'Addis Ababa',
+  'Hawassa',
+  'Adama',
   'Bole Medhanialem',
+  'Bole Adama',
   'Bole',
   'Kazanchis',
   'Piassa',
@@ -44,6 +50,8 @@ const KNOWN_LOCATIONS = [
   'Kolfe',
   'Akaky Kaliti',
   'Nifas Silk-Lafto',
+  'Old Airport',
+  'Tabor',
 ] as const;
 
 const AMENITY_ALIASES: Record<string, (typeof ALLOWED_AMENITIES)[number]> = {
@@ -58,46 +66,88 @@ const AMENITY_ALIASES: Record<string, (typeof ALLOWED_AMENITIES)[number]> = {
   lift: 'elevator',
 };
 
-const PROPERTY_TYPE_ALIASES: Record<string, (typeof ALLOWED_PROPERTY_TYPES)[number]> = {
-  apartment: 'apartment',
-  apartments: 'apartment',
-  villa: 'villa',
-  villas: 'villa',
-  studio: 'studio',
-  studios: 'studio',
-  house: 'house',
-  houses: 'house',
-};
+const PROPERTY_TYPE_SET = new Set<string>([
+  'apartment',
+  'villa',
+  'studio',
+  'house',
+  'penthouse',
+  'condo',
+  'shared room',
+  'serviced apartment',
+]);
 
 function parseNumberToken(raw: string): number | null {
   const value = Number(raw.replace(/,/g, ''));
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function applyPriceRulesFromText(query: string, filters: ParsedFilters): void {
+function detectPriceCurrency(query: string): SupportedCurrency {
+  if (/\$|usd\b|dollars?\b/i.test(query)) return 'USD';
+  return 'ETB';
+}
+
+function applyPriceRulesFromText(query: string, filters: ParsedFilters, etbPerUsd: number): void {
   const lower = query.toLowerCase();
+  const priceCurrency = filters.priceCurrency;
+
+  const usdMatch = query.match(USD_AMOUNT_PATTERN);
+  if (usdMatch && filters.maxPrice == null) {
+    const amount = parseNumberToken(usdMatch[1] || usdMatch[2] || '');
+    if (amount != null) {
+      filters.maxPrice = amount;
+      filters.priceCurrency = 'USD';
+    }
+  }
+
+  const etbMatch = query.match(ETB_AMOUNT_PATTERN);
+  if (etbMatch && filters.maxPrice == null) {
+    const amount = parseNumberToken(etbMatch[1]);
+    if (amount != null) {
+      filters.maxPrice = amount;
+      filters.priceCurrency = 'ETB';
+    }
+  }
 
   if (/\bmid[- ]?range\b/i.test(lower) && filters.maxPrice == null) {
     filters.maxPrice = 100_000;
+    filters.priceCurrency = 'ETB';
   }
   if (/\baffordable\b/i.test(lower) && filters.maxPrice == null) {
     filters.maxPrice = 60_000;
+    filters.priceCurrency = 'ETB';
   }
   if (/\bcheap\b/i.test(lower) && filters.maxPrice == null) {
-    filters.maxPrice = 40_000;
+    filters.maxPrice = priceCurrency === 'USD' ? 800 : 40_000;
+    filters.priceCurrency = priceCurrency === 'USD' ? 'USD' : 'ETB';
   }
   if (/\bluxury\b/i.test(lower) && filters.minPrice == null) {
-    filters.minPrice = 120_000;
+    filters.minPrice = priceCurrency === 'USD' ? 2_000 : 120_000;
+    filters.priceCurrency = priceCurrency === 'USD' ? 'USD' : 'ETB';
   }
 
   const underMatch = query.match(PRICE_UNDER_PATTERN);
   if (underMatch && filters.maxPrice == null) {
-    filters.maxPrice = parseNumberToken(underMatch[1]);
+    const amount = parseNumberToken(underMatch[1]);
+    if (amount != null) {
+      filters.maxPrice = amount;
+      if (priceCurrency === 'ETB' && /\$|usd/i.test(underMatch[0])) {
+        filters.priceCurrency = 'USD';
+      }
+    }
   }
 
   const overMatch = query.match(PRICE_OVER_PATTERN);
   if (overMatch && filters.minPrice == null) {
-    filters.minPrice = parseNumberToken(overMatch[1]);
+    const amount = parseNumberToken(overMatch[1]);
+    if (amount != null) {
+      filters.minPrice = amount;
+    }
+  }
+
+  // Normalize: if user said cheap in ETB context, ensure USD listings aren't compared raw
+  if (filters.priceCurrency === 'ETB' && filters.maxPrice != null && priceCurrency === 'USD') {
+    // explicit USD amount already set
   }
 }
 
@@ -114,6 +164,15 @@ function extractKeywords(query: string): string[] {
   return [...found];
 }
 
+function parsePropertyTypeFromQuery(query: string): PropertyTypeFilter | null {
+  for (const { pattern, type } of PROPERTY_TYPE_PARSE_ORDER) {
+    if (pattern.test(query)) {
+      return type;
+    }
+  }
+  return null;
+}
+
 export function computeConfidence(filters: ParsedFilters, query: string): number {
   let score = 0;
 
@@ -128,7 +187,11 @@ export function computeConfidence(filters: ParsedFilters, query: string): number
   return Math.min(1, Math.round(score * 100) / 100);
 }
 
-export function sanitizeParsedFilters(raw: Partial<ParsedFilters>, query: string): ParsedFilters {
+export function sanitizeParsedFilters(
+  raw: Partial<ParsedFilters>,
+  query: string,
+  displayCurrency: SupportedCurrency = 'ETB',
+): ParsedFilters {
   const amenities = Array.isArray(raw.amenities)
     ? raw.amenities
         .map((a) => String(a).trim().toLowerCase())
@@ -140,8 +203,8 @@ export function sanitizeParsedFilters(raw: Partial<ParsedFilters>, query: string
   let propertyType: ParsedFilters['propertyType'] = null;
   if (raw.propertyType) {
     const normalized = String(raw.propertyType).trim().toLowerCase();
-    if ((ALLOWED_PROPERTY_TYPES as readonly string[]).includes(normalized)) {
-      propertyType = normalized as ParsedFilters['propertyType'];
+    if (PROPERTY_TYPE_SET.has(normalized)) {
+      propertyType = normalized as PropertyTypeFilter;
     }
   }
 
@@ -150,6 +213,8 @@ export function sanitizeParsedFilters(raw: Partial<ParsedFilters>, query: string
     bedrooms: raw.bedrooms != null ? Number(raw.bedrooms) : null,
     minPrice: raw.minPrice != null ? Number(raw.minPrice) : null,
     maxPrice: raw.maxPrice != null ? Number(raw.maxPrice) : null,
+    priceCurrency: raw.priceCurrency === 'USD' ? 'USD' : 'ETB',
+    currency: displayCurrency,
     amenities,
     propertyType,
     keywords: Array.isArray(raw.keywords)
@@ -165,7 +230,14 @@ export function sanitizeParsedFilters(raw: Partial<ParsedFilters>, query: string
   if (Number.isNaN(filters.minPrice as number)) filters.minPrice = null;
   if (Number.isNaN(filters.maxPrice as number)) filters.maxPrice = null;
 
-  applyPriceRulesFromText(query, filters);
+  if (!query) return filters;
+
+  filters.priceCurrency = detectPriceCurrency(query);
+  applyPriceRulesFromText(query, filters, FALLBACK_ETB_PER_USD);
+
+  if (!filters.propertyType) {
+    filters.propertyType = parsePropertyTypeFromQuery(query);
+  }
 
   if (!filters.keywords.length) {
     filters.keywords = extractKeywords(query);
@@ -178,10 +250,10 @@ export function sanitizeParsedFilters(raw: Partial<ParsedFilters>, query: string
   return filters;
 }
 
-/**
- * Rule-based parser — mirrors the Gemini spec for offline / quota fallback.
- */
-export function parseQueryLocally(query: string): ParsedFilters {
+export function parseQueryLocally(
+  query: string,
+  displayCurrency: SupportedCurrency = 'ETB',
+): ParsedFilters {
   const q = query.trim();
   const lower = q.toLowerCase();
 
@@ -190,6 +262,8 @@ export function parseQueryLocally(query: string): ParsedFilters {
     bedrooms: null,
     minPrice: null,
     maxPrice: null,
+    priceCurrency: detectPriceCurrency(q),
+    currency: displayCurrency,
     amenities: [],
     propertyType: null,
     keywords: [],
@@ -206,14 +280,8 @@ export function parseQueryLocally(query: string): ParsedFilters {
     if (filters.bedrooms == null) {
       filters.bedrooms = 0;
     }
-  }
-
-  for (const [alias, canonical] of Object.entries(PROPERTY_TYPE_ALIASES)) {
-    if (alias === 'studios' || alias === 'studio') continue;
-    if (new RegExp(`\\b${alias}\\b`, 'i').test(lower)) {
-      filters.propertyType = canonical;
-      break;
-    }
+  } else {
+    filters.propertyType = parsePropertyTypeFromQuery(q);
   }
 
   const amenitySet = new Set<(typeof ALLOWED_AMENITIES)[number]>();
@@ -248,17 +316,17 @@ export function parseQueryLocally(query: string): ParsedFilters {
   }
 
   filters.keywords = extractKeywords(q);
-  applyPriceRulesFromText(q, filters);
-
+  applyPriceRulesFromText(q, filters, FALLBACK_ETB_PER_USD);
   filters.confidence = computeConfidence(filters, q);
+
   return filters;
 }
 
-/** Gemini output wins when set; local parser fills gaps. */
 export function mergeParsedFilters(
   primary: ParsedFilters,
   fallback: ParsedFilters,
   query: string,
+  displayCurrency: SupportedCurrency = 'ETB',
 ): ParsedFilters {
   return sanitizeParsedFilters(
     {
@@ -266,11 +334,14 @@ export function mergeParsedFilters(
       bedrooms: primary.bedrooms ?? fallback.bedrooms ?? null,
       minPrice: primary.minPrice ?? fallback.minPrice ?? null,
       maxPrice: primary.maxPrice ?? fallback.maxPrice ?? null,
+      priceCurrency: primary.priceCurrency || fallback.priceCurrency,
+      currency: displayCurrency,
       amenities: primary.amenities.length > 0 ? primary.amenities : fallback.amenities,
       propertyType: primary.propertyType ?? fallback.propertyType ?? null,
       keywords: primary.keywords.length > 0 ? primary.keywords : fallback.keywords,
       confidence: primary.confidence > 0 ? primary.confidence : fallback.confidence,
     },
     query,
+    displayCurrency,
   );
 }

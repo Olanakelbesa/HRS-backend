@@ -20,6 +20,7 @@ Return this structure:
   "bedrooms": number | null,
   "minPrice": number | null,
   "maxPrice": number | null,
+  "priceCurrency": "ETB" | "USD",
   "amenities": string[],
   "propertyType": string | null,
   "keywords": string[],
@@ -30,13 +31,14 @@ Return this structure:
 
 ## Interpretation Rules
 
-### Price rules:
-- "cheap" → maxPrice = 40000
-- "affordable" → maxPrice = 60000
-- "mid-range" → maxPrice = 100000
-- "luxury" → minPrice = 120000
-- "under X" → maxPrice = X
-- "over X" → minPrice = X
+### Price rules (always set priceCurrency: ETB or USD):
+- "cheap" → maxPrice = 40000 ETB (or 800 USD if query uses $ / USD)
+- "affordable" → maxPrice = 60000 ETB
+- "mid-range" → maxPrice = 100000 ETB
+- "luxury" → minPrice = 120000 ETB
+- "under X" / "$X" → maxPrice = X with matching priceCurrency
+- "over X" → minPrice = X with matching priceCurrency
+- Compare rents using ETB equivalent in the database (amountEtb)
 
 ### Bedrooms:
 - "1 bedroom" → 1
@@ -51,12 +53,9 @@ Return this structure:
 Extract only from:
 ["gym", "parking", "wifi", "furnished", "balcony", "security", "elevator"]
 
-### Property Types:
+### Property Types (exact match on category; use penthouse not house for penthouses):
 Infer only if explicitly stated:
-- apartment
-- villa
-- studio
-- house
+- apartment, villa, studio, house, penthouse, condo, shared room, serviced apartment
 
 ### Keywords:
 Include descriptive words like:
@@ -94,6 +93,7 @@ Output:
   "bedrooms": 2,
   "minPrice": null,
   "maxPrice": 40000,
+  "priceCurrency": "ETB",
   "amenities": ["gym"],
   "propertyType": null,
   "keywords": ["cheap", "modern"],
