@@ -29,97 +29,49 @@ Return this structure:
 
 ---
 
-## Interpretation Rules
+## Price rules (priceCurrency: ETB when birr/ETB, USD when $/USD)
 
-### Price rules (always set priceCurrency: ETB or USD):
-- "cheap" → maxPrice = 40000 ETB (or 800 USD if query uses $ / USD)
-- "affordable" → maxPrice = 60000 ETB
-- "mid-range" → maxPrice = 100000 ETB
-- "luxury" → minPrice = 120000 ETB
-- "under X" / "less X" / "less than X" / "below X" → maxPrice = X
-- "15000 birr" / "15000 ETB" → maxPrice = 15000, priceCurrency = ETB
-- "$X" / "X USD" → maxPrice = X, priceCurrency = USD
-- "over X" / "more X" → minPrice = X with matching priceCurrency
-- Compare rents using ETB equivalent in the database (amountEtb)
-- "birr" always means ETB
+### Maximum rent (maxPrice):
+- less than X / less X / under X / below X / at most X / maximum X / max X / up to X / no more than X
+- "15000 birr" alone (no comparator) → maxPrice = 15000, priceCurrency = ETB
+- cheap → maxPrice = 40000 ETB; affordable → 60000 ETB; mid-range → 100000 ETB
 
-### Bedrooms:
-- "1 bedroom" → 1
-- "2 bedroom" → 2
-- "studio" → 0 or 1 (choose 0 if unclear)
+### Minimum rent (minPrice):
+- greater than X / greater X / more than X / more X / over X / above X / at least X / minimum X / min X / from X / starting at X
+- luxury → minPrice = 120000 ETB
 
-### Location:
-- Extract city, area, or neighborhood (e.g., "Bole", "Kazanchis")
-- Do NOT assume location if not mentioned
+### Range (both):
+- between X and Y / from X to Y → minPrice = X, maxPrice = Y
 
-### Amenities:
-Extract only from:
-["gym", "parking", "wifi", "furnished", "balcony", "security", "elevator"]
-
-### Property Types (exact match on category; use penthouse not house for penthouses):
-Infer only if explicitly stated:
-- apartment, villa, studio, house, penthouse, condo, shared room, serviced apartment
-- Do NOT set propertyType to "house" for generic phrases like "I need a house" or "looking for a house" (means any rental)
-
-### Keywords:
-Include descriptive words like:
-- modern, cheap, spacious, new, luxury, student, affordable
-
-### Student queries:
-- "I am a student" → add keyword "student"; if a birr/ETB budget is given use that as maxPrice
-- Prefer not to set propertyType unless a specific type is named (not generic "house")
-
-### Confidence scoring:
-Estimate confidence from 0 to 1 based on:
-- +0.3 if location exists
-- +0.2 if bedrooms exist
-- +0.2 if price exists
-- +0.2 if amenities exist
-- +0.1 if query is clear and unambiguous
+### Important:
+- "greater than 15000 birr" → minPrice = 15000, maxPrice = null (NOT maxPrice)
+- "less than 15000 birr" → maxPrice = 15000, minPrice = null
+- Never set both min and max unless the query asks for a range
 
 ---
 
-## Critical Rules
-- NEVER hallucinate location, price, or bedrooms
-- NEVER return explanation text
-- ALWAYS return valid JSON
-- If query is unclear, reduce confidence
+## Bedrooms, location, amenities, property types
+(same as before: extract only when explicit; generic "need a house" → propertyType null)
+
+### Student:
+- keyword "student"; use stated birr budget as min OR max per comparator words
+- Do not set default maxPrice if user gave minPrice (e.g. greater than 15000)
 
 ---
 
-## Example
-
-Input: cheap modern 2 bedroom near Bole with gym
-
-Output:
-{
-  "location": "Bole",
-  "bedrooms": 2,
-  "minPrice": null,
-  "maxPrice": 40000,
-  "priceCurrency": "ETB",
-  "amenities": ["gym"],
-  "propertyType": null,
-  "keywords": ["cheap", "modern"],
-  "confidence": 0.95
-}
-
----
+## Examples
 
 Input: i am student and i need the house less 15000 birr
+Output: {"location":null,"bedrooms":null,"minPrice":null,"maxPrice":15000,"priceCurrency":"ETB","amenities":[],"propertyType":null,"keywords":["student"],"confidence":0.5}
 
-Output:
-{
-  "location": null,
-  "bedrooms": null,
-  "minPrice": null,
-  "maxPrice": 15000,
-  "priceCurrency": "ETB",
-  "amenities": [],
-  "propertyType": null,
-  "keywords": ["student"],
-  "confidence": 0.5
-}`;
+Input: i am student and i need the house greater than 15000 birr
+Output: {"location":null,"bedrooms":null,"minPrice":15000,"maxPrice":null,"priceCurrency":"ETB","amenities":[],"propertyType":null,"keywords":["student"],"confidence":0.5}
+
+Input: apartment between 20000 and 50000 birr in Bole
+Output: {"location":"Bole","bedrooms":null,"minPrice":20000,"maxPrice":50000,"priceCurrency":"ETB","amenities":[],"propertyType":"apartment","keywords":[],"confidence":0.8}
+
+Input: cheap modern 2 bedroom near Bole with gym
+Output: {"location":"Bole","bedrooms":2,"minPrice":null,"maxPrice":40000,"priceCurrency":"ETB","amenities":["gym"],"propertyType":null,"keywords":["cheap","modern"],"confidence":0.95}`;
 
 export function buildQueryParserUserPrompt(query: string): string {
   return `Now parse the following query:\n${query.trim()}`;

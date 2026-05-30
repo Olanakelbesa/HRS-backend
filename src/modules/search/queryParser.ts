@@ -1,7 +1,7 @@
 import type { ParsedFilters, PropertyTypeFilter } from './filters';
 import type { SupportedCurrency } from './currency';
-import { FALLBACK_ETB_PER_USD } from './currency';
 import { PROPERTY_TYPE_PARSE_ORDER } from './propertyTypes';
+import { detectPriceCurrency, extractPriceBounds } from './pricePhrases';
 
 export const ALLOWED_AMENITIES = [
   'gym',
@@ -26,16 +26,9 @@ const KEYWORD_VOCAB = [
 ] as const;
 
 const BEDROOM_PATTERN = /\b(\d+)\s*(?:bed(?:room)?s?|br)\b/i;
-/** "under 15000", "less than 15000", "less 15000 birr" */
-const PRICE_UNDER_PATTERN =
-  /\b(?:under|below|upto|up to|max|less than|less)\s*([\d,]+)(?:\s*(?:birr|etb|br))?/i;
-const PRICE_OVER_PATTERN =
-  /\b(?:over|above|min|from|more than|more)\s*([\d,]+)(?:\s*(?:birr|etb|br))?/i;
 /** Colloquial housing request — not property category "House" */
 const GENERIC_HOUSE_PHRASE =
   /\b(?:need|want|looking for|searching for|find|get)\s+(?:a\s+)?(?:the\s+)?house\b/i;
-const USD_AMOUNT_PATTERN = /\$\s*([\d,]+)|\b([\d,]+)\s*(?:usd|dollars?)\b/i;
-const ETB_AMOUNT_PATTERN = /\b([\d,]+)\s*(?:etb|birr)\b/i;
 const NEAR_LOCATION_PATTERN = /\b(?:near|in|around|at)\s+([a-z][a-z\s-]{1,40})/i;
 
 const KNOWN_LOCATIONS = [
@@ -98,69 +91,30 @@ function parseNumberToken(raw: string): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function detectPriceCurrency(query: string): SupportedCurrency {
-  if (/\$|usd\b|dollars?\b/i.test(query)) return 'USD';
-  if (/\bbirr\b|\betb\b|\bbr\b/i.test(query)) return 'ETB';
-  return 'ETB';
-}
-
-function applyPriceRulesFromText(query: string, filters: ParsedFilters, etbPerUsd: number): void {
+function applyPriceRulesFromText(query: string, filters: ParsedFilters): void {
   const lower = query.toLowerCase();
-  const priceCurrency = filters.priceCurrency;
+  const bounds = extractPriceBounds(query);
 
-  const usdMatch = query.match(USD_AMOUNT_PATTERN);
-  if (usdMatch && filters.maxPrice == null) {
-    const amount = parseNumberToken(usdMatch[1] || usdMatch[2] || '');
-    if (amount != null) {
-      filters.maxPrice = amount;
-      filters.priceCurrency = 'USD';
-    }
-  }
+  if (bounds.minPrice != null) filters.minPrice = bounds.minPrice;
+  if (bounds.maxPrice != null) filters.maxPrice = bounds.maxPrice;
+  filters.priceCurrency = bounds.priceCurrency;
 
-  const etbMatch = query.match(ETB_AMOUNT_PATTERN);
-  if (etbMatch && filters.maxPrice == null) {
-    const amount = parseNumberToken(etbMatch[1]);
-    if (amount != null) {
-      filters.maxPrice = amount;
+  if (!bounds.hasExplicitComparator) {
+    if (/\bmid[- ]?range\b/i.test(lower) && filters.maxPrice == null) {
+      filters.maxPrice = 100_000;
       filters.priceCurrency = 'ETB';
     }
-  }
-
-  if (/\bmid[- ]?range\b/i.test(lower) && filters.maxPrice == null) {
-    filters.maxPrice = 100_000;
-    filters.priceCurrency = 'ETB';
-  }
-  if (/\baffordable\b/i.test(lower) && filters.maxPrice == null) {
-    filters.maxPrice = 60_000;
-    filters.priceCurrency = 'ETB';
-  }
-  if (/\bcheap\b/i.test(lower) && filters.maxPrice == null) {
-    filters.maxPrice = priceCurrency === 'USD' ? 800 : 40_000;
-    filters.priceCurrency = priceCurrency === 'USD' ? 'USD' : 'ETB';
-  }
-  if (/\bluxury\b/i.test(lower) && filters.minPrice == null) {
-    filters.minPrice = priceCurrency === 'USD' ? 2_000 : 120_000;
-    filters.priceCurrency = priceCurrency === 'USD' ? 'USD' : 'ETB';
-  }
-
-  const underMatch = query.match(PRICE_UNDER_PATTERN);
-  if (underMatch && filters.maxPrice == null) {
-    const amount = parseNumberToken(underMatch[1]);
-    if (amount != null) {
-      filters.maxPrice = amount;
-      if (/\bbirr\b|\betb\b/i.test(underMatch[0]) || /\bbirr\b|\betb\b/i.test(query)) {
-        filters.priceCurrency = 'ETB';
-      } else if (/\$|usd/i.test(underMatch[0])) {
-        filters.priceCurrency = 'USD';
-      }
+    if (/\baffordable\b/i.test(lower) && filters.maxPrice == null) {
+      filters.maxPrice = 60_000;
+      filters.priceCurrency = 'ETB';
     }
-  }
-
-  const overMatch = query.match(PRICE_OVER_PATTERN);
-  if (overMatch && filters.minPrice == null) {
-    const amount = parseNumberToken(overMatch[1]);
-    if (amount != null) {
-      filters.minPrice = amount;
+    if (/\bcheap\b/i.test(lower) && filters.maxPrice == null) {
+      filters.maxPrice = bounds.priceCurrency === 'USD' ? 800 : 40_000;
+      filters.priceCurrency = bounds.priceCurrency === 'USD' ? 'USD' : 'ETB';
+    }
+    if (/\bluxury\b/i.test(lower) && filters.minPrice == null) {
+      filters.minPrice = bounds.priceCurrency === 'USD' ? 2_000 : 120_000;
+      filters.priceCurrency = bounds.priceCurrency === 'USD' ? 'USD' : 'ETB';
     }
   }
 
@@ -168,7 +122,7 @@ function applyPriceRulesFromText(query: string, filters: ParsedFilters, etbPerUs
     if (!filters.keywords.includes('student')) {
       filters.keywords = [...filters.keywords, 'student'];
     }
-    if (filters.maxPrice == null) {
+    if (filters.maxPrice == null && filters.minPrice == null) {
       filters.maxPrice = 40_000;
       filters.priceCurrency = 'ETB';
     }
@@ -260,8 +214,7 @@ export function sanitizeParsedFilters(
 
   if (!query) return filters;
 
-  filters.priceCurrency = detectPriceCurrency(query);
-  applyPriceRulesFromText(query, filters, FALLBACK_ETB_PER_USD);
+  applyPriceRulesFromText(query, filters);
 
   if (!filters.propertyType) {
     filters.propertyType = parsePropertyTypeFromQuery(query);
@@ -272,10 +225,6 @@ export function sanitizeParsedFilters(
   } else {
     const extra = extractKeywords(query);
     filters.keywords = [...new Set([...filters.keywords, ...extra])];
-  }
-
-  if (/\bstudent(s)?\b/i.test(query.toLowerCase()) && filters.maxPrice == null) {
-    applyPriceRulesFromText(query, filters, FALLBACK_ETB_PER_USD);
   }
 
   if (filters.confidence === 0) {
@@ -351,7 +300,7 @@ export function parseQueryLocally(
   }
 
   filters.keywords = extractKeywords(q);
-  applyPriceRulesFromText(q, filters, FALLBACK_ETB_PER_USD);
+  applyPriceRulesFromText(q, filters);
   filters.confidence = computeConfidence(filters, q);
 
   return filters;
