@@ -13,6 +13,7 @@ import { rateLimiter } from './middlewares/rateLimiter';
 
 // Routes
 import apiRoutes from './routes';
+import embeddingsRoutes from './modules/admin/embeddings.routes';
 
 const app = express();
 
@@ -111,7 +112,8 @@ app.get('/api/v1/health/schema', async (_, res) => {
         agreementFields: agreement?.fields.map((f) => f.name) ?? [],
         paymentFields: payment?.fields.map((f) => f.name) ?? [],
         enums,
-        legacyPaymentStatusColumn: agreement?.fields.some((f) => f.name === 'paymentStatus') ?? false,
+        legacyPaymentStatusColumn:
+          agreement?.fields.some((f) => f.name === 'paymentStatus') ?? false,
         legacyPaymentStatusEnum: enums.includes('PaymentStatus'),
       },
       build: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || process.env.BUILD_ID || 'local',
@@ -126,6 +128,7 @@ app.get('/api/v1/health/schema', async (_, res) => {
 
 // API Routes
 app.use('/api/v1', apiRoutes);
+app.use('/api/v1/admin', embeddingsRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

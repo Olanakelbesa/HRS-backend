@@ -1,5 +1,5 @@
 import prisma from '../../config/database';
-import { AppError } from '../../core/AppError';
+import { buildFilterSql, type ParsedFilters } from './filters';
 
 // BAAI/bge-small-en-v1.5 has a dimension of 384
 const EMBEDDING_DIMENSION = 384;
@@ -37,51 +37,14 @@ export async function initVectorSearch() {
 /**
  * Executes a semantic vector search combined with structured SQL filters.
  */
-export async function vectorSearch(embedding: number[], filters: any, skip: number, limit: number) {
-  // Convert vector to postgres array format: '[0.1, 0.2, ...]'
+export async function vectorSearch(
+  embedding: number[],
+  filters: ParsedFilters,
+  skip: number,
+  limit: number,
+) {
   const embeddingString = `[${embedding.join(',')}]`;
-
-  let filterSql = '';
-
-  // Apply price filters (JSON price field -> price->'value')
-  if (filters.maxPrice != null) {
-    filterSql += ` AND (p.price->>'value')::numeric <= ${Number(filters.maxPrice)}`;
-  }
-  if (filters.minPrice != null) {
-    filterSql += ` AND (p.price->>'value')::numeric >= ${Number(filters.minPrice)}`;
-  }
-
-  // Bed/Bath filtering
-  if (filters.bedrooms != null) {
-    filterSql += ` AND p.bedrooms >= ${Number(filters.bedrooms)}`;
-  }
-  if (filters.bathrooms != null) {
-    filterSql += ` AND p.bathrooms >= ${Number(filters.bathrooms)}`;
-  }
-
-  // Location/Address matching (case-insensitive ILIKE)
-  if (filters.location) {
-    const locEscaped = `%${filters.location.replace(/[%_]/g, '\\$&')}%`;
-    filterSql += ` AND p.address::text ILIKE '${locEscaped}'`;
-  }
-
-  // Style descriptions (modern, luxury, cheap, etc.)
-  if (filters.style) {
-    const styleEscaped = `%${filters.style.replace(/[%_]/g, '\\$&')}%`;
-    filterSql += ` AND (
-      p.title::text ILIKE '${styleEscaped}' OR 
-      p.description::text ILIKE '${styleEscaped}' OR 
-      p.category::text ILIKE '${styleEscaped}'
-    )`;
-  }
-
-  // Amenities filtering
-  if (Array.isArray(filters.amenities) && filters.amenities.length > 0) {
-    for (const amenity of filters.amenities) {
-      const amenityEscaped = `%${amenity.replace(/[%_]/g, '\\$&')}%`;
-      filterSql += ` AND p.amenities::text ILIKE '${amenityEscaped}'`;
-    }
-  }
+  const filterSql = buildFilterSql(filters);
 
   // Execute raw query using pgvector operators
   // <=> computes cosine distance, similarity is 1 - distance

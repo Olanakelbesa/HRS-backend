@@ -2,22 +2,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getCache, setCache } from '../../utils/cache';
 import { vectorSearch } from './repository';
 import { formatPropertyResponse } from '../properties/service';
+import {
+  hasStructuredFilters,
+  normalizeParsedFilters,
+  relaxFilters,
+  type ParsedFilters,
+} from './filters';
 
 // BAAI/bge-small-en-v1.5 has a dimension of 384
 const EMBEDDING_DIMENSION = 384;
-
-/**
- * Interface representing parsed query filters extracted by LLM.
- */
-interface ParsedFilters {
-  location?: string | null;
-  maxPrice?: number | null;
-  minPrice?: number | null;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  amenities?: string[];
-  style?: string | null;
-}
 
 // Lazily initialized Gemini Client to avoid errors if API key is not yet set at startup
 let genAI: GoogleGenerativeAI | null = null;
@@ -48,20 +41,23 @@ export async function parseQuery(query: string): Promise<ParsedFilters> {
       },
     });
 
-    const prompt = `Analyze the user query for house rental search and output a JSON object.
+    const prompt = `Analyze the user query for house rental search in Addis Ababa and output a JSON object.
 
 JSON Schema:
 {
-  "location": string | null (e.g. "Bole", "Kazanchis"),
-  "maxPrice": number | null (budget ceiling, numeric),
-  "minPrice": number | null (budget floor, numeric),
-  "bedrooms": number | null (minimum rooms),
-  "bathrooms": number | null (minimum bathrooms),
-  "amenities": string[] (array of amenities, e.g. ["wifi", "pool", "gym", "parking"]),
-  "style": string | null (design, status, or description keywords, e.g. "modern", "cheap", "luxury", "furnished", "spacious")
+  "location": string | null (neighborhood or subcity name only, e.g. "Bole", "Kazanchis", "Piassa"),
+  "maxPrice": number | null (monthly rent ceiling in ETB; use for "cheap", "affordable", "under X", budget limits),
+  "minPrice": number | null (monthly rent floor in ETB; use for "luxury", "premium", "above X"),
+  "bedrooms": number | null (minimum bedroom count if mentioned),
+  "bathrooms": number | null (minimum bathroom count if mentioned),
+  "amenities": string[] (explicit amenities only, e.g. ["wifi", "gym", "parking", "elevator"]),
+  "style": string | null (descriptive vibe words only for UI display, e.g. "modern", "spacious"; do NOT put price words like "cheap" here)
 }
 
-Return ONLY valid JSON. Do not wrap in markdown or include any explanations. If invalid, return an empty object.
+Rules:
+- Put price intent in maxPrice/minPrice, not in style.
+- "cheap" or "affordable" without a number → set maxPrice to a reasonable ETB ceiling (e.g. 35000–45000).
+- Return ONLY valid JSON, no markdown.
 
 User query: "${query}"`;
 
@@ -119,14 +115,31 @@ export async function searchProperties(query: string, page = 1, limit = 12) {
   }
 
   // 2. Parse text query using Gemini AI (Query understanding)
-  const filters = await parseQuery(query);
+  const rawFilters = await parseQuery(query);
+  const filters = normalizeParsedFilters(query, rawFilters);
 
   // 3. Generate BGE text embedding (Vectorization)
   const embedding = await createEmbedding(query);
 
-  // 4. Run Vector + SQL hybrid search in pgvector database
+  // 4. Run vector + SQL hybrid search; fall back if structured filters are too strict
   const skip = (page - 1) * limit;
-  const { results, total } = await vectorSearch(embedding, filters, skip, limit);
+  let { results, total } = await vectorSearch(embedding, filters, skip, limit);
+  let appliedFilters = filters;
+
+  if (total === 0 && hasStructuredFilters(filters)) {
+    const relaxed = relaxFilters(filters);
+    const relaxedResult = await vectorSearch(embedding, relaxed, skip, limit);
+    if (relaxedResult.total > 0) {
+      ({ results, total } = relaxedResult);
+      appliedFilters = relaxed;
+    } else {
+      const vectorOnly = await vectorSearch(embedding, {}, skip, limit);
+      if (vectorOnly.total > 0) {
+        ({ results, total } = vectorOnly);
+        appliedFilters = {};
+      }
+    }
+  }
 
   // 5. Structure and format standard property objects
   const formattedProperties = results.map((row) => {
@@ -154,7 +167,7 @@ export async function searchProperties(query: string, page = 1, limit = 12) {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-      filters, // Returns parsed query understanding metrics to the frontend
+      filters: appliedFilters,
     },
   };
 
