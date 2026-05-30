@@ -180,3 +180,58 @@ export async function syncAllPropertyEmbeddings() {
     console.error('❌ Failed to bulk sync property embeddings:', err);
   }
 }
+
+export interface EmbeddingResyncResult {
+  total: number;
+  success: number;
+  failed: number;
+  errors: { propertyId: string; error: string }[];
+}
+
+/**
+ * Regenerates embeddings for every active property (admin resync).
+ */
+export async function resyncAllPropertyEmbeddings(): Promise<EmbeddingResyncResult> {
+  const properties = await prisma.property.findMany({
+    where: { isDeleted: false },
+    select: { id: true },
+  });
+
+  const result: EmbeddingResyncResult = {
+    total: properties.length,
+    success: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  for (const { id } of properties) {
+    try {
+      const property = await prisma.property.findFirst({
+        where: { id, isDeleted: false },
+      });
+
+      if (!property) {
+        throw new Error('Property not found');
+      }
+
+      const text = getPropertyTextRepresentation(property);
+      const vector = await createEmbedding(text);
+
+      await prisma.propertyEmbedding.upsert({
+        where: { propertyId: id },
+        update: { embedding: vector },
+        create: { propertyId: id, embedding: vector },
+      });
+
+      result.success++;
+      console.log(`📡 Resynced embedding for Property ID: ${id}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      result.failed++;
+      result.errors.push({ propertyId: id, error: message });
+      console.error(`❌ Failed to resync embedding for Property ID: ${id}`, message);
+    }
+  }
+
+  return result;
+}

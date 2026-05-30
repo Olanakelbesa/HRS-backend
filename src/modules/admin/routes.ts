@@ -19,6 +19,7 @@ import {
   pendingVerifications,
 } from './controller';
 import * as controller from './controller';
+import embeddingsRoutes from './embeddings.routes';
 
 const router = Router();
 
@@ -1099,5 +1100,7 @@ router.patch('/reviews/:id/status', controller.reviewUpdateStatus);
  *         description: Review deleted
  */
 router.delete('/reviews/:id', controller.reviewDelete);
+
+router.use(embeddingsRoutes);
 
 export default router;

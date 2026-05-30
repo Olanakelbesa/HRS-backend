@@ -1,10 +1,26 @@
 import { Router } from 'express';
 import { resyncEmbeddingsController } from './embeddings.controller';
-import { requireAdmin } from '../auth/requireAdmin';
 
 /**
  * @swagger
  * /admin/embeddings/resync:
+ *   post:
+ *     summary: Resync all property embeddings (legacy path)
+ *     description: Same as POST /api/v1/admin/embeddings/resync. Prefer the /api/v1 path for new integrations.
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Admin
+ *     responses:
+ *       200:
+ *         description: Embedding resync completed successfully.
+ *       401:
+ *         description: Missing or invalid token.
+ *       403:
+ *         description: Admin role required.
+ *       500:
+ *         description: Internal server error during embedding resync.
+ * /api/v1/admin/embeddings/resync:
  *   post:
  *     summary: Resync all property embeddings
  *     description: Fetches all properties, regenerates their embeddings via the embedding service, and upserts them into the PropertyEmbedding table. This operation is safe to call multiple times.
@@ -70,6 +86,6 @@ import { requireAdmin } from '../auth/requireAdmin';
 
 const router = Router();
 
-router.post('/embeddings/resync', requireAdmin, resyncEmbeddingsController);
+router.post('/embeddings/resync', resyncEmbeddingsController);
 
 export default router;

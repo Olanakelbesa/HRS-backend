@@ -10,10 +10,11 @@ import { swaggerSpec } from './config/swagger';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
 import { rateLimiter } from './middlewares/rateLimiter';
+import { requireAuth, restrictTo } from './middlewares/auth.middleware';
+import { resyncEmbeddingsController } from './modules/admin/embeddings.controller';
 
 // Routes
 import apiRoutes from './routes';
-import embeddingsRoutes from './modules/admin/embeddings.routes';
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use(rateLimiter);
 app.set('trust proxy', true);
 // Swagger Documentation
 app.get('/swagger.json', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.json(swaggerSpec);
 });
 app.use(
@@ -128,7 +130,14 @@ app.get('/api/v1/health/schema', async (_, res) => {
 
 // API Routes
 app.use('/api/v1', apiRoutes);
-app.use('/api/v1/admin', embeddingsRoutes);
+
+// Legacy alias (Swagger UI and older clients used /admin/... without /api/v1)
+app.post(
+  '/admin/embeddings/resync',
+  requireAuth,
+  restrictTo('admin'),
+  resyncEmbeddingsController,
+);
 
 // Global Error Handler
 app.use(errorHandler);
