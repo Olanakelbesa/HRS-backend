@@ -33,6 +33,8 @@ const envSchema = z.object({
   CHAPA_SECRET_KEY: z.string().optional(),
   CHAPA_PUBLICK_KEY: z.string().optional(),
   EXCHANGE_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  EMBEDDING_URL: z.string().optional(),
 });
 
 const rawEnv = envSchema.parse(process.env);

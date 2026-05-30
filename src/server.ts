@@ -26,6 +26,10 @@ async function bootstrap() {
     await prisma.$connect();
     console.log('🐘 PostgreSQL connected');
 
+    const { initVectorSearch, syncAllPropertyEmbeddings } = await import('./modules/search/repository');
+    await initVectorSearch();
+    syncAllPropertyEmbeddings().catch((err) => console.error('Bulk embedding sync failed:', err));
+
     if (env.NODE_ENV === 'production') {
       await assertDatabaseSchemaReady();
       console.log('✅ Database schema compatible with Prisma client');

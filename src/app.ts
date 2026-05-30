@@ -10,6 +10,8 @@ import { swaggerSpec } from './config/swagger';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
 import { rateLimiter } from './middlewares/rateLimiter';
+import { requireAuth, restrictTo } from './middlewares/auth.middleware';
+import { resyncEmbeddingsController } from './modules/admin/embeddings.controller';
 
 // Routes
 import apiRoutes from './routes';
@@ -68,6 +70,7 @@ app.use(rateLimiter);
 app.set('trust proxy', true);
 // Swagger Documentation
 app.get('/swagger.json', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.json(swaggerSpec);
 });
 app.use(
@@ -111,7 +114,8 @@ app.get('/api/v1/health/schema', async (_, res) => {
         agreementFields: agreement?.fields.map((f) => f.name) ?? [],
         paymentFields: payment?.fields.map((f) => f.name) ?? [],
         enums,
-        legacyPaymentStatusColumn: agreement?.fields.some((f) => f.name === 'paymentStatus') ?? false,
+        legacyPaymentStatusColumn:
+          agreement?.fields.some((f) => f.name === 'paymentStatus') ?? false,
         legacyPaymentStatusEnum: enums.includes('PaymentStatus'),
       },
       build: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || process.env.BUILD_ID || 'local',
@@ -126,6 +130,14 @@ app.get('/api/v1/health/schema', async (_, res) => {
 
 // API Routes
 app.use('/api/v1', apiRoutes);
+
+// Legacy alias (Swagger UI and older clients used /admin/... without /api/v1)
+app.post(
+  '/admin/embeddings/resync',
+  requireAuth,
+  restrictTo('admin'),
+  resyncEmbeddingsController,
+);
 
 // Global Error Handler
 app.use(errorHandler);

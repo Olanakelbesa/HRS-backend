@@ -12,6 +12,7 @@ import paymentRoutes from './modules/payments/routes';
 import agreementRoutes from './modules/agreements/routes';
 import recommendationRoutes from './modules/recommendation/routes';
 import recommendationController from './modules/recommendation/controller';
+import searchRoutes from './modules/search/routes';
 import { requireAuth, restrictTo } from './middlewares/auth.middleware';
 import { validate } from './middlewares/validate';
 import { preferenceSchema, searchSchema, interactionSchema } from './modules/recommendation/schema';
@@ -34,6 +35,9 @@ router.use('/profile', profileRoutes);
 
 // Property Routes
 router.use('/properties', propertyRoutes);
+
+// Semantic Search Routes
+router.use('/search', searchRoutes);
 
 // Messaging Routes
 router.use('/messaging', messagingRoutes);

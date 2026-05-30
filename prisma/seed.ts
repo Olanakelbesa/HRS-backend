@@ -120,6 +120,7 @@ const LEGACY_OWNER_EMAILS = [
   'selam.tadesse@smart-rentals.com',
   'yonas.bekele@smart-rentals.com',
   'meron.girma@smart-rentals.com',
+  'admin@smartrental.com',
 ];
 
 /// @seed
@@ -913,6 +914,39 @@ function logDistribution(): void {
 }
 
 /**
+ * Creates the admin user.
+ */
+async function createAdminUser(passwordHash: string): Promise<void> {
+  console.log('Seeding admin user...');
+  await prisma.user.create({
+    data: {
+      email: 'admin@smartrental.com',
+      password: passwordHash,
+      first_name: 'System',
+      last_name: 'Admin',
+      phone: '+251900000000',
+      role: Role.admin,
+      emailVerified: true,
+      isVerified: true,
+      verificationState: VerificationState.verified,
+      status: UserStatus.active,
+      preferredLanguage: 'en',
+      notificationPreference: {
+        create: {
+          appointments: true,
+          agreements: true,
+          payments: true,
+          reviews: true,
+          reports: true,
+          system: true,
+        },
+      },
+    },
+  });
+  console.log('Admin user seeded successfully: admin@smartrental.com');
+}
+
+/**
  * Runs the seed script.
  */
 async function main(): Promise<void> {
@@ -928,6 +962,7 @@ async function main(): Promise<void> {
   await clearSeedData();
 
   const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  await createAdminUser(passwordHash);
   const owners = await createSeedOwners(passwordHash);
   await createSeedProperties(owners.map((owner) => owner.id));
   await seedRenterRecommendationData(prisma, passwordHash);
