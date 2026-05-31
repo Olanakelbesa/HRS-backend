@@ -229,124 +229,39 @@ class RecommendationService {
   // MAIN RECOMMENDATION ENGINE
   // ========================
   async getRecommendations(userId: string) {
-    const preferences = await prisma.userPreference.findUnique({ where: { userId } });
-    const searches = await this.getSearchHistory(userId);
+    // FAST PATH: Check the Python Recommendation Microservice (Redis/DB Precomputed)
+    try {
+      const recommendationUrl = process.env.RECOMMENDATION_URL || 'http://recommendation-service:8001';
+      const response = await fetch(`${recommendationUrl}/api/v1/recommendations/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.recommendations && data.recommendations.length > 0) {
+          // Fetch property objects for the returned IDs
+          const properties = await prisma.property.findMany({
+            where: {
+              id: { in: data.recommendations },
+              isDeleted: false,
+              status: 'AVAILABLE'
+            },
+            include: {
+              reviews: true,
+            }
+          });
 
-    const interactions = await prisma.userInteractionEvent.findMany({
-      where: { userId, type: 'VIEW' },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+          // Maintain AI ranking order
+          const propMap = new Map(properties.map(p => [p.id, p]));
+          const sortedProps = data.recommendations.map((id: string) => propMap.get(id)).filter(Boolean);
 
-    const userEmbedding = await this.getUserEmbedding(userId);
-
-    const viewedEmbeddings = await prisma.propertyEmbedding.findMany({
-      where: {
-        propertyId: { in: interactions.map((i) => i.propertyId) },
-      },
-    });
-
-    const properties = await prisma.property.findMany({
-      where: { isDeleted: false, status: 'AVAILABLE' },
-      include: {
-        reviews: true,
-        embedding: true,
-      },
-    });
-
-    const scored = properties.map((property) => {
-      let score = 0;
-      const reasons: string[] = [];
-
-      // ========================
-      // PREFERENCES
-      // ========================
-      if (preferences) {
-        const priceValue = typeof property.price === 'object' && property.price ? (property.price as any).value : undefined;
-        if (
-          preferences.preferredPriceMin !== null &&
-          preferences.preferredPriceMax !== null &&
-          priceValue !== undefined &&
-          priceValue >= preferences.preferredPriceMin &&
-          priceValue <= preferences.preferredPriceMax
-        ) {
-          score += 30;
-          reasons.push('matches your budget');
-        }
-
-        const preferredLocations = preferences.preferredLocations as any[];
-        if (
-          Array.isArray(preferredLocations) &&
-          preferredLocations.some((loc: any) => loc.address === property.location)
-        ) {
-          score += 25;
-          reasons.push('preferred location');
+          if (sortedProps.length > 0) {
+            return sortedProps;
+          }
         }
       }
+    } catch (e) {
+      console.error("Microservice unavailable or empty:", e);
+    }
 
-      // ========================
-      // SEARCH MATCHING
-      // ========================
-      searches.forEach((s) => {
-        if (property.title?.toString().toLowerCase().includes(s.query.toLowerCase())) {
-          score += 20;
-          reasons.push('matches your search');
-        }
-      });
-
-      // ========================
-      // PROPERTY SIMILARITY (EXISTING)
-      // ========================
-      if (property.embedding && viewedEmbeddings.length > 0) {
-        let maxSim = 0;
-
-        for (const viewed of viewedEmbeddings) {
-          const sim = cosineSimilarity(property.embedding.embedding, viewed.embedding);
-          if (sim > maxSim) maxSim = sim;
-        }
-
-        if (maxSim > 0.5) {
-          score += maxSim * 50;
-          reasons.push('similar to viewed properties');
-        }
-      }
-
-      // ========================
-      // USER EMBEDDING (NEW AI)
-      // ========================
-      if (userEmbedding && property.embedding) {
-        const sim = cosineSimilarity(userEmbedding, property.embedding.embedding);
-
-        if (sim > 0.5) {
-          score += sim * 60;
-          reasons.push('matches your taste');
-        }
-      }
-
-      // ========================
-      // RATING BOOST
-      // ========================
-      if (property.reviews.length > 0) {
-        const avg = property.reviews.reduce((a, r) => a + r.rating, 0) / property.reviews.length;
-        score += avg * 5;
-      }
-
-      return { property, score, reasons };
-    });
-
-    // ========================
-    // COLLABORATIVE RESULTS
-    // ========================
-    const collaborative = await this.getCollaborativeRecommendations(userId);
-
-    const topScored = scored
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 7)
-      .map((s) => s.property);
-
-    const collabTop = collaborative.slice(0, 3);
-
-    return [...topScored, ...collabTop];
+    return [];
   }
 
   // ========================

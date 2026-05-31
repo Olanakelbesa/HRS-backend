@@ -9,9 +9,10 @@ import {
   UserStatus,
   VerificationState,
 } from '@prisma/client';
+import { getRenterMapLocation, RENTER_SEED_LOCATION_COUNT, SeedMapLocation } from './seedLocations';
 
 const RENTER_SEED_TAG = '';
-const RENTER_TOTAL = 100;
+const RENTER_TOTAL = RENTER_SEED_LOCATION_COUNT;
 const HISTORY_DAYS = 60;
 
 type LocaleText = {
@@ -76,6 +77,7 @@ type RenterDraft = {
   phone: string;
   persona: Persona;
   location: string;
+  mapLocation: SeedMapLocation;
   preferredLanguage: 'en' | 'am';
 };
 
@@ -337,7 +339,7 @@ const LAST_NAMES = [
 /**
  * Seed realistic renter profiles, preferences, search history, event streams, and state projections.
  */
-export async function seedRenterRecommendationData(
+export async function seedRenterInteractionData(
   prisma: PrismaClient,
   passwordHash: string
 ): Promise<void> {
@@ -470,7 +472,7 @@ function buildRenterDrafts(): RenterDraft[] {
     const firstName = FIRST_NAMES[index % FIRST_NAMES.length];
     const lastName = LAST_NAMES[(index * 7) % LAST_NAMES.length];
     const persona = personaQueue[index];
-    const location = persona.preferredLocations[index % persona.preferredLocations.length] ?? 'Addis Ababa';
+    const mapLocation = getRenterMapLocation(index);
     renters.push({
       index,
       firstName,
@@ -478,7 +480,8 @@ function buildRenterDrafts(): RenterDraft[] {
       persona,
       email: `${firstName}.${lastName}.renter${String(index + 1).padStart(3, '0')}@smartrental.com`.toLowerCase(),
       phone: `+251 9${String(40000000 + index).padStart(8, '0')}`,
-      location: `${location}, Ethiopia`,
+      location: mapLocation.address.en,
+      mapLocation,
       preferredLanguage: index % 5 === 0 ? 'am' : 'en',
     });
   }
@@ -530,11 +533,13 @@ function buildPreferenceRow(userId: string, renter: RenterDraft): Prisma.UserPre
     preferredPriceMax: persona.budget[1],
     preferredCurrency: 'ETB',
     preferredBedrooms: persona.bedroomRange[0],
-    preferredLocations: persona.preferredLocations.map((location) => ({
-      address: `${location}, Ethiopia`,
-      lat: null,
-      lng: null,
-    })) as Prisma.InputJsonValue,
+    preferredLocations: [
+      {
+        address: renter.mapLocation.address.en,
+        lat: renter.mapLocation.lat,
+        lng: renter.mapLocation.lng,
+      },
+    ] as Prisma.InputJsonValue,
     preferredAmenities: persona.preferredAmenities,
     preferredType: persona.preferredTypes[0],
     furnishStatus: persona.furnishStatus,
@@ -562,8 +567,8 @@ function buildRenterJourney(
     const progress = sessionCount <= 1 ? 1 : sessionIndex / (sessionCount - 1);
     const sessionStart = sessionDate(start, sessionIndex, sessionCount, random);
     const sessionId = `mlseed-${userId.slice(-8)}-${String(sessionIndex + 1).padStart(2, '0')}`;
-    const sessionTheme = chooseSessionTheme(persona, sessionIndex, random);
-    const candidatePool = rankProperties(properties, persona, sessionTheme, progress);
+    const sessionTheme = chooseSessionTheme(renter, persona, sessionIndex, random);
+    const candidatePool = rankProperties(properties, persona, renter, sessionTheme, progress);
     const viewCount = randomInt(random, persona.viewsPerSession[0], persona.viewsPerSession[1]);
     const viewed = pickSessionProperties(candidatePool, viewCount, random);
 
@@ -606,7 +611,7 @@ function buildRenterJourney(
       markPair(stats.viewedPairs, userId, property.id);
       incrementStats(stats, viewEvent, property, viewed.length);
 
-      const score = scoreProperty(property, persona, sessionTheme, progress);
+      const score = scoreProperty(property, persona, renter, sessionTheme, progress);
       const engagementBoost = Math.min(0.18, score / 600);
       const forceFullFunnel =
         ['serious_seeker', 'family_seeker', 'executive'].includes(persona.key) &&
@@ -826,17 +831,24 @@ function applyState(
 function scoreProperty(
   property: PropertyFeature,
   persona: Persona,
+  renter: RenterDraft,
   sessionTheme: { location: string; type: PropertyType; typeLabel: string },
   progress: number
 ): number {
   const budget = currentBudget(persona, progress);
   let score = 0;
+  const preferredAreas = [
+    renter.mapLocation.neighborhood,
+    renter.mapLocation.subcity,
+    renter.mapLocation.city,
+    ...persona.preferredLocations,
+  ];
 
   if (property.priceEtb >= budget[0] && property.priceEtb <= budget[1]) score += 90;
   if (persona.preferredTypes.includes(property.categoryEnum)) score += 60;
   if (property.categoryEnum === sessionTheme.type) score += 35;
-  if (persona.preferredLocations.includes(property.neighborhood)) score += 55;
-  if (property.neighborhood === sessionTheme.location) score += 45;
+  if (preferredAreas.includes(property.neighborhood) || preferredAreas.includes(property.city)) score += 55;
+  if (property.neighborhood === sessionTheme.location || property.city === sessionTheme.location) score += 45;
   if (property.bedrooms >= persona.bedroomRange[0] && property.bedrooms <= persona.bedroomRange[1]) score += 35;
   if (property.furnishingStatus === persona.furnishStatus) score += 15;
 
@@ -854,13 +866,14 @@ function scoreProperty(
 function rankProperties(
   properties: PropertyFeature[],
   persona: Persona,
+  renter: RenterDraft,
   sessionTheme: { location: string; type: PropertyType; typeLabel: string },
   progress: number
 ): PropertyFeature[] {
   return properties
     .map((property, index) => ({
       property,
-      score: scoreProperty(property, persona, sessionTheme, progress) + (index % 17),
+      score: scoreProperty(property, persona, renter, sessionTheme, progress) + (index % 17),
     }))
     .sort((a, b) => b.score - a.score)
     .map((item) => item.property);
@@ -893,11 +906,15 @@ function pickSessionProperties(
  * Session theme controls coherence within a browse session.
  */
 function chooseSessionTheme(
+  renter: RenterDraft,
   persona: Persona,
   sessionIndex: number,
   random: () => number
 ): { location: string; type: PropertyType; typeLabel: string } {
-  const location = persona.preferredLocations[sessionIndex % persona.preferredLocations.length];
+  const location =
+    sessionIndex % 2 === 0
+      ? renter.mapLocation.neighborhood
+      : persona.preferredLocations[sessionIndex % persona.preferredLocations.length];
   const type = persona.preferredTypes[randomInt(random, 0, persona.preferredTypes.length - 1)];
   return { location, type, typeLabel: type.toLowerCase().replace(/_/g, ' ') };
 }

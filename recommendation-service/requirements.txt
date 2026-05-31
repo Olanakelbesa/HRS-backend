@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+requests
+redis
+psycopg2-binary
+scikit-learn
+lightfm
+pandas
+numpy
+pydantic

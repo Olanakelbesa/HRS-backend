@@ -22,6 +22,8 @@ import ownerRoutes from './modules/owner/routes';
 import interactionRoutes from './modules/interactions/routes';
 import * as appointmentController from './modules/appointments/controller';
 import { listAppointmentsQuerySchema } from './modules/appointments/schema';
+import internalRoutes from './modules/internal/routes';
+
 const router = Router();
 
 // Auth Routes
@@ -124,6 +126,9 @@ router.get(
   appointmentController.list
 );
 router.use('/owner', ownerRoutes);
+
+// Internal Microservices Integration
+router.use('/internal', internalRoutes);
 
 // Agreements (also exposes GET /owner/overview for older deploys)
 router.use('/', agreementRoutes);

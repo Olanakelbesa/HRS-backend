@@ -307,3 +307,19 @@ export async function reviewDelete(req: Request, res: Response) {
   const data = await adminService.deleteReview(auth.userId, params.id);
   return res.status(200).json({ status: 'success', data });
 }
+
+export async function triggerTraining(req: Request, res: Response) {
+  try {
+    const recommendationUrl = process.env.RECOMMENDATION_URL || 'http://recommendation-service:8001';
+    const response = await fetch(`${recommendationUrl}/api/v1/train`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to trigger training: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return res.status(200).json({ status: 'success', data });
+  } catch (error: any) {
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+}

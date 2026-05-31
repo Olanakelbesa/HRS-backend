@@ -280,6 +280,20 @@ router.get('/overview', validate(getOverviewQuerySchema, 'query'), overview);
 
 /**
  * @swagger
+ * /api/v1/admin/recommendations/train:
+ *   post:
+ *     summary: Trigger ML model training
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Training triggered successfully
+ */
+router.post('/recommendations/train', controller.triggerTraining);
+
+/**
+ * @swagger
  * /api/v1/admin/pending-verifications:
  *   get:
  *     summary: List owners waiting for verification

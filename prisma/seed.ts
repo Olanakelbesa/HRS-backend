@@ -10,17 +10,23 @@ import {
   VerificationStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { seedRenterRecommendationData } from './seedRenters';
+import { getPropertyMapLocation, SeedMapLocation, toPropertyLocationJson } from './seedLocations';
+import { seedRenterInteractionData } from './seedRenters';
 
 const prisma = new PrismaClient();
 
 const SEED_TAG = '';
 const DEFAULT_PASSWORD = 'Password123!';
 const PROPERTY_TOTAL = 300;
-const KM_PER_LATITUDE_DEGREE = 111.32;
 
 type LocaleText = Prisma.InputJsonObject & { en: string; am: string };
-type JsonLocation = Prisma.InputJsonObject & { lat: number; lng: number };
+type JsonLocation = Prisma.InputJsonObject & {
+  lat: number;
+  lng: number;
+  city: string;
+  subcity: string;
+  neighborhood: string;
+};
 type JsonPrice = Prisma.InputJsonObject & {
   value: number;
   currency: 'ETB' | 'USD';
@@ -94,7 +100,7 @@ type PropertyDraft = {
   bedrooms: number;
   bathrooms: number;
   price: JsonPrice;
-  location: JsonLocation;
+  mapLocation: SeedMapLocation;
   amenities: LocaleText[];
   imageCount: number;
   area: number;
@@ -422,14 +428,6 @@ function chooseOne<T>(items: readonly T[], random: () => number): T {
 }
 
 /**
- * Rounds a number to a fixed decimal precision.
- */
-function roundTo(value: number, decimals: number): number {
-  const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
-}
-
-/**
  * Returns a future date at 09:00 local time.
  */
 function daysFromNow(days: number): Date {
@@ -437,26 +435,6 @@ function daysFromNow(days: number): Date {
   date.setDate(date.getDate() + days);
   date.setHours(9, 0, 0, 0);
   return date;
-}
-
-/**
- * Returns a coordinate within roughly two kilometers of a neighborhood center.
- */
-function jitterLocation(neighborhood: Neighborhood, random: () => number): JsonLocation {
-  const distanceKm = Math.sqrt(random()) * 2;
-  const angle = random() * Math.PI * 2;
-  const latOffset = (distanceKm * Math.cos(angle)) / KM_PER_LATITUDE_DEGREE;
-  const lngOffset =
-    (distanceKm * Math.sin(angle)) /
-    (KM_PER_LATITUDE_DEGREE * Math.cos((neighborhood.lat * Math.PI) / 180));
-
-  return {
-    lat: roundTo(neighborhood.lat + latOffset, 6),
-    lng: roundTo(neighborhood.lng + lngOffset, 6),
-    city: neighborhood.cityEn,
-    subcity: neighborhood.subcityEn,
-    neighborhood: neighborhood.neighborhoodEn,
-  };
 }
 
 /**
@@ -535,8 +513,8 @@ function buildTitle(draft: PropertyDraft): LocaleText {
     draft.config.type === PROPERTY_TYPE.STUDIO ? 'ስቱዲዮ' : `${draft.bedrooms} መኝታ ቤት ${draft.config.noun.am}`;
 
   return textPair(
-    `${englishPrefix} in ${draft.neighborhood.neighborhoodEn}`,
-    `${amharicPrefix} - ${draft.neighborhood.neighborhoodAm}`
+    `${englishPrefix} in ${draft.mapLocation.neighborhood}`,
+    `${amharicPrefix} - ${draft.mapLocation.neighborhood}`
   );
 }
 
@@ -610,18 +588,8 @@ function buildDescription(draft: PropertyDraft): LocaleText {
   const keywords = pickVariant(DESCRIPTION_KEYWORDS[draft.config.type], draft.sequence);
 
   return textPair(
-    `${SEED_TAG} This ${draft.config.category.en.toLowerCase()} is located in ${draft.neighborhood.neighborhoodEn}, ${draft.neighborhood.cityEn}, ${surroundings.en}. It works well for ${audience.en}. It offers ${draft.bedrooms} bedroom${draft.bedrooms === 1 ? '' : 's'}, ${draft.bathrooms} bathroom${draft.bathrooms === 1 ? '' : 's'}, and about ${draft.area} sqm of usable space. Key features include ${englishFeatures}. Search highlights: ${keywords.en}. The monthly rent is ${priceText}, with lease terms designed for ${draft.config.minLeaseMonths}+ month stays.`,
-    `${SEED_TAG} ይህ ${draft.config.category.am} በ${draft.neighborhood.neighborhoodAm}፣ ${draft.neighborhood.cityAm} ውስጥ ይገኛል፣ ${surroundings.am}። ለ${audience.am} ተስማሚ ነው። ${draft.bedrooms} መኝታ ቤት፣ ${draft.bathrooms} መታጠቢያ ቤት እና በግምት ${draft.area} ካሬ ሜትር ቦታ አለው። ዋና ገጽታዎቹ ${amharicFeatures} ያካትታሉ። የፍለጋ ቁልፍ ቃላት፦ ${keywords.am}። ወርሃዊ ኪራዩ ${priceText} ሲሆን የኪራይ ውሉ ለ${draft.config.minLeaseMonths}+ ወር ቆይታ ተዘጋጅቷል።`
-  );
-}
-
-/**
- * Builds a bilingual address from city, subcity, and neighborhood.
- */
-function buildAddress(neighborhood: Neighborhood): LocaleText {
-  return textPair(
-    `${neighborhood.neighborhoodEn}, ${neighborhood.subcityEn}, ${neighborhood.cityEn}, Ethiopia`,
-    `${neighborhood.neighborhoodAm}፣ ${neighborhood.subcityAm}፣ ${neighborhood.cityAm}፣ ኢትዮጵያ`
+    `${SEED_TAG} This ${draft.config.category.en.toLowerCase()} is located in ${draft.mapLocation.neighborhood}, ${draft.mapLocation.city}, ${surroundings.en}. It works well for ${audience.en}. It offers ${draft.bedrooms} bedroom${draft.bedrooms === 1 ? '' : 's'}, ${draft.bathrooms} bathroom${draft.bathrooms === 1 ? '' : 's'}, and about ${draft.area} sqm of usable space. Key features include ${englishFeatures}. Search highlights: ${keywords.en}. The monthly rent is ${priceText}, with lease terms designed for ${draft.config.minLeaseMonths}+ month stays.`,
+    `${SEED_TAG} ይህ ${draft.config.category.am} በ${draft.mapLocation.neighborhood}፣ ${draft.mapLocation.city} ውስጥ ይገኛል፣ ${surroundings.am}። ለ${audience.am} ተስማሚ ነው። ${draft.bedrooms} መኝታ ቤት፣ ${draft.bathrooms} መታጠቢያ ቤት እና በግምት ${draft.area} ካሬ ሜትር ቦታ አለው። ዋና ገጽታዎቹ ${amharicFeatures} ያካትታሉ። የፍለጋ ቁልፍ ቃላት፦ ${keywords.am}። ወርሃዊ ኪራዩ ${priceText} ሲሆን የኪራይ ውሉ ለ${draft.config.minLeaseMonths}+ ወር ቆይታ ተዘጋጅቷል።`
   );
 }
 
@@ -664,7 +632,7 @@ function buildPropertyDrafts(ownerIds: string[]): PropertyDraft[] {
         bedrooms,
         bathrooms: bathroomCount(config, bedrooms),
         price,
-        location: jitterLocation(neighborhood, random),
+        mapLocation: getPropertyMapLocation(drafts.length),
         amenities: buildAmenities(config, random),
         imageCount: randomInt(random, 3, 8),
         area: randomInt(random, config.areaRange[0], config.areaRange[1]),
@@ -862,8 +830,8 @@ function toPropertyCreateInput(draft: PropertyDraft): Prisma.PropertyUncheckedCr
     status: PropertyStatus.AVAILABLE,
     title: buildTitle(draft),
     description: buildDescription(draft),
-    location: draft.location,
-    address: buildAddress(draft.neighborhood),
+    location: toPropertyLocationJson(draft.mapLocation) as JsonLocation,
+    address: draft.mapLocation.address,
     price: draft.price,
     bedrooms: draft.bedrooms,
     bathrooms: draft.bathrooms,
@@ -965,7 +933,7 @@ async function main(): Promise<void> {
   await createAdminUser(passwordHash);
   const owners = await createSeedOwners(passwordHash);
   await createSeedProperties(owners.map((owner) => owner.id));
-  await seedRenterRecommendationData(prisma, passwordHash);
+  await seedRenterInteractionData(prisma, passwordHash);
 
   logDistribution();
   console.log('Seeding complete.');

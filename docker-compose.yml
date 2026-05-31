@@ -57,15 +57,16 @@ services:
       SUPPORT_EMAIL: ${SUPPORT_EMAIL}
       GOOGLE_EMAIL_USER: ${GOOGLE_EMAIL_USER}
       GOOGLE_EMAIL_PASS: ${GOOGLE_EMAIL_PASS}
-      CLOUDINARY_URL: ${CLOUDINARY_URL}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+
+      CLOUDINARY_API_KEY: 834196869572432
+      CLOUDINARY_API_SECRET: she14Ox3FZStR3kSpm8sTMJcwKk
+      CLOUDINARY_CLOUD_NAME: dbwxpsplw
+      CLOUDINARY_URL: cloudinary://671985636631885:ABLfgvTa95HSwImQd7T-gR6kYc8@dkqthvuy2
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      CHAPA_ENCRIPTION_KEY: ${CHAPA_ENCRIPTION_KEY}
-      CHAPA_PUBLICK_KEY: ${CHAPA_PUBLICK_KEY}
-      CHAPA_SECRET_KEY: ${CHAPA_SECRET_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      CHAPA_ENCRIPTION_KEY: 2PX7AUpEGyZEnJ0USYubh9gf
+      CHAPA_PUBLICK_KEY: CHAPUBK_TEST-aNhkNQ0MjV7EIH5ctTrqWyBGne9oPoe4
+      CHAPA_SECRET_KEY: CHASECK_TEST-RWIk0EmZvRVdmAnNOpGodkvRyFnbP1FS
+      GEMINI_API_KEY: AIzaSyBFCveS8vWBgABTLquruR_E3-Nyhrx5Jfk
       EMBEDDING_URL: ${EMBEDDING_URL:-http://embedding-service:8000}
       APP_BASE_URL: ${APP_BASE_URL}
     depends_on:
@@ -86,6 +87,44 @@ services:
       - '${EMBEDDING_PORT:-8000}:8000'
     restart: unless-stopped
 
+  recommendation-db:
+    image: postgres:16-alpine
+    container_name: smart-rental-rec-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: recommendations
+    ports:
+      - '5433:5432'
+    volumes:
+      - rec_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -U postgres' ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  recommendation-service:
+    build:
+      context: ./recommendation-service
+      dockerfile: Dockerfile
+    container_name: smart-rental-recommendations
+    ports:
+      - '8001:8001'
+    environment:
+      MAIN_DB_URL: postgresql://postgres:postgres@postgres:5432/${POSTGRES_DB:-house_rental}
+      RECOMMENDATION_DB_URL: postgresql://postgres:postgres@recommendation-db:5432/recommendations
+      REDIS_URL: redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      recommendation-db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
+  rec_db_data:
