@@ -1,6 +1,7 @@
 import { RequestHandler } from "express";
 import service from "./service";
 import { AuthenticatedRequest } from "../../types/request";
+import { formatPropertyResponse } from "../properties/service";
 
 class RecommendationController {
 
@@ -57,7 +58,13 @@ class RecommendationController {
   getRecommendations: RequestHandler = async (req, res) => {
     const { userId } = req as AuthenticatedRequest;
     const result = await service.getRecommendations(userId);
-    res.json(result);
+    res.json({
+      status: 'success',
+      message: 'Recommendations fetched successfully',
+      data: result.map((property: Parameters<typeof formatPropertyResponse>[0]) =>
+        formatPropertyResponse(property)
+      ),
+    });
   };
 
   getSimilarProperties: RequestHandler<{ id: string }> = async (req, res) => {

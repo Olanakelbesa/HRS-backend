@@ -36,6 +36,11 @@ router.use('/users', userRoutes);
 router.use('/profile', profileRoutes);
 
 // Property Routes
+router.get(
+  '/properties/recommendations',
+  requireAuth,
+  recommendationController.getRecommendations as any
+);
 router.use('/properties', propertyRoutes);
 
 // Semantic Search Routes
