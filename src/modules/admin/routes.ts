@@ -294,6 +294,43 @@ router.post('/recommendations/train', controller.triggerTraining);
 
 /**
  * @swagger
+ * /api/v1/admin/recommendations/analytics:
+ *   get:
+ *     summary: Get latest ML recommendation model performance and training analytics
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Training analytics (AUC, precision, dataset stats, interaction breakdown)
+ *       404:
+ *         description: No training run recorded yet
+ */
+router.get('/recommendations/analytics', controller.getRecommendationAnalytics);
+
+/**
+ * @swagger
+ * /api/v1/admin/recommendations/history:
+ *   get:
+ *     summary: List recent ML training runs with summary metrics
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           maximum: 50
+ *     responses:
+ *       200:
+ *         description: Training run history
+ */
+router.get('/recommendations/history', controller.getRecommendationTrainingHistory);
+
+/**
+ * @swagger
  * /api/v1/admin/pending-verifications:
  *   get:
  *     summary: List owners waiting for verification

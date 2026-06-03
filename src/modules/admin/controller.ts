@@ -308,20 +308,46 @@ export async function reviewDelete(req: Request, res: Response) {
   return res.status(200).json({ status: 'success', data });
 }
 
+function recommendationServiceBaseUrl() {
+  return process.env.RECOMMENDATION_URL || 'http://recommendation-service:8001';
+}
+
+async function fetchRecommendationService(path: string, init?: RequestInit) {
+  const response = await fetch(`${recommendationServiceBaseUrl()}${path}`, init);
+  const data = (await response.json().catch(() => ({}))) as {
+    detail?: string;
+    message?: string;
+  };
+  if (!response.ok) {
+    const detail = data.detail ?? data.message ?? response.statusText;
+    throw new Error(detail);
+  }
+  return data;
+}
+
 export async function triggerTraining(req: Request, res: Response) {
   try {
-    const recommendationUrl = process.env.RECOMMENDATION_URL || 'http://recommendation-service:8001';
-    const response = await fetch(`${recommendationUrl}/api/v1/train`, {
-      method: 'POST',
-    });
-    const data = (await response.json().catch(() => ({}))) as {
-      detail?: string;
-      message?: string;
-    };
-    if (!response.ok) {
-      const detail = data.detail ?? data.message ?? response.statusText;
-      throw new Error(`Failed to trigger training: ${detail}`);
-    }
+    const data = await fetchRecommendationService('/api/v1/train', { method: 'POST' });
+    return res.status(200).json({ status: 'success', data });
+  } catch (error: any) {
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+}
+
+export async function getRecommendationAnalytics(req: Request, res: Response) {
+  try {
+    const data = await fetchRecommendationService('/api/v1/training/analytics');
+    return res.status(200).json({ status: 'success', data });
+  } catch (error: any) {
+    const status = error.message?.includes('No training run') ? 404 : 500;
+    return res.status(status).json({ status: 'error', message: error.message });
+  }
+}
+
+export async function getRecommendationTrainingHistory(req: Request, res: Response) {
+  try {
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
+    const data = await fetchRecommendationService(`/api/v1/training/history?limit=${limit}`);
     return res.status(200).json({ status: 'success', data });
   } catch (error: any) {
     return res.status(500).json({ status: 'error', message: error.message });

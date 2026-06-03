@@ -27,16 +27,47 @@ def health():
 @app.post("/api/v1/train")
 def trigger_training():
     """
-    Manually triggers the ML training pipeline synchronously and returns metrics.
+    Manually triggers the ML training pipeline synchronously and returns analytics.
     """
     logger.info("Starting synchronous training pipeline...")
     try:
         from train import train_model
-        metrics = train_model()
-        return {"message": "Training pipeline completed successfully.", "metrics": metrics}
+        report = train_model()
+        if report and report.get("status") == "failed":
+            raise HTTPException(status_code=500, detail=report.get("error", "Training failed"))
+        return {
+            "message": "Training pipeline completed successfully.",
+            "analytics": report,
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error during training pipeline: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/training/analytics")
+def get_training_analytics():
+    """Latest model performance scores and training analytics."""
+    from train import get_latest_training_analytics
+
+    report = get_latest_training_analytics()
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="No training run recorded yet. POST /api/v1/train first.",
+        )
+    return report
+
+
+@app.get("/api/v1/training/history")
+def get_training_history(limit: int = 10):
+    """Recent training run summaries (newest first)."""
+    from train import get_training_history as fetch_history
+
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 50")
+    return {"runs": fetch_history(limit)}
 
 @app.get("/api/v1/recommendations/{user_id}")
 def get_recommendations(user_id: str, limit: int = 10):
