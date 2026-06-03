@@ -5,6 +5,7 @@ import { Prisma, PropertyStatus } from '@prisma/client';
 import { AppError } from '../../core/AppError';
 import { deleteFromCloudinary } from '../../utils/uploadToCloudinary';
 import interactionService from '../interactions/service';
+import { buildCategoryWhere } from './propertyCategoryFilter';
 
 const SUPPORTED_LANGUAGES = new Set(['en', 'am']);
 type Amenity = { en: string; am: string };
@@ -282,7 +283,8 @@ export const propertyService = {
 
     if (status) where.status = status;
     if (category) {
-      where.category = { string_contains: category };
+      const categoryFilter = buildCategoryWhere(category);
+      if (categoryFilter) where.category = categoryFilter;
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
@@ -340,7 +342,10 @@ export const propertyService = {
     };
 
     if (status) where.status = status;
-    if (category) where.category = { string_contains: category };
+    if (category) {
+      const categoryFilter = buildCategoryWhere(category);
+      if (categoryFilter) where.category = categoryFilter;
+    }
 
     const candidates = await prisma.property.findMany({
       where,

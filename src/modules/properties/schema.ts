@@ -1,9 +1,14 @@
-import { PropertyStatus } from '@prisma/client';
+import { PropertyStatus, PropertyType } from '@prisma/client';
 import { z } from 'zod';
 
 export const PropertyStatusEnum = z.preprocess(
   (val) => (typeof val === 'string' ? val.toUpperCase() : val),
   z.nativeEnum(PropertyStatus)
+);
+
+export const PropertyTypeEnum = z.preprocess(
+  (val) => (typeof val === 'string' ? val.toUpperCase().replace(/\s+/g, '_') : val),
+  z.nativeEnum(PropertyType)
 );
 
 export const SupportedLanguageEnum = z.enum(['en', 'am']);
@@ -139,7 +144,7 @@ export const getPropertiesSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(12),
   lang: SupportedLanguageEnum.optional(),
   status: PropertyStatusEnum.optional(),
-  category: z.string().optional(),
+  category: PropertyTypeEnum.optional(),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
   bedrooms: z.coerce.number().int().min(0).optional(),
@@ -156,7 +161,7 @@ export const getNearbyPropertiesSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(12),
   lang: SupportedLanguageEnum.optional(),
   status: PropertyStatusEnum.optional(),
-  category: z.string().optional(),
+  category: PropertyTypeEnum.optional(),
 });
 
 export const getSimilarPropertiesSchema = z.object({
