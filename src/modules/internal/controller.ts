@@ -22,6 +22,10 @@ export const getRecommendationData = async (req: Request, res: Response) => {
                 preferredType: true,
                 preferredLocations: true,
                 preferredAmenities: true,
+                preferredPriceMin: true,
+                preferredPriceMax: true,
+                preferredBedrooms: true,
+                furnishStatus: true,
             },
         });
 
@@ -35,6 +39,9 @@ export const getRecommendationData = async (req: Request, res: Response) => {
                 category: true,
                 status: true,
                 bedrooms: true,
+                furnishingStatus: true,
+                amenities: true,
+                price: true,
             },
         });
 

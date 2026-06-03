@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import * as messagingController from './controller';
 import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireMessagingAccess } from '../../middlewares/roleAccess.middleware';
 import { diskUpload } from '../../middlewares/multer.middleware';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requireMessagingAccess);
 
 /**
  * @swagger

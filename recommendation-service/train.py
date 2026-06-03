@@ -42,6 +42,100 @@ WEIGHTS = {
 }
 
 
+def _parse_category(category) -> str:
+    if isinstance(category, dict):
+        label = category.get("en") or category.get("am") or ""
+        return str(label).upper().replace(" ", "_")
+    if isinstance(category, str):
+        return category.upper().replace(" ", "_")
+    return ""
+
+
+def _parse_amenities(raw) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    labels = []
+    for entry in raw:
+        if isinstance(entry, str):
+            labels.append(entry.lower())
+        elif isinstance(entry, dict):
+            label = entry.get("en") or entry.get("am") or ""
+            if label:
+                labels.append(str(label).lower())
+    return labels
+
+
+def _budget_bucket(max_price) -> str | None:
+    if max_price is None or (isinstance(max_price, float) and np.isnan(max_price)):
+        return None
+    value = float(max_price)
+    if value <= 10000:
+        return "budget:low"
+    if value <= 25000:
+        return "budget:mid"
+    return "budget:high"
+
+
+def _pref_to_features(row) -> list[str]:
+    feats = []
+    preferred_type = row.get("preferredType")
+    if preferred_type and not (isinstance(preferred_type, float) and np.isnan(preferred_type)):
+        feats.append(f"type:{str(preferred_type).upper()}")
+
+    furnish = row.get("furnishStatus")
+    if furnish and not (isinstance(furnish, float) and np.isnan(furnish)):
+        feats.append(f"furnish:{str(furnish).lower()}")
+
+    bedrooms = row.get("preferredBedrooms")
+    if bedrooms is not None and not (isinstance(bedrooms, float) and np.isnan(bedrooms)):
+        feats.append(f"bedrooms:{int(bedrooms)}")
+
+    bucket = _budget_bucket(row.get("preferredPriceMax"))
+    if bucket:
+        feats.append(bucket)
+
+    amenities = row.get("preferredAmenities") or []
+    if isinstance(amenities, list):
+        for amenity in amenities:
+            if amenity:
+                feats.append(f"amenity:{str(amenity).lower()}")
+
+    return feats
+
+
+def _property_to_features(row) -> list[str]:
+    feats = []
+    category = _parse_category(row.get("category"))
+    if category:
+        feats.append(f"type:{category}")
+
+    bedrooms = row.get("bedrooms")
+    if bedrooms is not None and not (isinstance(bedrooms, float) and np.isnan(bedrooms)):
+        feats.append(f"bedrooms:{int(bedrooms)}")
+
+    furnish = row.get("furnishingStatus")
+    if furnish and not (isinstance(furnish, float) and np.isnan(furnish)):
+        feats.append(f"furnish:{str(furnish).lower()}")
+
+    for amenity in _parse_amenities(row.get("amenities")):
+        feats.append(f"amenity:{amenity}")
+
+    return feats
+
+
+def _build_user_feature_tuples(all_users, df_prefs: pd.DataFrame):
+    pref_by_user = {}
+    if not df_prefs.empty:
+        for _, row in df_prefs.iterrows():
+            pref_by_user[str(row["userId"])] = row
+
+    return [(str(user_id), _pref_to_features(pref_by_user[str(user_id)])) if str(user_id) in pref_by_user else (str(user_id), []) for user_id in all_users]
+
+
+def _build_item_feature_tuples(df_props: pd.DataFrame):
+    return [(str(row["id"]), _property_to_features(row)) for _, row in df_props.iterrows()]
+
+
 def init_rec_db():
     logger.info("Initializing recommendation DB...")
     conn = psycopg2.connect(REC_DB_URL)
@@ -165,7 +259,7 @@ def get_training_history(limit: int = 10):
     return history
 
 
-def _evaluate_model(model, train_interactions, test_interactions):
+def _evaluate_model(model, train_interactions, test_interactions, user_features=None, item_features=None):
     """Compute LightFM metrics; fall back to train-only metrics if test eval fails."""
     performance = {
         "train_auc": None,
@@ -175,28 +269,32 @@ def _evaluate_model(model, train_interactions, test_interactions):
         "evaluation_note": None,
     }
 
+    eval_kwargs = {"num_threads": 2}
+    if user_features is not None:
+        eval_kwargs["user_features"] = user_features
+    if item_features is not None:
+        eval_kwargs["item_features"] = item_features
+
     try:
         performance["train_auc"] = float(
-            auc_score(model, train_interactions, num_threads=2).mean()
+            auc_score(model, train_interactions, **eval_kwargs).mean()
         )
         performance["train_precision_at_10"] = float(
-            precision_at_k(model, train_interactions, k=10, num_threads=2).mean()
+            precision_at_k(model, train_interactions, k=10, **eval_kwargs).mean()
         )
+        test_kwargs = {
+            **eval_kwargs,
+            "train_interactions": train_interactions,
+        }
         performance["test_auc"] = float(
-            auc_score(
-                model,
-                test_interactions,
-                train_interactions=train_interactions,
-                num_threads=2,
-            ).mean()
+            auc_score(model, test_interactions, **test_kwargs).mean()
         )
         performance["test_precision_at_10"] = float(
             precision_at_k(
                 model,
                 test_interactions,
-                train_interactions=train_interactions,
                 k=10,
-                num_threads=2,
+                **test_kwargs,
             ).mean()
         )
     except Exception as e:
@@ -205,11 +303,11 @@ def _evaluate_model(model, train_interactions, test_interactions):
         try:
             if performance["train_auc"] is None:
                 performance["train_auc"] = float(
-                    auc_score(model, train_interactions, num_threads=2).mean()
+                    auc_score(model, train_interactions, **eval_kwargs).mean()
                 )
             if performance["train_precision_at_10"] is None:
                 performance["train_precision_at_10"] = float(
-                    precision_at_k(model, train_interactions, k=10, num_threads=2).mean()
+                    precision_at_k(model, train_interactions, k=10, **eval_kwargs).mean()
                 )
         except Exception as inner:
             performance["evaluation_note"] = str(inner)
@@ -276,10 +374,42 @@ def train_model():
     )
     item_ids = df_props["id"].unique()
 
-    dataset.fit(users=(x for x in all_users), items=(x for x in item_ids))
+    user_feature_tuples = _build_user_feature_tuples(all_users, df_prefs)
+    item_feature_tuples = _build_item_feature_tuples(df_props)
+
+    all_user_feats = {feat for _, feats in user_feature_tuples for feat in feats}
+    all_item_feats = {feat for _, feats in item_feature_tuples for feat in feats}
+
+    fit_kwargs = {
+        "users": (str(x) for x in all_users),
+        "items": (str(x) for x in item_ids),
+    }
+    if all_user_feats:
+        fit_kwargs["user_features"] = all_user_feats
+    if all_item_feats:
+        fit_kwargs["item_features"] = all_item_feats
+
+    dataset.fit(**fit_kwargs)
 
     num_users, num_items = dataset.interactions_shape()
     logger.info(f"Dataset mapped: {num_users} users, {num_items} items.")
+
+    user_features_matrix = None
+    item_features_matrix = None
+    if all_user_feats:
+        user_features_matrix, _ = dataset.build_user_features(
+            ((uid, feats) for uid, feats in user_feature_tuples),
+            normalize=True,
+        )
+    if all_item_feats:
+        item_features_matrix, _ = dataset.build_item_features(
+            ((iid, feats) for iid, feats in item_feature_tuples),
+            normalize=True,
+        )
+
+    logger.info(
+        f"Hybrid features: {len(all_user_feats)} user features, {len(all_item_feats)} item features."
+    )
 
     (interactions, weights) = dataset.build_interactions(
         (
@@ -315,15 +445,29 @@ def train_model():
         learning_rate=MODEL_CONFIG["learning_rate"],
         random_state=42,
     )
+    fit_model_kwargs = {
+        "epochs": MODEL_CONFIG["epochs"],
+        "num_threads": 2,
+    }
+    if user_features_matrix is not None:
+        fit_model_kwargs["user_features"] = user_features_matrix
+    if item_features_matrix is not None:
+        fit_model_kwargs["item_features"] = item_features_matrix
+
     model.fit(
         train_interactions,
         sample_weight=train_weights,
-        epochs=MODEL_CONFIG["epochs"],
-        num_threads=2,
+        **fit_model_kwargs,
     )
 
     logger.info("Evaluating model metrics...")
-    performance = _evaluate_model(model, train_interactions, test_interactions)
+    performance = _evaluate_model(
+        model,
+        train_interactions,
+        test_interactions,
+        user_features=user_features_matrix,
+        item_features=item_features_matrix,
+    )
     logger.info(f"Evaluation Metrics: {performance}")
 
     init_rec_db()
@@ -349,7 +493,13 @@ def train_model():
             continue
 
         uid_internal = user_id_to_internal[user_id]
-        predictions = model.predict(uid_internal, item_internal_ids)
+        predict_kwargs = {}
+        if user_features_matrix is not None:
+            predict_kwargs["user_features"] = user_features_matrix
+        if item_features_matrix is not None:
+            predict_kwargs["item_features"] = item_features_matrix
+
+        predictions = model.predict(uid_internal, item_internal_ids, **predict_kwargs)
         top_indices = np.argsort(-predictions)[:20]
         top_property_ids = [reverse_item_mapping[idx] for idx in top_indices]
 
@@ -384,6 +534,8 @@ def train_model():
             "items": int(num_items),
             "properties": int(len(item_ids)),
             "users_with_preferences": int(df_prefs["userId"].nunique()) if not df_prefs.empty else 0,
+            "user_features": len(all_user_feats),
+            "item_features": len(all_item_feats),
             "interactions_raw": int(len(df_interactions_raw)),
             "interactions_unique": int(len(df_interactions)),
             "train_interactions": int(train_interactions.nnz),

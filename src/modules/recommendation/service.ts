@@ -1,6 +1,11 @@
 import prisma from '../../config/database';
 import { cosineSimilarity } from '../../utils/similarity.utils';
 import interactionService from '../interactions/service';
+import {
+  hasMeaningfulPreferences,
+  scorePropertyAgainstPreferences,
+  type UserPrefForScoring,
+} from './preferenceScoring';
 
 type PreferencePayload = {
   budget?: { min?: number; max?: number; currency?: string };
@@ -226,6 +231,67 @@ class RecommendationService {
   }
 
   // ========================
+  // PREFERENCE-BASED (COLD START)
+  // ========================
+  private toPrefForScoring(pref: {
+    preferredPriceMin: number | null;
+    preferredPriceMax: number | null;
+    preferredBedrooms: number | null;
+    preferredType: string | null;
+    preferredAmenities: string[];
+    furnishStatus: string | null;
+    preferredLocations: unknown;
+  }): UserPrefForScoring {
+    const locations = Array.isArray(pref.preferredLocations)
+      ? (pref.preferredLocations as UserPrefForScoring['preferredLocations'])
+      : [];
+
+    return {
+      preferredPriceMin: pref.preferredPriceMin,
+      preferredPriceMax: pref.preferredPriceMax,
+      preferredBedrooms: pref.preferredBedrooms,
+      preferredType: pref.preferredType,
+      preferredAmenities: pref.preferredAmenities,
+      furnishStatus: pref.furnishStatus,
+      preferredLocations: locations,
+    };
+  }
+
+  async getPreferenceBasedRecommendations(userId: string, limit = 20) {
+    const pref = await prisma.userPreference.findUnique({ where: { userId } });
+    if (!pref) return [];
+
+    const prefForScoring = this.toPrefForScoring(pref);
+    if (!hasMeaningfulPreferences(prefForScoring)) return [];
+
+    const properties = await prisma.property.findMany({
+      where: {
+        isDeleted: false,
+        status: 'AVAILABLE',
+      },
+      include: {
+        reviews: true,
+      },
+    });
+
+    if (properties.length === 0) return [];
+
+    const ranked = properties
+      .map((property) => ({
+        property,
+        score: scorePropertyAgainstPreferences(property, prefForScoring),
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (b.property.viewCount ?? 0) - (a.property.viewCount ?? 0);
+      })
+      .slice(0, limit)
+      .map(({ property }) => property);
+
+    return ranked;
+  }
+
+  // ========================
   // MAIN RECOMMENDATION ENGINE
   // ========================
   async getRecommendations(userId: string) {
@@ -261,7 +327,8 @@ class RecommendationService {
       console.error("Microservice unavailable or empty:", e);
     }
 
-    return [];
+    // Cold-start fallback: rank available listings by saved renter preferences
+    return this.getPreferenceBasedRecommendations(userId);
   }
 
   // ========================

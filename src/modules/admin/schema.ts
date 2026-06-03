@@ -141,11 +141,7 @@ export const resolveVerificationSchema = z.object({
   note: z.string().trim().min(1).max(1000).optional(),
 });
 
-export const broadcastNotificationSchema = z.object({
-  audience: z.enum(['all', 'renters', 'owners', 'verified_owners']),
-  title: z.string().min(1),
-  message: z.string().min(1),
-});
+export { broadcastNotificationSchema } from '../notifications/schema';
 
 export const updateReviewStatusSchema = z.object({
   status: z.enum(['published', 'flagged', 'removed']),

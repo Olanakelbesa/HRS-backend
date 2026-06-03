@@ -1034,54 +1034,6 @@ router.get('/reports/:id', controller.reportGet);
  */
 router.get('/reports/:id/risk-assessment', controller.reportRiskAssessment);
 
-// Notifications & Broadcasts
-/**
- * @swagger
- * /api/v1/admin/notifications:
- *   get:
- *     summary: List platform notifications
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Notifications list
- */
-router.get('/notifications', controller.notificationsList);
-
-/**
- * @swagger
- * /api/v1/admin/notifications/broadcast:
- *   post:
- *     summary: Broadcast a notification to users
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               audience:
- *                 type: string
- *                 enum: [all, renters, owners, verified_owners]
- *               title:
- *                 type: string
- *               message:
- *                 type: string
- *     responses:
- *       200:
- *         description: Broadcast sent successfully
- */
-router.post('/notifications/broadcast', controller.notificationBroadcast);
-
 // Reviews Moderation
 /**
  * @swagger

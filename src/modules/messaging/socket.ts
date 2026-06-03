@@ -4,6 +4,7 @@ import { createClient } from 'redis';
 import { env } from '../../config/env';
 import { verifyAccessToken } from '../../utils/jwt.utils';
 import * as messagingService from './service';
+import { canUseMessaging } from './access';
 
 const conversationRoom = (conversationId: string) => `conversation:${conversationId}`;
 const userRoom = (userId: string) => `user:${userId}`;
@@ -50,11 +51,18 @@ export async function initMessagingSocket(io: Server) {
     }
   });
 
+  const rejectMessaging = (socket: Socket, ack?: (payload: unknown) => void) => {
+    if (canUseMessaging(socket.data.userRole as string)) return false;
+    ack?.({ status: 'error', message: 'Messaging is only available for owner and renter accounts' });
+    return true;
+  };
+
   io.on('connection', (socket) => {
     const userId = socket.data.userId as string;
     if (userId) socket.join(userRoom(userId));
 
     socket.on('conversation:join', async (conversationId: string, ack?: (payload: any) => void) => {
+      if (rejectMessaging(socket, ack)) return;
       try {
         await messagingService.assertParticipant(conversationId, userId);
         socket.join(conversationRoom(conversationId));
@@ -68,6 +76,7 @@ export async function initMessagingSocket(io: Server) {
     socket.on(
       'conversation:typing',
       async (payload: { conversationId: string; isTyping: boolean }, ack?: (data: any) => void) => {
+        if (rejectMessaging(socket, ack)) return;
         try {
           const { conversationId, isTyping } = payload;
           await messagingService.assertParticipant(conversationId, userId);
@@ -90,6 +99,7 @@ export async function initMessagingSocket(io: Server) {
         payload: { conversationId: string; content: string; replyToId?: string },
         ack?: (data: any) => void
       ) => {
+        if (rejectMessaging(socket, ack)) return;
         try {
           const { conversationId, content, replyToId } = payload;
           const result = await messagingService.sendMessage(conversationId, userId, {
@@ -115,6 +125,7 @@ export async function initMessagingSocket(io: Server) {
     socket.on(
       'message:reaction:add',
       async (payload: { messageId: string; emoji: string }, ack?: (data: any) => void) => {
+        if (rejectMessaging(socket, ack)) return;
         try {
           const message = await messagingService.addReaction(payload.messageId, userId, {
             emoji: payload.emoji,
@@ -132,6 +143,7 @@ export async function initMessagingSocket(io: Server) {
     socket.on(
       'message:reaction:remove',
       async (payload: { messageId: string; emoji: string }, ack?: (data: any) => void) => {
+        if (rejectMessaging(socket, ack)) return;
         try {
           const message = await messagingService.removeReaction(payload.messageId, userId, {
             emoji: payload.emoji,
@@ -149,6 +161,7 @@ export async function initMessagingSocket(io: Server) {
     socket.on(
       'message:delete',
       async (payload: { messageId: string }, ack?: (data: any) => void) => {
+        if (rejectMessaging(socket, ack)) return;
         try {
           const result = await messagingService.deleteMessage(payload.messageId, userId);
           io.to(conversationRoom(result.conversationId)).emit('message:deleted', result);

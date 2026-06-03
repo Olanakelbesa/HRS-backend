@@ -91,7 +91,6 @@ import {
   updateAgreementStatusSchema,
   updateReportStatusSchema,
   resolveVerificationSchema,
-  broadcastNotificationSchema,
   updateReviewStatusSchema,
 } from './schema';
 import { paginationQuerySchema } from './schema';
@@ -271,19 +270,6 @@ export async function paymentProofGet(req: Request, res: Response) {
   if (!data) {
     return res.status(404).json({ status: 'error', message: 'Payment not found' });
   }
-  return res.status(200).json({ status: 'success', data });
-}
-
-export async function notificationsList(req: Request, res: Response) {
-  const query = paginationQuerySchema.parse(req.query);
-  const data = await adminService.getNotifications(query);
-  return res.status(200).json({ status: 'success', data });
-}
-
-export async function notificationBroadcast(req: Request, res: Response) {
-  const auth = req as AuthenticatedRequest;
-  const body = broadcastNotificationSchema.parse(req.body);
-  const data = await adminService.broadcastNotification(auth.userId, body);
   return res.status(200).json({ status: 'success', data });
 }
 

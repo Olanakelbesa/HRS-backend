@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import type { Prisma, Report, ReportTargetType } from '@prisma/client';
+import { excludePeerMessageNotifications } from '../notifications/access';
 import type {
   AdminUpdatePropertyBodyInput,
   ApprovePropertyInput,
@@ -168,8 +169,10 @@ export async function getPlatformAnalytics(range?: '7d' | '30d' | '90d') {
     prisma.appointment.count({ where: { status: 'ACCEPTED' } }),
     prisma.conversation.count(),
     prisma.message.count(),
-    prisma.notification.count(),
-    prisma.notification.count({ where: { readAt: null } }),
+    prisma.notification.count({ where: excludePeerMessageNotifications() }),
+    prisma.notification.count({
+      where: { readAt: null, ...excludePeerMessageNotifications() },
+    }),
     prisma.auditLog.count(),
   ]);
 
@@ -1493,55 +1496,6 @@ export async function getAgreementRiskAssessment(
     propertyVerified: property?.isVerified,
     agreementId: agreement.id,
   });
-}
-
-export async function getNotifications(query: any) {
-  const { page = 1, limit = 20 } = query;
-  const skip = (page - 1) * limit;
-
-  const data = await prisma.notification.findMany({
-    skip,
-    take: limit,
-    orderBy: { createdAt: 'desc' },
-    include: { user: { select: { id: true, first_name: true, last_name: true } } },
-  });
-  const total = await prisma.notification.count();
-
-  return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
-}
-
-export async function broadcastNotification(adminId: string, payload: any) {
-  const { audience, title, message } = payload;
-
-  let userFilter: any = {};
-  if (audience === 'renters') userFilter = { role: 'renter' };
-  else if (audience === 'owners') userFilter = { role: 'owner' };
-  else if (audience === 'verified_owners') userFilter = { role: 'owner', isVerified: true };
-
-  const users = await prisma.user.findMany({ where: userFilter, select: { id: true } });
-
-  const notifications = users.map((u) => ({
-    userId: u.id,
-    type: 'MESSAGE_NEW' as const,
-    title,
-    body: message,
-    payload: { broadcast: true },
-  }));
-
-  if (notifications.length > 0) {
-    await prisma.notification.createMany({ data: notifications });
-  }
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: adminId,
-      eventType: 'BROADCAST_SENT',
-      entityType: 'Notification',
-      metadata: { audience, title, count: notifications.length },
-    },
-  });
-
-  return { success: true, count: notifications.length };
 }
 
 export async function getReviews(query: any) {
