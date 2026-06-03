@@ -5,7 +5,7 @@ import { Prisma, PropertyStatus } from '@prisma/client';
 import { AppError } from '../../core/AppError';
 import { deleteFromCloudinary } from '../../utils/uploadToCloudinary';
 import interactionService from '../interactions/service';
-import { buildCategoryWhere } from './propertyCategoryFilter';
+import { findPropertyIdsByCategory } from './propertyCategoryFilter';
 
 const SUPPORTED_LANGUAGES = new Set(['en', 'am']);
 type Amenity = { en: string; am: string };
@@ -257,7 +257,12 @@ export const propertyService = {
     const limit = Math.min(50, Math.max(1, Math.trunc(toNumber(raw.limit) ?? 12)));
 
     const status = typeof raw.status === 'string' ? raw.status : undefined;
-    const category = typeof raw.category === 'string' ? raw.category : undefined;
+    const category =
+      typeof raw.category === 'string'
+        ? raw.category
+        : raw.category != null
+          ? String(raw.category)
+          : undefined;
 
     const minPrice = toNumber(raw.minPrice);
     const maxPrice = toNumber(raw.maxPrice);
@@ -283,8 +288,10 @@ export const propertyService = {
 
     if (status) where.status = status;
     if (category) {
-      const categoryFilter = buildCategoryWhere(category);
-      if (categoryFilter) where.category = categoryFilter;
+      const matchingIds = await findPropertyIdsByCategory(category);
+      if (matchingIds) {
+        where.id = { in: matchingIds.length > 0 ? matchingIds : ['__no_category_match__'] };
+      }
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
@@ -343,8 +350,10 @@ export const propertyService = {
 
     if (status) where.status = status;
     if (category) {
-      const categoryFilter = buildCategoryWhere(category);
-      if (categoryFilter) where.category = categoryFilter;
+      const matchingIds = await findPropertyIdsByCategory(category);
+      if (matchingIds) {
+        where.id = { in: matchingIds.length > 0 ? matchingIds : ['__no_category_match__'] };
+      }
     }
 
     const candidates = await prisma.property.findMany({
