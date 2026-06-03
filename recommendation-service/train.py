@@ -98,8 +98,20 @@ def train_model():
     logger.info("Splitting dataset 80/20 for evaluation...")
     train_interactions, test_interactions = random_train_test_split(interactions, test_percentage=0.2, random_state=42)
     
-    # Apply the same exact split mask to the weights matrix using element-wise multiplication
-    train_weights = train_interactions.multiply(weights)
+    # LightFM requires sample_weight as COO with identical (row, col) ordering as interactions.
+    train_coo = train_interactions.tocoo()
+    weight_lookup = {
+        (int(r), int(c)): float(d)
+        for r, c, d in zip(weights.tocoo().row, weights.tocoo().col, weights.tocoo().data)
+    }
+    train_weight_data = np.array(
+        [weight_lookup.get((int(r), int(c)), 1.0) for r, c in zip(train_coo.row, train_coo.col)],
+        dtype=np.float32,
+    )
+    train_weights = coo_matrix(
+        (train_weight_data, (train_coo.row, train_coo.col)),
+        shape=train_coo.shape,
+    )
     
     # 6. Train LightFM
     logger.info("Training LightFM model...")

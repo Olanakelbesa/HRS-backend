@@ -314,10 +314,14 @@ export async function triggerTraining(req: Request, res: Response) {
     const response = await fetch(`${recommendationUrl}/api/v1/train`, {
       method: 'POST',
     });
+    const data = (await response.json().catch(() => ({}))) as {
+      detail?: string;
+      message?: string;
+    };
     if (!response.ok) {
-      throw new Error(`Failed to trigger training: ${response.statusText}`);
+      const detail = data.detail ?? data.message ?? response.statusText;
+      throw new Error(`Failed to trigger training: ${detail}`);
     }
-    const data = await response.json();
     return res.status(200).json({ status: 'success', data });
   } catch (error: any) {
     return res.status(500).json({ status: 'error', message: error.message });
