@@ -55,9 +55,7 @@ function mapNotificationActivity(notification: {
   };
 }
 
-function mapTopProperty(
-  property: Awaited<ReturnType<typeof propertyService.getMyProperties>>[number]
-) {
+function mapTopProperty(property: Awaited<ReturnType<typeof propertyService.getMyProperties>>[number]) {
   const title = getLocalizedText(property.title);
   const address = getLocalizedText(property.address);
 
