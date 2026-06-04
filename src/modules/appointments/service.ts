@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 import { logger } from '../../core/logger';
 import { sendEmail } from '../../emails/emailService';
+import { getLocalizedText } from '../../utils/localized';
 import { createAuditLog, createNotification } from '../notifications/service';
 import type {
   CreateAppointmentInput,
@@ -57,6 +58,18 @@ const RENTER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED'] as const;
 
 const ACTIVE_SLOT_STATUSES = ['PENDING', 'ACCEPTED'] as const;
 
+function formatAppointmentDateTime(date: Date): string {
+  return date.toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Africa/Addis_Ababa',
+  });
+}
+
 async function findOverlappingAppointment(where: {
   propertyId?: string;
   renterId?: string;
@@ -105,7 +118,14 @@ export async function getAvailability(options: {
 
   const appointments = await prisma.appointment.findMany({
     where,
-    select: { id: true, propertyId: true, ownerId: true, startsAt: true, endsAt: true, status: true },
+    select: {
+      id: true,
+      propertyId: true,
+      ownerId: true,
+      startsAt: true,
+      endsAt: true,
+      status: true,
+    },
     orderBy: { startsAt: 'asc' },
   });
 
@@ -187,10 +207,10 @@ async function notifyOwnerOfNewBooking(appointmentId: string) {
           [appointment.renter.first_name, appointment.renter.last_name].filter(Boolean).join(' ') ||
           appointment.renter.email ||
           'Renter',
-        propertyTitle: appointment.property.title,
-        propertyAddress: appointment.property.address,
-        startsAt: appointment.startsAt.toISOString(),
-        endsAt: appointment.endsAt.toISOString(),
+        propertyTitle: getLocalizedText(appointment.property.title),
+        propertyAddress: getLocalizedText(appointment.property.address),
+        startsAt: formatAppointmentDateTime(appointment.startsAt),
+        endsAt: formatAppointmentDateTime(appointment.endsAt),
       },
       'New property visit booking request'
     );
@@ -286,7 +306,7 @@ export async function bookAppointment(
     userId: appointment.ownerId,
     type: 'APPOINTMENT_BOOKED',
     title: 'New booking request',
-    body: `A renter requested a visit for ${appointment.property.title}`,
+    body: `A renter requested a visit for ${getLocalizedText(appointment.property.title)}`,
     payload: {
       appointmentId: appointment.id,
       propertyId: appointment.propertyId,
@@ -324,7 +344,11 @@ export async function listMyAppointmentsForRenter(
   return listAppointments(userId, 'renter', query);
 }
 
-export async function getRenterAppointmentById(userId: string, userRole: string, appointmentId: string) {
+export async function getRenterAppointmentById(
+  userId: string,
+  userRole: string,
+  appointmentId: string
+) {
   if (userRole !== 'renter') {
     throw new AppError('Only renters can access this appointment', 403);
   }
@@ -369,7 +393,11 @@ export async function cancelRenterAppointment(
     throw new AppError('You can only cancel your own appointments', 403);
   }
 
-  if (!RENTER_CANCELLABLE_STATUSES.includes(appointment.status as (typeof RENTER_CANCELLABLE_STATUSES)[number])) {
+  if (
+    !RENTER_CANCELLABLE_STATUSES.includes(
+      appointment.status as (typeof RENTER_CANCELLABLE_STATUSES)[number]
+    )
+  ) {
     throw new AppError('Only pending or confirmed appointments can be cancelled', 400);
   }
 
@@ -445,11 +473,7 @@ export async function listOwnerAppointments(
   return listAppointments(userId, userRole === 'admin' ? 'admin' : 'owner', query);
 }
 
-export async function getAppointmentById(
-  userId: string,
-  userRole: string,
-  appointmentId: string
-) {
+export async function getAppointmentById(userId: string, userRole: string, appointmentId: string) {
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
     select: appointmentSelect,
@@ -485,9 +509,7 @@ export async function updateAppointmentStatus(
 
   if (input.status === 'CANCELLED') {
     const canCancel =
-      userRole === 'admin' ||
-      appointment.renterId === userId ||
-      appointment.ownerId === userId;
+      userRole === 'admin' || appointment.renterId === userId || appointment.ownerId === userId;
 
     if (!canCancel) {
       throw new AppError('You do not have permission to cancel this appointment', 403);
