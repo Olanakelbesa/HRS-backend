@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { AppError } from '../../core/AppError';
 import { logger } from '../../core/logger';
 import { sendEmail } from '../../emails/emailService';
+import { getLocalizedText } from '../../utils/localized';
 import { createAuditLog, createNotification } from '../notifications/service';
 import type {
   CreateAppointmentInput,
@@ -56,6 +57,18 @@ const appointmentSelect = {
 const RENTER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED'] as const;
 
 const ACTIVE_SLOT_STATUSES = ['PENDING', 'ACCEPTED'] as const;
+
+function formatAppointmentDateTime(date: Date): string {
+  return date.toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Africa/Addis_Ababa',
+  });
+}
 
 async function findOverlappingAppointment(where: {
   propertyId?: string;
@@ -187,10 +200,10 @@ async function notifyOwnerOfNewBooking(appointmentId: string) {
           [appointment.renter.first_name, appointment.renter.last_name].filter(Boolean).join(' ') ||
           appointment.renter.email ||
           'Renter',
-        propertyTitle: appointment.property.title,
-        propertyAddress: appointment.property.address,
-        startsAt: appointment.startsAt.toISOString(),
-        endsAt: appointment.endsAt.toISOString(),
+        propertyTitle: getLocalizedText(appointment.property.title),
+        propertyAddress: getLocalizedText(appointment.property.address),
+        startsAt: formatAppointmentDateTime(appointment.startsAt),
+        endsAt: formatAppointmentDateTime(appointment.endsAt),
       },
       'New property visit booking request'
     );
@@ -286,7 +299,7 @@ export async function bookAppointment(
     userId: appointment.ownerId,
     type: 'APPOINTMENT_BOOKED',
     title: 'New booking request',
-    body: `A renter requested a visit for ${appointment.property.title}`,
+    body: `A renter requested a visit for ${getLocalizedText(appointment.property.title)}`,
     payload: {
       appointmentId: appointment.id,
       propertyId: appointment.propertyId,

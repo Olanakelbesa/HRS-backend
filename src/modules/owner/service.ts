@@ -3,18 +3,10 @@ import { propertyService } from '../properties/service';
 import { getProfile } from '../profile/service';
 import { safePrisma } from '../../lib/safePrisma';
 import { agreementListSelect } from '../../lib/prismaSelects';
+import { getLocalizedText } from '../../utils/localized';
 import type { GetOwnerOverviewQueryInput } from './schema';
 
 const PENDING_AGREEMENT_STATUSES = ['sent', 'payment_pending'] as const;
-
-function getLocalized(value: unknown, lang = 'en'): string {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const record = value as Record<string, string>;
-    return record[lang] || record.en || record.am || '';
-  }
-  return '';
-}
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -64,8 +56,8 @@ function mapNotificationActivity(notification: {
 }
 
 function mapTopProperty(property: Awaited<ReturnType<typeof propertyService.getMyProperties>>[number]) {
-  const title = getLocalized(property.title);
-  const address = getLocalized(property.address);
+  const title = getLocalizedText(property.title);
+  const address = getLocalizedText(property.address);
 
   return {
     id: property.id,
@@ -304,8 +296,8 @@ export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQ
       endsAt: a.endsAt.toISOString(),
       status: a.status,
       note: a.note,
-      propertyTitle: getLocalized(a.property.title),
-      propertyAddress: getLocalized(a.property.address),
+      propertyTitle: getLocalizedText(a.property.title),
+      propertyAddress: getLocalizedText(a.property.address),
       propertyImage: Array.isArray(a.property.images) ? a.property.images[0] : null,
       renterName: `${a.renter.first_name ?? ''} ${a.renter.last_name ?? ''}`.trim(),
       renterEmail: a.renter.email,
@@ -317,8 +309,8 @@ export async function getOwnerOverview(ownerId: string, query: GetOwnerOverviewQ
       currency: a.currency,
       startDate: a.startDate.toISOString(),
       endDate: a.endDate.toISOString(),
-      propertyTitle: getLocalized(a.property.title),
-      propertyAddress: getLocalized(a.property.address),
+      propertyTitle: getLocalizedText(a.property.title),
+      propertyAddress: getLocalizedText(a.property.address),
       renterName: `${a.renter.first_name ?? ''} ${a.renter.last_name ?? ''}`.trim(),
     })),
     recentActivity: recentNotifications.map(mapNotificationActivity),
