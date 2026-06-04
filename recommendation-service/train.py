@@ -397,12 +397,13 @@ def train_model():
     user_features_matrix = None
     item_features_matrix = None
     if all_user_feats:
-        user_features_matrix, _ = dataset.build_user_features(
+        # LightFM >= 1.17 returns only the CSR matrix (not a matrix + mapping tuple).
+        user_features_matrix = dataset.build_user_features(
             ((uid, feats) for uid, feats in user_feature_tuples),
             normalize=True,
         )
     if all_item_feats:
-        item_features_matrix, _ = dataset.build_item_features(
+        item_features_matrix = dataset.build_item_features(
             ((iid, feats) for iid, feats in item_feature_tuples),
             normalize=True,
         )
