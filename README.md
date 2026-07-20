@@ -1,72 +1,75 @@
 # backend
 
-Backend application for the Smart House Rental Platform built with Node and Express.
+Backend application for the Smart House Rental Platform built with **NestJS**, Prisma, and PostgreSQL.
+
+## Architecture
+
+- NestJS modular monolith (`src/modules/*`)
+- Global API prefix: `/api`
+- Auth: JWT access tokens + HTTP-only refresh cookies
+- Realtime: Socket.IO (messaging)
+- Sidecars: Python embedding + recommendation services (Docker Compose)
+
+## Scripts
+
+```bash
+npm run dev          # nest start --watch
+npm run build        # nest build + copy email/view assets
+npm start            # node dist/main.js
+npm run prisma:migrate
+npm run prisma:seed
+```
 
 ## Build behavior
 
-The build process compiles TypeScript and copies runtime assets into `dist`, including:
+The build compiles TypeScript via Nest CLI and copies runtime assets into `dist`:
 
 - `src/views` -> `dist/views`
 - `src/public` -> `dist/public`
 - `src/emails` -> `dist/emails`
 
-This prevents template-missing errors in production deployments.
-
 ## Email provider (Resend)
 
-The backend uses Resend API for transactional emails in all environments.
+Set:
 
-Set these environment variables:
-
-- `RESEND_API_KEY`: API key from Resend dashboard
-- `EMAIL_FROM`: sender address (must be a verified sender/domain in Resend for production)
-- `SUPPORT_EMAIL` (optional): support contact displayed in email templates
-
-For quick testing, `onboarding@resend.dev` can be used as sender with Resend test mode.
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `SUPPORT_EMAIL` (optional)
 
 ## Run with Docker
 
-1. Copy env file:
+1. `cp .env.example .env`
+2. Set strong `JWT_SECRET` / `JWT_REFRESH_SECRET`
+3. `docker compose up --build -d`
+4. Open:
+   - Health: http://localhost:5000/health
+   - API: http://localhost:5000/api
+   - Swagger: http://localhost:5000/api-docs
 
-```bash
-cp .env.example .env
-```
+## Canonical API map
 
-2. (Optional but recommended) set strong values in `.env` for `JWT_SECRET` and `JWT_REFRESH_SECRET`.
-
-3. Build and start all services:
-
-```bash
-docker compose up --build -d
-```
-
-4. Check running containers:
-
-```bash
-docker compose ps
-```
-
-5. Open the API:
-
-- App: http://localhost:5000
-- Health: http://localhost:5000/health
-- Swagger: http://localhost:5000/api-docs
-
-6. Stop services:
-
-```bash
-docker compose down
-```
+| Domain | Base path |
+|--------|-----------|
+| Auth | `/api/auth` |
+| Profile / me | `/api/me` |
+| Properties | `/api/properties` |
+| Search | `/api/search` |
+| Recommendations | `/api/recommendations` |
+| Conversations | `/api/conversations` |
+| Appointments | `/api/appointments` |
+| Agreements | `/api/agreements` |
+| Payments | `/api/payments` |
+| Reviews | `/api/reviews` |
+| Reports | `/api/reports` |
+| Owner overview | `/api/owner/overview` |
+| Admin | `/api/admin` |
+| Internal | `/api/internal` |
 
 ## Prisma migrations on existing databases
 
-If your deployment targets an already-populated database, `npx prisma migrate deploy` can fail with `P3005` because Prisma expects migration history to be baselined first.
-
-In that case, create or mark a baseline migration as applied before running deploy, for example:
+If `prisma migrate deploy` fails with `P3005`, baseline first:
 
 ```bash
 npx prisma migrate resolve --applied <baseline_migration_name>
 npx prisma migrate deploy
 ```
-
-Use this only when the database schema already matches the baseline migration history.

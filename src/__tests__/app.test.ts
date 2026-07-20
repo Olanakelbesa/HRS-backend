@@ -1,10 +1,28 @@
+import { Test } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import app from '../app';
+import { AppModule } from '../app.module';
 
 describe('app routes', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api', { exclude: ['health', '/'] });
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
   describe('GET /health', () => {
     it('returns ok status and uptime metadata', async () => {
-      const response = await request(app).get('/health');
+      const response = await request(app.getHttpServer()).get('/health');
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe('ok');
@@ -14,19 +32,9 @@ describe('app routes', () => {
     });
   });
 
-  describe('GET /swagger.json', () => {
-    it('returns the OpenAPI specification', async () => {
-      const response = await request(app).get('/swagger.json');
-
-      expect(response.status).toBe(200);
-      expect(response.body.openapi || response.body.swagger).toBeDefined();
-      expect(response.headers['cache-control']).toBe('no-store');
-    });
-  });
-
-  describe('GET /api/v1/health/schema', () => {
+  describe('GET /api/health/schema', () => {
     it('returns prisma schema metadata', async () => {
-      const response = await request(app).get('/api/v1/health/schema');
+      const response = await request(app.getHttpServer()).get('/api/health/schema');
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe('ok');

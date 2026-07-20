@@ -19,24 +19,24 @@ Each agreement includes `status` (enum) and `statusLabel` (user-facing):
 
 ## Owner flow
 
-1. `POST /api/v1/owner/agreements` — create (requires `offerExpiresAt`; optional `send: true`)
-2. `PATCH /api/v1/owner/agreements/:id` — edit while `draft`
-3. `POST /api/v1/owner/agreements/:id/send` — `draft` → `sent`
-4. `POST /api/v1/owner/agreements/:id/cancel` — cancel before completion
+1. `POST /api/agreements` — create (requires `offerExpiresAt`; optional `send: true`)
+2. `PATCH /api/agreements/:id` — edit while `draft`
+3. `POST /api/agreements/:id/send` — `draft` → `sent`
+4. `POST /api/agreements/:id/cancel` — cancel before completion
 
 ## Renter flow
 
-1. `GET /api/v1/agreements/me`
-2. `POST /api/v1/agreements/:id/accept` — → `payment_pending`
-3. `POST /api/v1/agreements/:id/reject`
-4. `POST /api/v1/agreements/:id/deposit/initiate` — Chapa checkout URL
-5. `GET /api/v1/agreements/:id/deposit/status`
+1. `GET /api/agreements/me`
+2. `POST /api/agreements/:id/accept` — → `payment_pending`
+3. `POST /api/agreements/:id/reject`
+4. `POST /api/agreements/:id/deposit/initiate` — Chapa checkout URL
+5. `GET /api/agreements/:id/deposit/status`
 
 ## Chapa
 
-- `POST /api/v1/payments/chapa/webhook` — server callback
-- `GET /api/v1/payments/chapa/callback?tx_ref=...` — return URL
-- `POST /api/v1/payments/chapa/verify` — body `{ "tx_ref": "..." }`
+- `POST /api/payments/chapa/webhook` — server callback
+- `GET /api/payments/chapa/callback?tx_ref=...` — return URL
+- `POST /api/payments/chapa/verify` — body `{ "tx_ref": "..." }`
 
 ## Environment
 

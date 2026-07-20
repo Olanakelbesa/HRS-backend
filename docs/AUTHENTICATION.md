@@ -38,7 +38,7 @@ We use a **dual-token approach**:
 
 ### 1. Register
 
-**POST** `/api/v1/auth/register`
+**POST** `/api/auth/register`
 
 **Request Body:**
 
@@ -76,7 +76,7 @@ We use a **dual-token approach**:
 
 ### 2. Login
 
-**POST** `/api/v1/auth/login`
+**POST** `/api/auth/login`
 
 **Request Body:**
 
@@ -113,7 +113,7 @@ We use a **dual-token approach**:
 
 ### 3. Refresh Token
 
-**POST** `/api/v1/auth/refresh-token`
+**POST** `/api/auth/refresh-token`
 
 **Headers:**
 
@@ -141,7 +141,7 @@ We use a **dual-token approach**:
 
 ### 4. Logout
 
-**POST** `/api/v1/auth/logout`
+**POST** `/api/auth/logout`
 
 **Headers:**
 
@@ -165,7 +165,7 @@ We use a **dual-token approach**:
 
 ### 5. Get Current User
 
-**GET** `/api/v1/auth/me`
+**GET** `/api/auth/me`
 
 **Headers:**
 
@@ -196,7 +196,7 @@ We use a **dual-token approach**:
 
 ```typescript
 // Login
-const response = await fetch('/api/v1/auth/login', {
+const response = await fetch('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   credentials: 'include', // Important: sends cookies
@@ -211,7 +211,7 @@ setAccessToken(data.accessToken);
 ### 2. Making Authenticated Requests
 
 ```typescript
-const response = await fetch('/api/v1/properties', {
+const response = await fetch('/api/properties', {
   headers: {
     Authorization: `Bearer ${accessToken}`,
   },
@@ -235,7 +235,7 @@ axios.interceptors.response.use(
       try {
         // Refresh the token
         const { data } = await axios.post(
-          '/api/v1/auth/refresh-token',
+          '/api/auth/refresh-token',
           {},
           {
             withCredentials: true,
@@ -368,7 +368,7 @@ model RefreshToken {
 ### Test Login
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/auth/login \
+curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@smart-rental.com","password":"Admin@123"}' \
   -c cookies.txt
@@ -380,14 +380,14 @@ curl -X POST http://localhost:5000/api/v1/auth/login \
 # Extract access token from login response
 ACCESS_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-curl http://localhost:5000/api/v1/auth/me \
+curl http://localhost:5000/api/auth/me \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ### Test Refresh Token
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/auth/refresh-token \
+curl -X POST http://localhost:5000/api/auth/refresh-token \
   -b cookies.txt \
   -c cookies.txt
 ```

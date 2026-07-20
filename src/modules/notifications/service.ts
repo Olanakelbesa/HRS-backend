@@ -49,7 +49,7 @@ export type ListNotificationsInput = {
 };
 
 /**
- * Single entry for GET /api/v1/notifications — scope depends on role.
+ * Single entry for GET /api/notifications — scope depends on role.
  * - admin: platform feed (excludes renter↔owner MESSAGE_NEW), paginated
  * - owner / renter: own inbox, all notification types
  */

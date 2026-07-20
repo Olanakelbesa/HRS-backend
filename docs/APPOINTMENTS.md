@@ -4,8 +4,8 @@ This document explains the backend endpoints and business rules needed to power 
 
 ## 1) API Base
 
-- Base URL prefix: `/api/v1`
-- Appointment route group: `/api/v1/appointments`
+- Base URL prefix: `/api`
+- Appointment route group: `/api/appointments`
 - Auth required on every route: `Authorization: Bearer <access_token>`
 - The router is protected by `requireAuth`, so unauthenticated requests are rejected before reaching the controller.
 
@@ -29,7 +29,7 @@ Note: `Completed` is used in the current UI mock, but it is not part of the back
 
 ### 3.1 Book an appointment
 
-`POST /api/v1/appointments`
+`POST /api/appointments`
 
 Request body:
 
@@ -65,7 +65,7 @@ Successful response:
 
 ### 3.2 List appointments
 
-`GET /api/v1/appointments`
+`GET /api/appointments`
 
 Query params:
 
@@ -93,7 +93,7 @@ Successful response:
 
 ### 3.3 Update appointment status
 
-`PATCH /api/v1/appointments/:id/status`
+`PATCH /api/appointments/:id/status`
 
 Request body:
 
@@ -124,7 +124,7 @@ Successful response:
 
 ### 3.4 Delete appointment
 
-`DELETE /api/v1/appointments/:id`
+`DELETE /api/appointments/:id`
 
 Successful response:
 
@@ -139,7 +139,7 @@ Successful response:
 
 ### 3.5 Update appointment note
 
-`PATCH /api/v1/appointments/:id/note`
+`PATCH /api/appointments/:id/note`
 
 Request body:
 
@@ -254,10 +254,10 @@ The current owner appointments page is still using local mock state in `frontend
 
 To make it data-driven, the page should:
 
-- fetch appointments with `GET /api/v1/appointments`
-- call `PATCH /api/v1/appointments/:id/status` for accept/reject actions
-- call `DELETE /api/v1/appointments/:id` for removal actions if needed
-- call `PATCH /api/v1/appointments/:id/note` for the “Save Note” action
+- fetch appointments with `GET /api/appointments`
+- call `PATCH /api/appointments/:id/status` for accept/reject actions
+- call `DELETE /api/appointments/:id` for removal actions if needed
+- call `PATCH /api/appointments/:id/note` for the “Save Note” action
 
 ## 7) Recommended UI Mapping
 

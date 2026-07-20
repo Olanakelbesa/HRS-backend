@@ -7,7 +7,7 @@ This document lists the backend endpoints required by the owner-facing agreement
 ## List agreements
 
 - Method: GET
-- Path: /api/owner/agreements
+- Path: /api/agreements
 - Query params:
   - `page` (int, optional)
   - `limit` (int, optional)
@@ -31,7 +31,7 @@ This document lists the backend endpoints required by the owner-facing agreement
   "meta": { "page": number, "limit": number, "total": number }
   }
 
-Notes: supports filtering, paging and CSV export via `/api/owner/agreements/export?format=csv`.
+Notes: supports filtering, paging and CSV export via `/api/agreements/export?format=csv`.
 
 ---
 
@@ -157,7 +157,7 @@ Note: frontend links to `/owner/messages` — ensure conversationId is present o
 ## Export agreements CSV
 
 - Method: GET
-- Path: /api/owner/agreements/export
+- Path: /api/agreements/export
 - Query: `format=csv` (default), filters same as list endpoint
 - Response: 200 — `text/csv` attachment
 

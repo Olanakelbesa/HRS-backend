@@ -95,7 +95,7 @@ export async function verifyTransaction(txRef: string): Promise<ChapaVerifyResul
 export function buildChapaUrls(txRef: string) {
   const base = env.APP_BASE_URL;
   return {
-    callback_url: `${base}/api/v1/payments/chapa/callback?tx_ref=${encodeURIComponent(txRef)}`,
+    callback_url: `${base}/api/payments/chapa/callback?tx_ref=${encodeURIComponent(txRef)}`,
     return_url: `${env.FRONTEND_URL}/agreements/payment/return?tx_ref=${encodeURIComponent(txRef)}`,
   };
 }

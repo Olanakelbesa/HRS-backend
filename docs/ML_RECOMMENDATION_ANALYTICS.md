@@ -44,7 +44,7 @@ Admins can **train the model**, view **scores and dataset analytics**, and inspe
 └─────────────────┘                                                        │
                                                                              │ HTTP (Docker network)
                                                                              ▼
-┌─────────────────┐     GET /api/v1/internal/recommendation-data ┌──────────────────────────┐
+┌─────────────────┐     GET /api/internal/recommendation-data ┌──────────────────────────┐
 │  Main Postgres  │ ◄───────────────────────────────────────────── │  Recommendation Service  │
 │  (house_rental) │                                                │  FastAPI (port 8001)     │
 └─────────────────┘                                                └───────────┬──────────────┘
@@ -62,11 +62,11 @@ Admins can **train the model**, view **scores and dataset analytics**, and inspe
 
 | Step | Actor                  | Action                                                            |
 | ---- | ---------------------- | ----------------------------------------------------------------- |
-| 1    | Admin UI               | `POST /api/v1/admin/recommendations/train`                        |
-| 2    | Backend                | Proxies to `POST http://recommendation-service:8001/api/v1/train` |
-| 3    | Recommendation service | `GET http://backend:5000/api/v1/internal/recommendation-data`     |
+| 1    | Admin UI               | `POST /api/admin/recommendations/train`                        |
+| 2    | Backend                | Proxies to `POST http://recommendation-service:8001/api/train` |
+| 3    | Recommendation service | `GET http://backend:5000/api/internal/recommendation-data`     |
 | 4    | Recommendation service | Train LightFM, evaluate, save predictions + analytics             |
-| 5    | Admin UI               | `GET /api/v1/admin/recommendations/analytics` for dashboard       |
+| 5    | Admin UI               | `GET /api/admin/recommendations/analytics` for dashboard       |
 
 ---
 
@@ -88,7 +88,7 @@ Implementation: `backend_fork/recommendation-service/train.py`
 
 ### 1. Fetch training data
 
-- **URL:** `{BACKEND_URL}/api/v1/internal/recommendation-data`
+- **URL:** `{BACKEND_URL}/api/internal/recommendation-data`
 - **Default `BACKEND_URL`:** `http://backend:5000` (Docker Compose)
 - **Payload sections:**
   - `interactions` — user events (VIEW, LIKE_ADDED, SAVE_ADDED, etc.)
@@ -215,12 +215,12 @@ Types not in this map default to `0.0` and are effectively ignored after scoring
 
 All admin routes require **authentication** and role **`admin`** (`requireAuth` + `restrictTo('admin')`).
 
-Base path: `/api/v1/admin`
+Base path: `/api/admin`
 
 ### Trigger training
 
 ```http
-POST /api/v1/admin/recommendations/train
+POST /api/admin/recommendations/train
 Authorization: Bearer <admin_jwt>
 ```
 
@@ -243,7 +243,7 @@ Authorization: Bearer <admin_jwt>
 ### Latest analytics
 
 ```http
-GET /api/v1/admin/recommendations/analytics
+GET /api/admin/recommendations/analytics
 Authorization: Bearer <admin_jwt>
 ```
 
@@ -307,7 +307,7 @@ Authorization: Bearer <admin_jwt>
 ### Training history
 
 ```http
-GET /api/v1/admin/recommendations/history?limit=10
+GET /api/admin/recommendations/history?limit=10
 Authorization: Bearer <admin_jwt>
 ```
 
@@ -341,7 +341,7 @@ Authorization: Bearer <admin_jwt>
 ### Internal data export (service-to-service)
 
 ```http
-GET /api/v1/internal/recommendation-data
+GET /api/internal/recommendation-data
 ```
 
 Used by the recommendation service during training. Intended for **internal network** (Docker Compose); not for public clients.
@@ -352,10 +352,10 @@ Used by the recommendation service during training. Intended for **internal netw
 
 | Method | Path                                         | Description                |
 | ------ | -------------------------------------------- | -------------------------- |
-| `POST` | `/api/v1/train`                              | Run training synchronously |
-| `GET`  | `/api/v1/training/analytics`                 | Latest report              |
-| `GET`  | `/api/v1/training/history?limit=N`           | Run summaries              |
-| `GET`  | `/api/v1/recommendations/{user_id}?limit=10` | Cached or DB-backed list   |
+| `POST` | `/api/train`                              | Run training synchronously |
+| `GET`  | `/api/training/analytics`                 | Latest report              |
+| `GET`  | `/api/training/history?limit=N`           | Run summaries              |
+| `GET`  | `/api/recommendations/{user_id}?limit=10` | Cached or DB-backed list   |
 | `GET`  | `/health`                                    | Health check               |
 
 ---
@@ -464,17 +464,17 @@ Open: `http://localhost:5173/admin/ml-analytics` (port may vary).
 
 ```bash
 # Train (direct to recommendation service)
-curl -X POST http://localhost:8001/api/v1/train
+curl -X POST http://localhost:8001/api/train
 
 # Analytics
-curl http://localhost:8001/api/v1/training/analytics
+curl http://localhost:8001/api/training/analytics
 ```
 
 With admin JWT:
 
 ```bash
 curl -H "Authorization: Bearer <token>" \
-  http://localhost:5000/api/v1/admin/recommendations/analytics
+  http://localhost:5000/api/admin/recommendations/analytics
 ```
 
 ---
@@ -523,7 +523,7 @@ curl -H "Authorization: Bearer <token>" \
 | `recommendation-service/app.py`   | FastAPI routes                    |
 | `src/modules/admin/controller.ts` | Admin proxy handlers              |
 | `src/modules/admin/routes.ts`     | Route + Swagger definitions       |
-| `src/modules/internal/routes.ts`  | `recommendation-data` export      |
+| `src/modules/internal/internal.controller.ts`  | `recommendation-data` export      |
 | `docker-compose.yml`              | Service wiring                    |
 
 ---
@@ -532,6 +532,6 @@ curl -H "Authorization: Bearer <token>" \
 
 - **LightFM** requires aligned COO weight matrices for `sample_weight`.
 - Analytics are **append-only** in `training_analytics`; “latest” is the most recent row by `run_at`.
-- Renter-facing recommendations may also be served from main backend logic; precomputed lists in recommendation-db accelerate reads via `GET /api/v1/recommendations/{user_id}` on the recommendation service.
+- Renter-facing recommendations may also be served from main backend logic; precomputed lists in recommendation-db accelerate reads via `GET /api/recommendations/{user_id}` on the recommendation service.
 
-For platform-wide admin metrics (non-ML), use **`GET /api/v1/admin/analytics`** and the **Analytics** sidebar page.
+For platform-wide admin metrics (non-ML), use **`GET /api/admin/analytics`** and the **Analytics** sidebar page.

@@ -4,7 +4,8 @@ export async function getCache(key: string): Promise<any | null> {
   try {
     if (!redisClient.isOpen) return null;
     const data = await redisClient.get(key);
-    return data ? JSON.parse(data) : null;
+    if (data == null) return null;
+    return JSON.parse(data);
   } catch (err) {
     console.error(`Cache get error for key ${key}:`, err);
     return null;

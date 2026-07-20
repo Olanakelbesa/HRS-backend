@@ -322,8 +322,8 @@ def train_model():
 
     # 1. Fetch Data from Backend API
     try:
-        logger.info(f"Fetching data from {BACKEND_URL}/api/v1/internal/recommendation-data")
-        resp = requests.get(f"{BACKEND_URL}/api/v1/internal/recommendation-data", timeout=300)
+        logger.info(f"Fetching data from {BACKEND_URL}/api/internal/recommendation-data")
+        resp = requests.get(f"{BACKEND_URL}/api/internal/recommendation-data", timeout=300)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
