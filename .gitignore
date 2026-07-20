@@ -1,7 +1,11 @@
 node_modules/
 dist/
+dist-test/
+dist*/
 .env
+.env.*
 *.log
 .DS_Store
 uploads/
+
 
