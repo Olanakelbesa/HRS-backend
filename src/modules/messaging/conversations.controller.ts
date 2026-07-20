@@ -15,10 +15,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import { diskStorage } from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { MessagingApiService } from './messaging.api.service';
+import { memoryStorage } from 'multer';
+import { MessagingService } from './messaging.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -33,17 +31,17 @@ import {
   type SendAttachmentInput,
 } from './schema';
 
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const MESSAGE_ATTACHMENT_UPLOAD = {
+  storage: memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+};
 
-@ApiTags('Conversations')
+@ApiTags('Messaging')
 @ApiBearerAuth()
 @Roles('owner', 'renter')
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly messagingService: MessagingApiService) {}
+  constructor(private readonly messagingService: MessagingService) {}
 
   @Get()
   async listConversations(@CurrentUser() user: AuthUser) {
@@ -106,19 +104,7 @@ export class ConversationsController {
   @Post(':id/attachments')
   @HttpCode(201)
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => cb(null, uploadDir),
-        filename: (_req, file, cb) => {
-          const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          const ext = path.extname(file.originalname) || '';
-          cb(null, `${unique}${ext}`);
-        },
-      }),
-      limits: { fileSize: 10 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', MESSAGE_ATTACHMENT_UPLOAD))
   async sendAttachment(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,

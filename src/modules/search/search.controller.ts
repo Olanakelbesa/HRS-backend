@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post, Query, UsePipes } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { SearchApiService } from './search.api.service';
+import { SearchService } from './search.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { propertySearchSchema, type PropertySearchInput } from './schema';
@@ -8,7 +8,7 @@ import { propertySearchSchema, type PropertySearchInput } from './schema';
 @ApiTags('Search')
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchApiService) {}
+  constructor(private readonly searchService: SearchService) {}
 
   @Public()
   @Get()

@@ -4,10 +4,22 @@ import { PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+    } catch (err) {
+      if (process.env.NODE_ENV === 'test') {
+        console.warn('⚠️ Test mode: Prisma connection failed, continuing with mocks/offline mode.');
+      } else {
+        throw err;
+      }
+    }
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    try {
+      await this.$disconnect();
+    } catch {
+      // Ignore disconnect errors during shutdown
+    }
   }
 }

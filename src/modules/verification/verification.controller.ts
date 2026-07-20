@@ -13,7 +13,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import { VerificationApiService } from './verification.api.service';
+import { VerificationService } from './verification.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -24,14 +24,14 @@ import {
 
 const VERIFICATION_UPLOAD = {
   storage: memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 },
 };
 
 @ApiTags('Verification')
 @ApiBearerAuth()
 @Controller('verification')
 export class VerificationController {
-  constructor(private readonly verificationService: VerificationApiService) {}
+  constructor(private readonly verificationService: VerificationService) {}
 
   @Roles('owner')
   @Post('documents')

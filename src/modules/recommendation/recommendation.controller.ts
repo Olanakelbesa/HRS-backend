@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { RecommendationApiService } from './recommendation.api.service';
+import { RecommendationService } from './recommendation.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { ServiceAuthGuard } from '../../common/guards/service-auth.guard';
@@ -48,7 +48,7 @@ type ExportQuery = z.infer<typeof exportQuerySchema>;
 @ApiBearerAuth()
 @Controller('recommendations')
 export class RecommendationController {
-  constructor(private readonly recommendationService: RecommendationApiService) {}
+  constructor(private readonly recommendationService: RecommendationService) {}
 
   @Get()
   async getRecommendations(@CurrentUser() user: AuthUser) {

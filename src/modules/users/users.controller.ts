@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, UsePipes } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { UsersApiService } from './users.api.service';
+import { UsersService } from './users.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
@@ -18,7 +18,7 @@ import {
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersApiService) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @ApiBearerAuth()
   @Get('profile')

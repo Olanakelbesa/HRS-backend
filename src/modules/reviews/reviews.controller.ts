@@ -15,7 +15,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { ReviewsApiService } from './reviews.api.service';
+import { ReviewsService } from './reviews.service';
 import {
   createReviewSchema,
   updateReviewSchema,
@@ -25,7 +25,7 @@ import {
 @ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsApiService) {}
+  constructor(private readonly reviewsService: ReviewsService) {}
 
   @ApiBearerAuth()
   @Post()

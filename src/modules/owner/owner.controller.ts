@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { OwnerApiService } from './owner.api.service';
+import { OwnerService } from './owner.service';
 import {
   getOwnerOverviewQuerySchema,
   type GetOwnerOverviewQueryInput,
@@ -14,7 +14,7 @@ import {
 @Roles('owner', 'admin')
 @Controller('owner')
 export class OwnerController {
-  constructor(private readonly ownerService: OwnerApiService) {}
+  constructor(private readonly ownerService: OwnerService) {}
 
   @Get('overview')
   @UsePipes(new ZodValidationPipe(getOwnerOverviewQuerySchema, 'query'))

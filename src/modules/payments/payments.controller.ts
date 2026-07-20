@@ -16,11 +16,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
+import { PaymentsService } from './payments.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { env } from '../../config/env';
-import { PaymentsApiService } from './payments.api.service';
 import {
   listPaymentsQuerySchema,
   exportPaymentsQuerySchema,
@@ -29,10 +29,15 @@ import {
   type ExportPaymentsQuery,
 } from './schema';
 
+const PAYMENT_PROOF_UPLOAD = {
+  storage: memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+};
+
 @ApiTags('Payments')
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsApiService) {}
+  constructor(private readonly paymentsService: PaymentsService) {}
 
   @Public()
   @Post('chapa/webhook')

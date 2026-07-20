@@ -10,7 +10,7 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { NotificationsApiService } from './notifications.api.service';
+import { NotificationsService } from './notifications.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -27,7 +27,7 @@ type ListQuery = z.infer<typeof listNotificationsQuerySchema>;
 @ApiBearerAuth()
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsApiService) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
   @UsePipes(new ZodValidationPipe(listNotificationsQuerySchema, 'query'))

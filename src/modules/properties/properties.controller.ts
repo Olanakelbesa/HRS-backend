@@ -16,7 +16,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import { PropertiesApiService } from './properties.api.service';
+import { PropertiesService } from './properties.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -53,7 +53,7 @@ function resolveLanguage(
 @ApiTags('Properties')
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesApiService) {}
+  constructor(private readonly propertiesService: PropertiesService) {}
 
   @Public()
   @Get()

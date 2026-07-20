@@ -13,10 +13,10 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { ReportsService } from './reports.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { ReportsApiService } from './reports.api.service';
 import {
   getOwnerReportsQuerySchema,
   submitOwnerResponseSchema,
@@ -26,11 +26,16 @@ import {
   type SubmitReportInput,
 } from './schema';
 
+const REPORT_IMAGE_UPLOAD = {
+  storage: memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+};
+
 @ApiTags('Reports')
 @ApiBearerAuth()
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsApiService) {}
+  constructor(private readonly reportsService: ReportsService) {}
 
   @Post()
   @Roles('renter')

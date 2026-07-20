@@ -12,21 +12,22 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { AgreementsService } from './agreements.service';
+import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { AgreementsApiService } from './agreements.api.service';
 import {
-  listAgreementsQuerySchema,
-  listOwnerAgreementsQuerySchema,
   createOwnerAgreementSchema,
   updateDraftAgreementSchema,
   sendAgreementSchema,
   cancelAgreementSchema,
   rejectAgreementSchema,
+  listAgreementsQuerySchema,
+  listOwnerAgreementsQuerySchema,
+  type CreateOwnerAgreementInput,
   type ListAgreementsQuery,
   type ListOwnerAgreementsQuery,
-  type CreateOwnerAgreementInput,
 } from './schema';
 import { z } from 'zod';
 
@@ -36,7 +37,7 @@ type UpdateDraftAgreementInput = z.infer<typeof updateDraftAgreementSchema>;
 @ApiBearerAuth()
 @Controller('agreements')
 export class AgreementsController {
-  constructor(private readonly agreementsService: AgreementsApiService) {}
+  constructor(private readonly agreementsService: AgreementsService) {}
 
   // ── Owner ─────────────────────────────────────────────────────────────────
 

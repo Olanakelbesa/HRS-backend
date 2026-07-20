@@ -9,7 +9,7 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { MessagingApiService } from './messaging.api.service';
+import { MessagingService } from './messaging.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -25,7 +25,7 @@ import {
 @Roles('owner', 'renter')
 @Controller('messages')
 export class MessagesController {
-  constructor(private readonly messagingService: MessagingApiService) {}
+  constructor(private readonly messagingService: MessagingService) {}
 
   @Patch(':id/status')
   @UsePipes(new ZodValidationPipe(updateMessageStatusSchema, 'body'))

@@ -8,14 +8,14 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { ServiceAuthGuard } from '../../common/guards/service-auth.guard';
-import { InternalApiService } from './internal.api.service';
+import { InternalService } from './internal.service';
 
 @ApiTags('Internal')
 @Public()
 @UseGuards(ServiceAuthGuard)
 @Controller('internal')
 export class InternalController {
-  constructor(private readonly internalService: InternalApiService) {}
+  constructor(private readonly internalService: InternalService) {}
 
   @Get('recommendation-data')
   async getRecommendationData() {

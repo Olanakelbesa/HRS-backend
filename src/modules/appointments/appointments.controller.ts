@@ -12,7 +12,7 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AppointmentsApiService } from './appointments.api.service';
+import { AppointmentsService } from './appointments.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -33,7 +33,7 @@ import {
 @ApiBearerAuth()
 @Controller('appointments')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsApiService) {}
+  constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @Post()
   @Roles('renter')

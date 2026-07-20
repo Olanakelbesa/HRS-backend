@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AgreementsController } from './agreements.controller';
-import { AgreementsApiService } from './agreements.api.service';
+import { AgreementsService } from './agreements.service';
 
 @Module({
   controllers: [AgreementsController],
-  providers: [AgreementsApiService],
-  exports: [AgreementsApiService],
+  providers: [AgreementsService],
+  exports: [AgreementsService],
 })
 export class AgreementsModule {}

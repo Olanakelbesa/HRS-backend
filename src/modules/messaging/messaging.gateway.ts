@@ -3,6 +3,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
@@ -15,7 +16,13 @@ import { env } from '../../config/env';
 import { verifyAccessToken } from '../../utils/jwt.utils';
 import { Public } from '../../common/decorators/public.decorator';
 import { canUseMessaging } from './access';
-import { MessagingApiService } from './messaging.api.service';
+import { MessagingService } from './messaging.service';
+import {
+  createConversationSchema,
+  createMessageSchema,
+  messageReactionSchema,
+  updateMessageStatusSchema,
+} from './schema';
 
 const conversationRoom = (conversationId: string) => `conversation:${conversationId}`;
 const userRoom = (userId: string) => `user:${userId}`;
@@ -23,17 +30,22 @@ const userRoom = (userId: string) => `user:${userId}`;
 @Public()
 @WebSocketGateway({
   cors: {
-    origin: env.ALLOWED_ORIGINS,
+    origin: '*',
     credentials: true,
   },
+  namespace: '/messaging',
 })
-export class MessagingGateway implements OnGatewayInit, OnGatewayConnection {
+export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(MessagingGateway.name);
 
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly messagingService: MessagingApiService) {}
+  constructor(private readonly messagingService: MessagingService) {}
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnected: ${client.id}`);
+  }
 
   async afterInit(server: Server) {
     await this.configureRedisAdapter(server);

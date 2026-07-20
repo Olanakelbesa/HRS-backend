@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { RecommendationController } from './recommendation.controller';
-import { RecommendationApiService } from './recommendation.api.service';
+import { RecommendationService } from './recommendation.service';
 
 @Module({
   controllers: [RecommendationController],
-  providers: [RecommendationApiService],
-  exports: [RecommendationApiService],
+  providers: [RecommendationService],
+  exports: [RecommendationService],
 })
 export class RecommendationsModule {}

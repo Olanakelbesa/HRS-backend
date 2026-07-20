@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ReportsController } from './reports.controller';
-import { ReportsApiService } from './reports.api.service';
+import { ReportsService } from './reports.service';
 
 @Module({
   controllers: [ReportsController],
-  providers: [ReportsApiService],
-  exports: [ReportsApiService],
+  providers: [ReportsService],
+  exports: [ReportsService],
 })
 export class ReportsModule {}

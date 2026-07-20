@@ -14,7 +14,7 @@ import {
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import { ProfileApiService } from './profile.api.service';
+import { ProfileService } from './profile.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
@@ -42,7 +42,7 @@ const PROFILE_UPLOAD = {
 @ApiBearerAuth()
 @Controller('me')
 export class MeController {
-  constructor(private readonly profileService: ProfileApiService) {}
+  constructor(private readonly profileService: ProfileService) {}
 
   @Get()
   async getProfile(@CurrentUser() user: AuthUser) {
