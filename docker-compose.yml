@@ -20,6 +20,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: smart-rental-redis
+
+
+    
     ports:
       - '${REDIS_PORT:-6379}:6379'
     volumes:
@@ -36,7 +39,7 @@ services:
       dockerfile: Dockerfile
     container_name: smart-rental-backend
     ports:
-      - '${PORT:-5000}:${PORT:-5000}'
+      - '8080:${PORT:-5000}'
     environment:
       PORT: ${PORT:-5000}
       NODE_ENV: ${NODE_ENV:-production}
