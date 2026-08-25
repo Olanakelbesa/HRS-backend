@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import { resolve } from 'node:path';
 
-dotenv.config();
+const envFile = resolve(__dirname, '../../.env');
+const result = dotenv.config({ path: envFile });
+if (result.error) {
+  console.warn(`Could not load .env from ${envFile}: ${result.error}`);
+}
 
 const envSchema = z.object({
   PORT: z.string().default('5000'),
