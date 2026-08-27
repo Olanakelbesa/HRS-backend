@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type { Response } from 'express';
 import bcrypt from 'bcryptjs';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../infrastructure/mail/mail.service';
 import { env } from '../../config/env';
 import { AppError } from '../../core/AppError';
 import { generateTokenPair, verifyRefreshToken } from '../../utils/jwt.utils';
+import type { OAuthUserProfile } from './oauth.service';
 import type {
   RegisterInput,
   LoginInput,
@@ -342,6 +343,107 @@ export class AuthService {
     return user;
   }
 
+  async handleSocialAuth(profile: OAuthUserProfile, requestedRole: string = 'renter') {
+    const validRole: Role = requestedRole === 'owner' ? 'owner' : 'renter';
+
+    // 1. Check if Account already linked
+    let account = await this.prisma.account.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: profile.provider,
+          providerAccountId: profile.providerAccountId,
+        },
+      },
+      include: { user: true },
+    });
+
+    let user = account?.user;
+    let isNewUser = false;
+
+    if (!user) {
+      // 2. Check if User with email exists
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: profile.email },
+      });
+
+      if (existingUser) {
+        user = existingUser;
+        // Link Account
+        await this.prisma.account.create({
+          data: {
+            userId: existingUser.id,
+            type: 'oauth',
+            provider: profile.provider,
+            providerAccountId: profile.providerAccountId,
+            access_token: profile.accessToken ?? null,
+            refresh_token: profile.refreshToken ?? null,
+            id_token: profile.idToken ?? null,
+          },
+        });
+
+        // Ensure email is verified and update missing name/image
+        await this.prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            emailVerified: true,
+            first_name: existingUser.first_name || profile.firstName || null,
+            last_name: existingUser.last_name || profile.lastName || null,
+            image: existingUser.image || profile.image || null,
+          },
+        });
+      } else {
+        // 3. Create brand new User + Account
+        isNewUser = true;
+        user = await this.prisma.user.create({
+          data: {
+            email: profile.email,
+            first_name: profile.firstName || null,
+            last_name: profile.lastName || null,
+            image: profile.image || null,
+            role: validRole,
+            emailVerified: true,
+            isVerified: false,
+            status: 'active',
+          },
+        });
+
+        await this.prisma.account.create({
+          data: {
+            userId: user.id,
+            type: 'oauth',
+            provider: profile.provider,
+            providerAccountId: profile.providerAccountId,
+            access_token: profile.accessToken ?? null,
+            refresh_token: profile.refreshToken ?? null,
+            id_token: profile.idToken ?? null,
+          },
+        });
+      }
+    } else {
+      // Existing user via Account: keep verified and update missing avatar
+      if (!user.emailVerified || (!user.image && profile.image)) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            emailVerified: true,
+            image: user.image || profile.image || null,
+          },
+        });
+      }
+    }
+
+    const { accessToken, refreshToken } = generateTokenPair(user.id, user.role);
+    await this.storeRefreshToken(user.id, refreshToken);
+
+    const { password: _, ...safeUser } = user;
+    return {
+      user: safeUser,
+      accessToken,
+      refreshToken,
+      isNewUser,
+    };
+  }
+
   setRefreshTokenCookie(res: Response, refreshToken: string) {
     const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -365,3 +467,4 @@ export class AuthService {
     });
   }
 }
+

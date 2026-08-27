@@ -8,38 +8,57 @@ if (result.error) {
   console.warn(`Could not load .env from ${envFile}: ${result.error}`);
 }
 
+const emptyToUndefined = (val: unknown) =>
+  typeof val === 'string' && val.trim() === '' ? undefined : val;
+
+const optionalString = z.preprocess(emptyToUndefined, z.string().optional());
+const optionalEmail = z.preprocess(emptyToUndefined, z.string().email().optional());
+
 const envSchema = z.object({
   PORT: z.string().default('5000'),
-  APP_BASE_URL: z.string().optional(),
+  APP_BASE_URL: optionalString,
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
-  ALLOWED_ORIGINS: z.string().optional(),
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z
-    .string()
-    .regex(
-      /^(?:[^<>]+\s<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/,
-      'EMAIL_FROM must be in the format email@example.com or Name <email@example.com>'
-    )
-    .default('House Rental <onboarding@resend.dev>'),
-  SUPPORT_EMAIL: z.string().email().optional(),
+  ALLOWED_ORIGINS: optionalString,
+  RESEND_API_KEY: optionalString,
+  EMAIL_FROM: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .regex(
+        /^(?:[^<>]+\s<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/,
+        'EMAIL_FROM must be in the format email@example.com or Name <email@example.com>'
+      )
+      .default('House Rental <onboarding@resend.dev>')
+  ),
+  SUPPORT_EMAIL: optionalEmail,
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
-  GOOGLE_EMAIL_USER: z.string().email().optional(),
-  GOOGLE_EMAIL_PASS: z.string().optional(),
+  GOOGLE_EMAIL_USER: optionalEmail,
+  GOOGLE_EMAIL_PASS: optionalString,
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
-  CLOUDINARY_URL: z.string().optional(),
-  CHAPA_SECRET_KEY: z.string().optional(),
-  CHAPA_PUBLICK_KEY: z.string().optional(),
-  EXCHANGE_API_KEY: z.string().optional(),
-  GEMINI_API_KEY: z.string().optional(),
-  EMBEDDING_URL: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: optionalString,
+  CLOUDINARY_API_KEY: optionalString,
+  CLOUDINARY_API_SECRET: optionalString,
+  CLOUDINARY_URL: optionalString,
+  CHAPA_SECRET_KEY: optionalString,
+  CHAPA_PUBLICK_KEY: optionalString,
+  EXCHANGE_API_KEY: optionalString,
+  GEMINI_API_KEY: optionalString,
+  EMBEDDING_URL: optionalString,
+  GOOGLE_CLIENT_ID: optionalString,
+  GOOGLE_CLIENT_SECRET: optionalString,
+  FACEBOOK_APP_ID: optionalString,
+  FACEBOOK_CLIENT_ID: optionalString,
+  FACEBOOK_APP_SECRET: optionalString,
+  FACEBOOK_CLIENT_SECRET: optionalString,
+  APPLE_CLIENT_ID: optionalString,
+  APPLE_CLIENT_SECRET: optionalString,
+  APPLE_TEAM_ID: optionalString,
+  APPLE_KEY_ID: optionalString,
 });
 
 const rawEnv = envSchema.parse(process.env);
