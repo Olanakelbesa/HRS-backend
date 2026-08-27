@@ -55,6 +55,8 @@ const envSchema = z.object({
   FACEBOOK_CLIENT_ID: optionalString,
   FACEBOOK_APP_SECRET: optionalString,
   FACEBOOK_CLIENT_SECRET: optionalString,
+  TELEGRAM_BOT_TOKEN: optionalString,
+  TELEGRAM_BOT_USERNAME: optionalString,
   APPLE_CLIENT_ID: optionalString,
   APPLE_CLIENT_SECRET: optionalString,
   APPLE_TEAM_ID: optionalString,

@@ -262,6 +262,62 @@ export class AuthController {
   }
 
   @Public()
+  @Get('telegram')
+  @ApiOperation({ summary: 'Initiate Telegram OAuth login' })
+  telegramAuth(
+    @Query('role') role: string = 'renter',
+    @Query('redirect') redirect: string = '',
+    @Res() res: Response,
+  ) {
+    const state = this.oauthService.encodeState({
+      provider: 'telegram',
+      role,
+      redirectUrl: redirect,
+    });
+    const url = this.oauthService.getTelegramAuthUrl(state);
+    return res.redirect(url);
+  }
+
+  @Public()
+  @Get('telegram/callback')
+  @ApiOperation({ summary: 'Telegram OAuth callback handler' })
+  async telegramCallback(
+    @Query() query: Record<string, any>,
+    @Res() res: Response,
+  ) {
+    const stateStr = query.state as string | undefined;
+    const error = query.error as string | undefined;
+
+    if (error) {
+      return res.redirect(
+        this.oauthService.getFrontendCallbackUrl({ error, provider: 'telegram' }),
+      );
+    }
+    try {
+      const state = this.oauthService.decodeState(stateStr);
+      const profile = this.oauthService.handleTelegramCallback(query);
+      const result = await this.authService.handleSocialAuth(profile, state?.role);
+      this.authService.setRefreshTokenCookie(res, result.refreshToken);
+      return res.redirect(
+        this.oauthService.getFrontendCallbackUrl({
+          token: result.accessToken,
+          role: result.user.role,
+          isNewUser: result.isNewUser,
+          provider: 'telegram',
+        }),
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Telegram authentication failed';
+      return res.redirect(
+        this.oauthService.getFrontendCallbackUrl({
+          error: message,
+          provider: 'telegram',
+        }),
+      );
+    }
+  }
+
+  @Public()
   @Get('apple')
   @ApiOperation({ summary: 'Initiate Apple OAuth login' })
   appleAuth(
@@ -353,7 +409,7 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Direct Social Login token exchange' })
   async directSocialLogin(
-    @Body() body: { provider: 'google' | 'facebook' | 'apple'; profile: any; role?: string },
+    @Body() body: { provider: 'google' | 'facebook' | 'telegram' | 'apple'; profile: any; role?: string },
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.handleSocialAuth(body.profile, body.role);

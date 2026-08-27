@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import crypto from 'crypto';
 import { env } from '../../config/env';
 import { AppError } from '../../core/AppError';
 
 export interface OAuthUserProfile {
-  provider: 'google' | 'facebook' | 'apple';
+  provider: 'google' | 'facebook' | 'telegram' | 'apple';
   providerAccountId: string;
   email: string;
   firstName?: string | null;
@@ -15,7 +16,7 @@ export interface OAuthUserProfile {
 }
 
 export interface OAuthStateData {
-  provider: 'google' | 'facebook' | 'apple';
+  provider: 'google' | 'facebook' | 'telegram' | 'apple';
   role?: string;
   redirectUrl?: string;
   nonce?: string;
@@ -302,10 +303,79 @@ export class OAuthService {
   }
 
   // ==========================================
+  // TELEGRAM AUTH
+  // ==========================================
+  isTelegramConfigured(): boolean {
+    return Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_USERNAME);
+  }
+
+  getTelegramAuthUrl(state: string): string {
+    if (!this.isTelegramConfigured()) {
+      return `${env.APP_BASE_URL}/api/auth/dev-demo?state=${state}`;
+    }
+
+    const botId = env.TELEGRAM_BOT_TOKEN!.split(':')[0];
+    const callbackUrl = `${env.APP_BASE_URL}/api/auth/telegram/callback`;
+
+    return `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(env.APP_BASE_URL)}&return_to=${encodeURIComponent(callbackUrl)}&request_access=write`;
+  }
+
+  verifyTelegramAuth(data: Record<string, any>): boolean {
+    if (!env.TELEGRAM_BOT_TOKEN) return false;
+
+    const hash = data.hash ? String(data.hash) : '';
+    if (!hash) return false;
+
+    const authDate = Number(data.auth_date);
+    if (!authDate || (Date.now() / 1000 - authDate) > 86400) {
+      this.logger.warn('Telegram auth data expired (older than 24 hours)');
+      return false;
+    }
+
+    const dataCheckArr: string[] = [];
+    for (const key of Object.keys(data).sort()) {
+      if (key !== 'hash' && key !== 'state' && data[key] !== undefined && data[key] !== null) {
+        dataCheckArr.push(`${key}=${data[key]}`);
+      }
+    }
+    const dataCheckString = dataCheckArr.join('\n');
+
+    const secretKey = crypto.createHash('sha256').update(env.TELEGRAM_BOT_TOKEN).digest();
+    const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+    return hmac === hash;
+  }
+
+  handleTelegramCallback(query: Record<string, any>): OAuthUserProfile {
+    if (!this.verifyTelegramAuth(query)) {
+      throw new AppError('Telegram authentication signature verification failed.', 400);
+    }
+
+    const telegramId = String(query.id);
+    const firstName = query.first_name || 'TelegramUser';
+    const lastName = query.last_name || '';
+    const username = query.username;
+    const photoUrl = query.photo_url || null;
+
+    const email = username
+      ? `${String(username).toLowerCase()}@telegram.user.local`
+      : `tg_${telegramId}@telegram.user.local`;
+
+    return {
+      provider: 'telegram',
+      providerAccountId: telegramId,
+      email,
+      firstName,
+      lastName,
+      image: photoUrl,
+    };
+  }
+
+  // ==========================================
   // DEV DEMO SIMULATION (Fallback when keys aren't in .env)
   // ==========================================
-  generateDemoProfile(provider: 'google' | 'facebook' | 'apple', role = 'renter'): OAuthUserProfile {
-    const demoProfiles: Record<'google' | 'facebook' | 'apple', OAuthUserProfile> = {
+  generateDemoProfile(provider: 'google' | 'facebook' | 'telegram' | 'apple', role = 'renter'): OAuthUserProfile {
+    const demoProfiles: Record<'google' | 'facebook' | 'telegram' | 'apple', OAuthUserProfile> = {
       google: {
         provider: 'google',
         providerAccountId: 'demo_google_id_1029384756',
@@ -321,6 +391,14 @@ export class OAuthService {
         firstName: 'Sarah',
         lastName: 'Tadesse',
         image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&fit=crop&q=80',
+      },
+      telegram: {
+        provider: 'telegram',
+        providerAccountId: 'demo_tg_id_5544332211',
+        email: `samuel.estay.${role}@telegram.user.local`,
+        firstName: 'Samuel',
+        lastName: 'Alemu',
+        image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&fit=crop&q=80',
       },
       apple: {
         provider: 'apple',
