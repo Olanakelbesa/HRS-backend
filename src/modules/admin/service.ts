@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import type { Prisma, Report, ReportTargetType } from '@prisma/client';
 import { excludePeerMessageNotifications } from '../notifications/access';
+import { getLocalizedText } from '../../utils/localized';
 import type {
   AdminUpdatePropertyBodyInput,
   ApprovePropertyInput,
@@ -416,7 +417,7 @@ export async function getAdminOverview(query: GetOverviewQueryInput) {
         'Untitled Property',
       owner,
       ownerAvatar: property.owner.image,
-      location: property.address ?? property.location,
+      location: getLocalizedText(property.address) || (typeof property.location === 'string' ? property.location : 'Addis Ababa'),
       status: property.status,
       statusLabel: statusMeta.statusLabel,
       statusStyle: statusMeta.statusStyle,
@@ -427,14 +428,14 @@ export async function getAdminOverview(query: GetOverviewQueryInput) {
 
   const totalListingsCount = areaGroups.reduce((sum, item) => sum + item._count._all, 0);
   const listingsByArea = areaGroups.map((item) => {
-    const rawAddress = String(item.address ?? '').trim();
-    const area = rawAddress ? rawAddress.split(',')[0].trim() : 'Unknown';
+    const localizedAddr = getLocalizedText(item.address, 'en');
+    const area = localizedAddr ? localizedAddr.split(',')[0].trim() : 'Addis Ababa';
     const percentage = totalListingsCount
       ? Math.round((item._count._all / totalListingsCount) * 100)
       : 0;
 
     return {
-      area,
+      area: area || 'Addis Ababa',
       count: item._count._all,
       percentage,
     };
