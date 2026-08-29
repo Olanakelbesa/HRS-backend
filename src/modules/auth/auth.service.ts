@@ -124,6 +124,7 @@ export class AuthService {
           first_name: true,
           last_name: true,
           role: true,
+          image: true,
           createdAt: true,
           emailVerified: true,
           isVerified: true,
@@ -332,9 +333,17 @@ export class AuthService {
         first_name: true,
         last_name: true,
         role: true,
-        createdAt: true,
-        emailVerified: true,
+        image: true,
         phone: true,
+        location: true,
+        bio: true,
+        preferredLanguage: true,
+        isVerified: true,
+        verificationState: true,
+        status: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
     if (!user) {
@@ -367,7 +376,6 @@ export class AuthService {
       });
 
       if (existingUser) {
-        user = existingUser;
         // Link Account
         await this.prisma.account.create({
           data: {
@@ -382,7 +390,7 @@ export class AuthService {
         });
 
         // Ensure email is verified and update missing name/image
-        await this.prisma.user.update({
+        user = await this.prisma.user.update({
           where: { id: existingUser.id },
           data: {
             emailVerified: true,
@@ -420,14 +428,24 @@ export class AuthService {
         });
       }
     } else {
-      // Existing user via Account: keep verified and update missing avatar
-      if (!user.emailVerified || (!user.image && profile.image)) {
+      // Existing user via Account: keep verified and update avatar / names
+      const updateData: any = {};
+      if (profile.image && (!user.image || user.image !== profile.image)) {
+        updateData.image = profile.image;
+      }
+      if (!user.first_name && profile.firstName) {
+        updateData.first_name = profile.firstName;
+      }
+      if (!user.last_name && profile.lastName) {
+        updateData.last_name = profile.lastName;
+      }
+      if (!user.emailVerified) {
+        updateData.emailVerified = true;
+      }
+      if (Object.keys(updateData).length > 0) {
         user = await this.prisma.user.update({
           where: { id: user.id },
-          data: {
-            emailVerified: true,
-            image: user.image || profile.image || null,
-          },
+          data: updateData,
         });
       }
     }

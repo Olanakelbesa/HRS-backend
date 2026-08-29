@@ -121,6 +121,8 @@ export async function getProfile(userId: string) {
     location: user.location || '',
     bio: user.bio || '',
     image: user.image,
+    avatar: user.image,
+    profilePicture: user.image,
     role: user.role,
     status: user.status,
     preferredLanguage: user.preferredLanguage,
