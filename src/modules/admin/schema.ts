@@ -89,6 +89,18 @@ export const paramIdSchema = z.object({
   id: z.string().min(1),
 });
 
+export const createAdminUserSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required'),
+  last_name: z.string().trim().min(1, 'Last name is required'),
+  email: z.string().trim().email('Invalid email address').toLowerCase(),
+  phone: z.string().trim().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  role: z.enum(['renter', 'owner', 'admin']).default('renter'),
+  status: z.enum(['active', 'suspended', 'pending']).default('active'),
+  verificationState: z.enum(['verified', 'pending', 'rejected', 'resubmit']).default('verified'),
+  emailVerified: z.boolean().default(true),
+});
+
 export const updateUserStatusSchema = z.object({
   status: z.enum(['active', 'suspended', 'pending']),
 });
@@ -163,6 +175,7 @@ export type GetAuditLogsQueryInput = z.infer<typeof getAuditLogsQuerySchema>;
 export type AdminUpdatePropertyParamsInput = z.infer<typeof adminUpdatePropertyParamsSchema>;
 export type AdminUpdatePropertyBodyInput = z.infer<typeof adminUpdatePropertyBodySchema>;
 export type GetUsersQueryInput = z.infer<typeof getUsersQuerySchema>;
+export type CreateAdminUserInput = z.infer<typeof createAdminUserSchema>;
 export type GetAdminPropertiesQueryInput = z.infer<typeof getAdminPropertiesQuerySchema>;
 export type ApprovePropertyInput = z.infer<typeof approvePropertySchema>;
 export type RejectPropertyInput = z.infer<typeof rejectPropertySchema>;

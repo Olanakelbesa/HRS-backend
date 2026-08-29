@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Post,
   NotFoundException,
   Param,
   Patch,
@@ -14,12 +15,14 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AdminUsersService } from './admin-users.service';
 import {
+  createAdminUserSchema,
   getPendingVerificationsQuerySchema,
   getUsersQuerySchema,
   paramIdSchema,
   resolveVerificationSchema,
   updateUserStatusSchema,
   updateUserVerificationSchema,
+  type CreateAdminUserInput,
   type GetPendingVerificationsQueryInput,
   type GetUsersQueryInput,
 } from './schema';
@@ -30,6 +33,16 @@ import {
 @Controller('admin')
 export class AdminUsersController {
   constructor(private readonly usersService: AdminUsersService) {}
+
+  @Post('users')
+  @UsePipes(new ZodValidationPipe(createAdminUserSchema, 'body'))
+  async create(
+    @CurrentUser() user: AuthUser,
+    @Body() body: CreateAdminUserInput,
+  ) {
+    const data = await this.usersService.createUser(user.userId, body);
+    return { status: 'success', data };
+  }
 
   @Get('pending-verifications')
   @UsePipes(new ZodValidationPipe(getPendingVerificationsQuerySchema, 'query'))

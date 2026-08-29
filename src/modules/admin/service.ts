@@ -1,10 +1,13 @@
 import prisma from '../../config/database';
 import type { Prisma, Report, ReportTargetType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import { AppError } from '../../core/AppError';
 import { excludePeerMessageNotifications } from '../notifications/access';
 import { getLocalizedText } from '../../utils/localized';
 import type {
   AdminUpdatePropertyBodyInput,
   ApprovePropertyInput,
+  CreateAdminUserInput,
   GetAdminPropertiesQueryInput,
   GetAuditLogsQueryInput,
   GetOverviewQueryInput,
@@ -750,6 +753,70 @@ export async function getUsers(query: import('./schema').GetUsersQueryInput) {
   ]);
 
   return { items, meta: { total, page: query.page, limit: query.limit } };
+}
+
+export async function createUser(adminId: string, input: CreateAdminUserInput) {
+  const existingEmail = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+  if (existingEmail) {
+    throw new AppError('Email already registered', 409);
+  }
+
+  if (input.phone) {
+    const existingPhone = await prisma.user.findFirst({
+      where: { phone: input.phone },
+    });
+    if (existingPhone) {
+      throw new AppError('Phone number already registered', 409);
+    }
+  }
+
+  const hashedPassword = await bcrypt.hash(input.password, 10);
+
+  const newUser = await prisma.user.create({
+    data: {
+      first_name: input.first_name,
+      last_name: input.last_name,
+      email: input.email,
+      phone: input.phone || null,
+      password: hashedPassword,
+      role: input.role,
+      status: input.status,
+      verificationState: input.verificationState,
+      isVerified: input.verificationState === 'verified',
+      emailVerified: input.emailVerified ?? true,
+    },
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      phone: true,
+      role: true,
+      status: true,
+      verificationState: true,
+      isVerified: true,
+      emailVerified: true,
+      createdAt: true,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: adminId,
+      eventType: 'ADMIN_USER_CREATED',
+      entityType: 'User',
+      entityId: newUser.id,
+      metadata: {
+        email: newUser.email,
+        role: newUser.role,
+        created_by_admin: true,
+      },
+    },
+  });
+
+  return newUser;
 }
 
 export async function getUserById(id: string) {

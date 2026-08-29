@@ -2,11 +2,16 @@ import { Injectable } from '@nestjs/common';
 import * as adminService from './service';
 import type {
   GetUsersQueryInput,
+  CreateAdminUserInput,
   GetPendingVerificationsQueryInput,
 } from './schema';
 
 @Injectable()
 export class AdminUsersService {
+  createUser(adminId: string, input: CreateAdminUserInput) {
+    return adminService.createUser(adminId, input);
+  }
+
   getUsers(query: GetUsersQueryInput) {
     return adminService.getUsers(query);
   }
