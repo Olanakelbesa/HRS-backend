@@ -349,7 +349,28 @@ export class AuthService {
     if (!user) {
       throw new AppError('User not found', 404);
     }
-    return user;
+    const isTelegram = Boolean(user.email?.endsWith('@telegram.user.local'));
+    const isFacebook = Boolean(user.email?.endsWith('@facebook.user.local') || user.email?.endsWith('@facebook.com'));
+    const isApple = Boolean(user.email?.endsWith('@privaterelay.appleid.com') || user.email?.endsWith('@apple.user.local'));
+
+    let username: string | null = null;
+    if (isTelegram && user.email) {
+      username = `@${user.email.replace('@telegram.user.local', '').replace(/^tg_/, '')}`;
+    } else if (isFacebook && user.email) {
+      const raw = user.email.replace('@facebook.user.local', '').replace('@facebook.com', '');
+      username = raw.startsWith('fb_') ? `@${raw}` : `@fb_${raw}`;
+    } else if (isApple && user.email) {
+      const raw = user.email.replace('@privaterelay.appleid.com', '').replace('@apple.user.local', '');
+      username = raw.startsWith('apple_') ? `@${raw}` : `@apple_${raw}`;
+    }
+
+    return {
+      ...user,
+      username,
+      isTelegram,
+      isFacebook,
+      isApple,
+    };
   }
 
   async handleSocialAuth(profile: OAuthUserProfile, requestedRole: string = 'renter') {
@@ -454,8 +475,29 @@ export class AuthService {
     await this.storeRefreshToken(user.id, refreshToken);
 
     const { password: _, ...safeUser } = user;
+    const isTelegram = Boolean(user.email?.endsWith('@telegram.user.local'));
+    const isFacebook = Boolean(user.email?.endsWith('@facebook.user.local') || user.email?.endsWith('@facebook.com'));
+    const isApple = Boolean(user.email?.endsWith('@privaterelay.appleid.com') || user.email?.endsWith('@apple.user.local'));
+
+    let username: string | null = null;
+    if (isTelegram && user.email) {
+      username = `@${user.email.replace('@telegram.user.local', '').replace(/^tg_/, '')}`;
+    } else if (isFacebook && user.email) {
+      const raw = user.email.replace('@facebook.user.local', '').replace('@facebook.com', '');
+      username = raw.startsWith('fb_') ? `@${raw}` : `@fb_${raw}`;
+    } else if (isApple && user.email) {
+      const raw = user.email.replace('@privaterelay.appleid.com', '').replace('@apple.user.local', '');
+      username = raw.startsWith('apple_') ? `@${raw}` : `@apple_${raw}`;
+    }
+
     return {
-      user: safeUser,
+      user: {
+        ...safeUser,
+        username,
+        isTelegram,
+        isFacebook,
+        isApple,
+      },
       accessToken,
       refreshToken,
       isNewUser,
