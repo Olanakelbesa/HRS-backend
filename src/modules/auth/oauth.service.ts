@@ -26,6 +26,8 @@ export interface OAuthStateData {
 @Injectable()
 export class OAuthService {
   private readonly logger = new Logger(OAuthService.name);
+  private readonly callbackPromiseMap = new Map<string, Promise<OAuthUserProfile>>();
+  private readonly callbackResultCache = new Map<string, { profile: OAuthUserProfile; expiresAt: number }>();
 
   encodeState(data: OAuthStateData): string {
     return Buffer.from(JSON.stringify(data)).toString('base64url');
@@ -91,64 +93,85 @@ export class OAuthService {
   }
 
   async handleGoogleCallback(code: string): Promise<OAuthUserProfile> {
-    const redirectUri = `${env.APP_BASE_URL}/api/auth/google/callback`;
+    const cacheKey = `google:${code}`;
+    const cached = this.callbackResultCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.profile;
+    }
 
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: env.GOOGLE_CLIENT_ID!,
-        client_secret: env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }).toString(),
+    const existingPromise = this.callbackPromiseMap.get(cacheKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const promise = (async () => {
+      const redirectUri = `${env.APP_BASE_URL}/api/auth/google/callback`;
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: env.GOOGLE_CLIENT_ID!,
+          client_secret: env.GOOGLE_CLIENT_SECRET!,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }).toString(),
+      });
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text();
+        this.logger.error(`Google token exchange failed: ${errText}`);
+        throw new AppError('Failed to exchange Google authorization code.', 400);
+      }
+
+      const tokens = (await tokenRes.json()) as {
+        access_token: string;
+        id_token?: string;
+        refresh_token?: string;
+      };
+
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+
+      if (!userRes.ok) {
+        throw new AppError('Failed to fetch user info from Google.', 400);
+      }
+
+      const userInfo = (await userRes.json()) as {
+        sub: string;
+        email: string;
+        name?: string;
+        given_name?: string;
+        family_name?: string;
+        picture?: string;
+      };
+
+      if (!userInfo.email) {
+        throw new AppError('Google account does not have a verified email.', 400);
+      }
+
+      const profile: OAuthUserProfile = {
+        provider: 'google',
+        providerAccountId: userInfo.sub,
+        email: userInfo.email.toLowerCase().trim(),
+        firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || 'GoogleUser',
+        lastName: userInfo.family_name || userInfo.name?.split(' ').slice(1).join(' ') || '',
+        image: userInfo.picture || null,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || null,
+        idToken: tokens.id_token || null,
+      };
+
+      this.callbackResultCache.set(cacheKey, { profile, expiresAt: Date.now() + 60_000 });
+      return profile;
+    })().finally(() => {
+      this.callbackPromiseMap.delete(cacheKey);
     });
 
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text();
-      this.logger.error(`Google token exchange failed: ${errText}`);
-      throw new AppError('Failed to exchange Google authorization code.', 400);
-    }
-
-    const tokens = (await tokenRes.json()) as {
-      access_token: string;
-      id_token?: string;
-      refresh_token?: string;
-    };
-
-    const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
-
-    if (!userRes.ok) {
-      throw new AppError('Failed to fetch user info from Google.', 400);
-    }
-
-    const userInfo = (await userRes.json()) as {
-      sub: string;
-      email: string;
-      name?: string;
-      given_name?: string;
-      family_name?: string;
-      picture?: string;
-    };
-
-    if (!userInfo.email) {
-      throw new AppError('Google account does not have a verified email.', 400);
-    }
-
-    return {
-      provider: 'google',
-      providerAccountId: userInfo.sub,
-      email: userInfo.email.toLowerCase().trim(),
-      firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || 'GoogleUser',
-      lastName: userInfo.family_name || userInfo.name?.split(' ').slice(1).join(' ') || '',
-      image: userInfo.picture || null,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || null,
-      idToken: tokens.id_token || null,
-    };
+    this.callbackPromiseMap.set(cacheKey, promise);
+    return promise;
   }
 
   // ==========================================
@@ -180,63 +203,84 @@ export class OAuthService {
   }
 
   async handleFacebookCallback(code: string): Promise<OAuthUserProfile> {
-    const appId = env.FACEBOOK_APP_ID || env.FACEBOOK_CLIENT_ID;
-    const appSecret = env.FACEBOOK_APP_SECRET || env.FACEBOOK_CLIENT_SECRET;
-    const redirectUri = `${env.APP_BASE_URL}/api/auth/facebook/callback`;
+    const cacheKey = `facebook:${code}`;
+    const cached = this.callbackResultCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.profile;
+    }
 
-    const params = new URLSearchParams({
-      client_id: appId!,
-      client_secret: appSecret!,
-      redirect_uri: redirectUri,
-      code,
-    });
-    const tokenUrl = `https://graph.facebook.com/v20.0/oauth/access_token?${params.toString()}`;
-    const tokenRes = await fetch(tokenUrl);
+    const existingPromise = this.callbackPromiseMap.get(cacheKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
 
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text();
-      let fbMessage = '';
-      try {
-        const parsed = JSON.parse(errText);
-        fbMessage = parsed?.error?.message || '';
-      } catch {
-        // ignore json parse error
+    const promise = (async () => {
+      const appId = env.FACEBOOK_APP_ID || env.FACEBOOK_CLIENT_ID;
+      const appSecret = env.FACEBOOK_APP_SECRET || env.FACEBOOK_CLIENT_SECRET;
+      const redirectUri = `${env.APP_BASE_URL}/api/auth/facebook/callback`;
+
+      const params = new URLSearchParams({
+        client_id: appId!,
+        client_secret: appSecret!,
+        redirect_uri: redirectUri,
+        code,
+      });
+      const tokenUrl = `https://graph.facebook.com/v20.0/oauth/access_token?${params.toString()}`;
+      const tokenRes = await fetch(tokenUrl);
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text();
+        let fbMessage = '';
+        try {
+          const parsed = JSON.parse(errText);
+          fbMessage = parsed?.error?.message || '';
+        } catch {
+          // ignore json parse error
+        }
+        this.logger.error(`Facebook token exchange failed: ${errText}`);
+        throw new AppError(fbMessage || 'Failed to exchange Facebook authorization code.', 400);
       }
-      this.logger.error(`Facebook token exchange failed: ${errText}`);
-      throw new AppError(fbMessage || 'Failed to exchange Facebook authorization code.', 400);
-    }
 
-    const tokenData = (await tokenRes.json()) as { access_token: string };
+      const tokenData = (await tokenRes.json()) as { access_token: string };
 
-    const profileUrl = `https://graph.facebook.com/me?fields=id,name,first_name,last_name,email,picture.type(large)&access_token=${tokenData.access_token}`;
-    const profileRes = await fetch(profileUrl);
+      const profileUrl = `https://graph.facebook.com/me?fields=id,name,first_name,last_name,email,picture.type(large)&access_token=${tokenData.access_token}`;
+      const profileRes = await fetch(profileUrl);
 
-    if (!profileRes.ok) {
-      throw new AppError('Failed to fetch user profile from Facebook.', 400);
-    }
+      if (!profileRes.ok) {
+        throw new AppError('Failed to fetch user profile from Facebook.', 400);
+      }
 
-    const fbProfile = (await profileRes.json()) as {
-      id: string;
-      name?: string;
-      first_name?: string;
-      last_name?: string;
-      email?: string;
-      picture?: { data?: { url?: string } };
-    };
+      const fbProfile = (await profileRes.json()) as {
+        id: string;
+        name?: string;
+        first_name?: string;
+        last_name?: string;
+        email?: string;
+        picture?: { data?: { url?: string } };
+      };
 
-    const email = fbProfile.email
-      ? fbProfile.email.toLowerCase().trim()
-      : `fb_${fbProfile.id}@facebook.user.local`;
+      const email = fbProfile.email
+        ? fbProfile.email.toLowerCase().trim()
+        : `fb_${fbProfile.id}@facebook.user.local`;
 
-    return {
-      provider: 'facebook',
-      providerAccountId: fbProfile.id,
-      email,
-      firstName: fbProfile.first_name || fbProfile.name?.split(' ')[0] || 'FacebookUser',
-      lastName: fbProfile.last_name || fbProfile.name?.split(' ').slice(1).join(' ') || '',
-      image: fbProfile.picture?.data?.url || null,
-      accessToken: tokenData.access_token,
-    };
+      const profile: OAuthUserProfile = {
+        provider: 'facebook',
+        providerAccountId: fbProfile.id,
+        email,
+        firstName: fbProfile.first_name || fbProfile.name?.split(' ')[0] || 'FacebookUser',
+        lastName: fbProfile.last_name || fbProfile.name?.split(' ').slice(1).join(' ') || '',
+        image: fbProfile.picture?.data?.url || null,
+        accessToken: tokenData.access_token,
+      };
+
+      this.callbackResultCache.set(cacheKey, { profile, expiresAt: Date.now() + 60_000 });
+      return profile;
+    })().finally(() => {
+      this.callbackPromiseMap.delete(cacheKey);
+    });
+
+    this.callbackPromiseMap.set(cacheKey, promise);
+    return promise;
   }
 
   // ==========================================
