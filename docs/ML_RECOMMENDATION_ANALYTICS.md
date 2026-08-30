@@ -501,7 +501,7 @@ curl -H "Authorization: Bearer <token>" \
 ### Frontend cannot load ML Analytics
 
 - Confirm backend exposes new routes (rebuild backend image).
-- Check `VITE_API_URL` (or equivalent) points to backend `http://localhost:5000`.
+- Check `VITE_API_BASE_URL` (or equivalent) points to backend `http://localhost:5000/api`.
 - Admin role required.
 
 ### Redis `ECONNREFUSED` on host dev

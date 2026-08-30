@@ -184,13 +184,26 @@ export class OAuthService {
     const appSecret = env.FACEBOOK_APP_SECRET || env.FACEBOOK_CLIENT_SECRET;
     const redirectUri = `${env.APP_BASE_URL}/api/auth/facebook/callback`;
 
-    const tokenUrl = `https://graph.facebook.com/v20.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(redirectUri)}&code=${code}`;
+    const params = new URLSearchParams({
+      client_id: appId!,
+      client_secret: appSecret!,
+      redirect_uri: redirectUri,
+      code,
+    });
+    const tokenUrl = `https://graph.facebook.com/v20.0/oauth/access_token?${params.toString()}`;
     const tokenRes = await fetch(tokenUrl);
 
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
+      let fbMessage = '';
+      try {
+        const parsed = JSON.parse(errText);
+        fbMessage = parsed?.error?.message || '';
+      } catch {
+        // ignore json parse error
+      }
       this.logger.error(`Facebook token exchange failed: ${errText}`);
-      throw new AppError('Failed to exchange Facebook authorization code.', 400);
+      throw new AppError(fbMessage || 'Failed to exchange Facebook authorization code.', 400);
     }
 
     const tokenData = (await tokenRes.json()) as { access_token: string };
