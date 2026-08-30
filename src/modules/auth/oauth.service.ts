@@ -434,7 +434,35 @@ export class OAuthService {
     return false;
   }
 
-  handleTelegramCallback(query: Record<string, any>): OAuthUserProfile {
+  parseTelegramPayload(raw: Record<string, any>): Record<string, any> {
+    let payload = { ...raw };
+    if (raw.tgAuthResult) {
+      try {
+        const decoded = JSON.parse(Buffer.from(raw.tgAuthResult, 'base64url').toString('utf-8'));
+        payload = { ...payload, ...decoded };
+      } catch {
+        try {
+          const decoded = JSON.parse(Buffer.from(raw.tgAuthResult, 'base64').toString('utf-8'));
+          payload = { ...payload, ...decoded };
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (typeof raw.user === 'string') {
+      try {
+        const parsedUser = JSON.parse(raw.user);
+        payload = { ...payload, ...parsedUser };
+      } catch {
+        // ignore
+      }
+    }
+    return payload;
+  }
+
+  handleTelegramCallback(rawQuery: Record<string, any>): OAuthUserProfile {
+    const query = this.parseTelegramPayload(rawQuery);
+
     if (!this.verifyTelegramAuth(query)) {
       throw new AppError('Telegram authentication signature verification failed.', 400);
     }
