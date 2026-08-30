@@ -448,12 +448,35 @@ export class OAuthService {
   parseTelegramPayload(raw: Record<string, any>): Record<string, any> {
     let payload = { ...raw };
     if (raw.tgAuthResult) {
+      let parsed = false;
       try {
         const decoded = JSON.parse(Buffer.from(raw.tgAuthResult, 'base64url').toString('utf-8'));
         payload = { ...payload, ...decoded };
+        parsed = true;
       } catch {
+        // try standard base64
+      }
+      if (!parsed) {
         try {
           const decoded = JSON.parse(Buffer.from(raw.tgAuthResult, 'base64').toString('utf-8'));
+          payload = { ...payload, ...decoded };
+          parsed = true;
+        } catch {
+          // try direct string or URI component
+        }
+      }
+      if (!parsed) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(raw.tgAuthResult));
+          payload = { ...payload, ...decoded };
+          parsed = true;
+        } catch {
+          // try raw JSON parse
+        }
+      }
+      if (!parsed && typeof raw.tgAuthResult === 'string' && raw.tgAuthResult.startsWith('{')) {
+        try {
+          const decoded = JSON.parse(raw.tgAuthResult);
           payload = { ...payload, ...decoded };
         } catch {
           // ignore

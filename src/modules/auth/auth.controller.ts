@@ -293,6 +293,49 @@ export class AuthController {
         this.oauthService.getFrontendCallbackUrl({ error, provider: 'telegram' }),
       );
     }
+
+    // When Telegram redirects from oauth.telegram.org/auth, the authentication payload is placed in the URL hash fragment (#tgAuthResult=...)
+    // Browsers never send hash fragments to HTTP servers.
+    // If neither query.hash nor query.tgAuthResult nor query.id is present in the query string,
+    // we serve a client-side bridge script to read window.location.hash and re-submit as query params.
+    if (!query.hash && !query.tgAuthResult && !query.id) {
+      const fallbackUrl = this.oauthService.getFrontendCallbackUrl({
+        error: 'No Telegram authentication data received',
+        provider: 'telegram',
+      });
+      return res.type('html').send(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Verifying Telegram Login...</title></head>
+<body style="font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f8fafc;color:#1e293b;">
+  <div style="text-align:center;">
+    <p style="font-size:16px;font-weight:500;">Completing Telegram sign-in...</p>
+  </div>
+  <script>
+    (function() {
+      try {
+        var hash = window.location.hash ? window.location.hash.substring(1) : '';
+        if (hash) {
+          var hashParams = new URLSearchParams(hash);
+          var searchParams = new URLSearchParams(window.location.search);
+          for (var pair of hashParams.entries()) {
+            searchParams.set(pair[0], pair[1]);
+          }
+          window.location.replace(window.location.pathname + '?' + searchParams.toString());
+        } else {
+          var searchParams = new URLSearchParams(window.location.search);
+          if (!searchParams.get('hash') && !searchParams.get('tgAuthResult') && !searchParams.get('id')) {
+            window.location.replace('${fallbackUrl}');
+          }
+        }
+      } catch(err) {
+        window.location.replace('${fallbackUrl}');
+      }
+    })();
+  </script>
+</body>
+</html>`);
+    }
+
     try {
       const state = this.oauthService.decodeState(stateStr);
       const profile = this.oauthService.handleTelegramCallback(query);
