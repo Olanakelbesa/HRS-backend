@@ -397,39 +397,50 @@ export class OAuthService {
       return false;
     }
 
-    // Telegram only signs these exact fields
-    const TELEGRAM_SIGNED_KEYS = ['auth_date', 'first_name', 'id', 'last_name', 'photo_url', 'username'];
-    const dataCheckArr: string[] = [];
+    // Keys added by frontend / backend wrapper that should never be in Telegram signature
+    const EXCLUDED_KEYS = new Set(['hash', 'state', 'code', 'tgAuthResult', 'provider', 'redirectUrl', 'role']);
+
+    // Permutation 1: All received Telegram fields except exclusions
+    const allFieldsArr: string[] = [];
     for (const key of Object.keys(data).sort()) {
-      if (
-        TELEGRAM_SIGNED_KEYS.includes(key) &&
-        data[key] !== undefined &&
-        data[key] !== null &&
-        data[key] !== ''
-      ) {
-        dataCheckArr.push(`${key}=${data[key]}`);
+      if (!EXCLUDED_KEYS.has(key) && data[key] !== undefined && data[key] !== null && data[key] !== '') {
+        allFieldsArr.push(`${key}=${data[key]}`);
       }
     }
-    const dataCheckString = dataCheckArr.join('\n');
+    const allFieldsString = allFieldsArr.join('\n');
 
-    // 1. Standard Telegram Login Widget secret: SHA256(bot_token)
-    const widgetSecret = crypto.createHash('sha256').update(token).digest();
-    const widgetHmac = crypto.createHmac('sha256', widgetSecret).update(dataCheckString).digest('hex');
-
-    if (widgetHmac.toLowerCase() === hash.toLowerCase()) {
-      return true;
+    // Permutation 2: Strict known Telegram widget fields
+    const KNOWN_KEYS = ['auth_date', 'first_name', 'id', 'last_name', 'photo_url', 'username'];
+    const knownFieldsArr: string[] = [];
+    for (const key of KNOWN_KEYS.sort()) {
+      if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+        knownFieldsArr.push(`${key}=${data[key]}`);
+      }
     }
+    const knownFieldsString = knownFieldsArr.join('\n');
 
-    // 2. Fallback for Telegram WebApp secret: HMAC_SHA256("WebAppData", bot_token)
+    const candidateStrings = [allFieldsString, knownFieldsString];
+
+    // Secret keys:
+    // 1. Standard Telegram Login Widget: SHA256(bot_token)
+    const widgetSecret = crypto.createHash('sha256').update(token).digest();
+    // 2. Telegram WebApp: HMAC_SHA256("WebAppData", bot_token)
     const webAppSecret = crypto.createHmac('sha256', 'WebAppData').update(token).digest();
-    const webAppHmac = crypto.createHmac('sha256', webAppSecret).update(dataCheckString).digest('hex');
 
-    if (webAppHmac.toLowerCase() === hash.toLowerCase()) {
-      return true;
+    const targetHash = hash.toLowerCase();
+
+    for (const checkString of candidateStrings) {
+      if (!checkString) continue;
+
+      const widgetHmac = crypto.createHmac('sha256', widgetSecret).update(checkString).digest('hex').toLowerCase();
+      if (widgetHmac === targetHash) return true;
+
+      const webAppHmac = crypto.createHmac('sha256', webAppSecret).update(checkString).digest('hex').toLowerCase();
+      if (webAppHmac === targetHash) return true;
     }
 
     this.logger.warn(
-      `Telegram signature mismatch. Computed: ${widgetHmac}, Received: ${hash}, DataCheckString:\n${dataCheckString}`,
+      `Telegram signature mismatch for hash: ${hash}. Evaluated strings:\n--- Permutation 1 ---\n${allFieldsString}\n--- Permutation 2 ---\n${knownFieldsString}`,
     );
     return false;
   }
