@@ -2,10 +2,13 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { AppError } from '../core/AppError';
 
+import crypto from 'crypto';
+
 export interface TokenPayload {
   sub: string; // userId
   role: string;
   type: 'access' | 'refresh';
+  jti?: string;
 }
 
 export interface DecodedToken {
@@ -21,6 +24,7 @@ export function generateAccessToken(userId: string, role: string): string {
     sub: userId,
     role,
     type: 'access',
+    jti: crypto.randomUUID(),
   };
 
   return jwt.sign(payload, env.JWT_SECRET, {
@@ -36,6 +40,7 @@ export function generateRefreshToken(userId: string): string {
     sub: userId,
     role: '', // Refresh tokens don't need role
     type: 'refresh',
+    jti: crypto.randomUUID(),
   };
 
   return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
