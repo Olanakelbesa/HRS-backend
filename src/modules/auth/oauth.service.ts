@@ -371,17 +371,25 @@ export class OAuthService {
       return `${env.APP_BASE_URL}/api/auth/dev-demo?state=${state}`;
     }
 
-    const botId = env.TELEGRAM_BOT_TOKEN!.split(':')[0];
-    const callbackUrl = `${env.APP_BASE_URL}/api/auth/telegram/callback`;
+    const token = env.TELEGRAM_BOT_TOKEN!.trim().replace(/^["']|["']$/g, '');
+    const botId = token.split(':')[0];
+    const callbackUrl = `${env.APP_BASE_URL}/api/auth/telegram/callback?state=${encodeURIComponent(state)}`;
 
     return `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(env.APP_BASE_URL)}&return_to=${encodeURIComponent(callbackUrl)}&request_access=write`;
   }
 
   verifyTelegramAuth(data: Record<string, any>): boolean {
-    if (!env.TELEGRAM_BOT_TOKEN) return false;
+    if (!env.TELEGRAM_BOT_TOKEN) {
+      this.logger.error('TELEGRAM_BOT_TOKEN is not configured');
+      return false;
+    }
 
+    const token = env.TELEGRAM_BOT_TOKEN.trim().replace(/^["']|["']$/g, '');
     const hash = data.hash ? String(data.hash) : '';
-    if (!hash) return false;
+    if (!hash) {
+      this.logger.warn('Telegram auth data missing hash');
+      return false;
+    }
 
     const authDate = Number(data.auth_date);
     if (!authDate || (Date.now() / 1000 - authDate) > 86400) {
@@ -389,18 +397,31 @@ export class OAuthService {
       return false;
     }
 
+    // Telegram only signs these exact fields
+    const TELEGRAM_SIGNED_KEYS = ['auth_date', 'first_name', 'id', 'last_name', 'photo_url', 'username'];
     const dataCheckArr: string[] = [];
     for (const key of Object.keys(data).sort()) {
-      if (key !== 'hash' && key !== 'state' && data[key] !== undefined && data[key] !== null) {
+      if (
+        TELEGRAM_SIGNED_KEYS.includes(key) &&
+        data[key] !== undefined &&
+        data[key] !== null &&
+        data[key] !== ''
+      ) {
         dataCheckArr.push(`${key}=${data[key]}`);
       }
     }
     const dataCheckString = dataCheckArr.join('\n');
 
-    const secretKey = crypto.createHash('sha256').update(env.TELEGRAM_BOT_TOKEN).digest();
+    const secretKey = crypto.createHash('sha256').update(token).digest();
     const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-    return hmac === hash;
+    const isValid = hmac.toLowerCase() === hash.toLowerCase();
+    if (!isValid) {
+      this.logger.warn(
+        `Telegram signature mismatch. Computed: ${hmac}, Received: ${hash}, DataCheckString:\n${dataCheckString}`,
+      );
+    }
+    return isValid;
   }
 
   handleTelegramCallback(query: Record<string, any>): OAuthUserProfile {
