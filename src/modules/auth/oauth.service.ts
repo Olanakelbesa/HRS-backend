@@ -412,16 +412,26 @@ export class OAuthService {
     }
     const dataCheckString = dataCheckArr.join('\n');
 
-    const secretKey = crypto.createHash('sha256').update(token).digest();
-    const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+    // 1. Standard Telegram Login Widget secret: SHA256(bot_token)
+    const widgetSecret = crypto.createHash('sha256').update(token).digest();
+    const widgetHmac = crypto.createHmac('sha256', widgetSecret).update(dataCheckString).digest('hex');
 
-    const isValid = hmac.toLowerCase() === hash.toLowerCase();
-    if (!isValid) {
-      this.logger.warn(
-        `Telegram signature mismatch. Computed: ${hmac}, Received: ${hash}, DataCheckString:\n${dataCheckString}`,
-      );
+    if (widgetHmac.toLowerCase() === hash.toLowerCase()) {
+      return true;
     }
-    return isValid;
+
+    // 2. Fallback for Telegram WebApp secret: HMAC_SHA256("WebAppData", bot_token)
+    const webAppSecret = crypto.createHmac('sha256', 'WebAppData').update(token).digest();
+    const webAppHmac = crypto.createHmac('sha256', webAppSecret).update(dataCheckString).digest('hex');
+
+    if (webAppHmac.toLowerCase() === hash.toLowerCase()) {
+      return true;
+    }
+
+    this.logger.warn(
+      `Telegram signature mismatch. Computed: ${widgetHmac}, Received: ${hash}, DataCheckString:\n${dataCheckString}`,
+    );
+    return false;
   }
 
   handleTelegramCallback(query: Record<string, any>): OAuthUserProfile {
